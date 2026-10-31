@@ -1,3 +1,4 @@
+import { assertNoBuiltInRecommendation } from "../domain/item-input";
 import type { PoolClient } from "pg";
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
@@ -14,15 +15,12 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
-  assertRecommendationsAllowed,
-  assertRecommenderInGroup,
   authorRequired,
   createCatalogItem,
   upsertCatalogItem,
 } from "../catalog";
 import { ensureChallengeLibraries, resolveItemLibrary } from "./libraries";
 import { midnightInTimeZone } from "../domain/shared";
-import { resolveItemRecommender } from "./recommender";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { deleteChallengeItemsHard } from "../hard-delete";
 import {
@@ -154,9 +152,9 @@ export async function addChallengeItem(
   challengeId: string,
   body: Record<string, unknown>,
 ) {
+  assertNoBuiltInRecommendation(body);
   const title = stringValue(body, "title", { max: 200 })!;
   const author = stringValue(body, "author", { max: 200, optional: true }) ?? null;
-  const originNote = stringValue(body, "originNote", { max: 200, optional: true }) ?? null;
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
@@ -170,7 +168,7 @@ export async function addChallengeItem(
     }
     const position = integerValue(body.position, 0, 0, 10_000);
     const checkpointId = await resolveCheckpointId(client, challengeId, body.checkpointId);
-    const recommender = await resolveItemRecommender(client, access.challenge.group_id, { ...body, originNote });
+
     const id = publicId();
     let catalogItemId: string;
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
@@ -187,10 +185,10 @@ export async function addChallengeItem(
     }
     await client.query(
       `INSERT INTO challenge_items
-        (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, checkpoint_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,NULL,$3,$4,$10,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
-      [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
-        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, position, recommender.externalId],
+        (id, challenge_id, entry_type_id, catalog_item_id, checkpoint_id, semantic_key, title, position, metadata, created_at, updated_at)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
+      [id, challengeId, catalogItemId, checkpointId,
+        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, position],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
@@ -240,15 +238,6 @@ export async function saveChallengeItems(
     const base = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_items WHERE challenge_id=$1 AND archived_at IS NULL",
       [challengeId]);
-    const memberIds = new Set(
-      (await client.query<{ user_id: string }>(
-        `SELECT gm.user_id
-           FROM group_members gm JOIN groups g ON g.id = gm.group_id
-          WHERE gm.group_id=$1 AND gm.removed_at IS NULL
-            AND (g.kind = 'standard' OR gm.user_id = g.owner_user_id)`,
-        [access.challenge.group_id])
-      ).rows.map((row) => row.user_id),
-    );
     const validCheckpointIds = new Set(
       (await client.query<{ id: string }>(
         "SELECT id FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL",
@@ -258,6 +247,7 @@ export async function saveChallengeItems(
     const ids: string[] = [];
     for (let index = 0; index < requestedItems.length; index += 1) {
       const item = asRecord(requestedItems[index]);
+      assertNoBuiltInRecommendation(item);
       const title = typeof item.title === "string" ? item.title.trim() : "";
       if (!title) throw new ApiError(400, "invalid_item", "Item sem título.");
       const author = typeof item.author === "string" ? item.author.trim() : "";
@@ -289,7 +279,7 @@ export async function saveChallengeItems(
       }
       // A member, a saved outside name, or a free-text note — never a made-up
       // participant, never more than one. All may be absent.
-      const recommender = await resolveItemRecommender(client, access.challenge.group_id, item, memberIds);
+
       let checkpointId: string | null = null;
       if (typeof item.checkpointId === "string" && item.checkpointId) {
         if (!validCheckpointIds.has(item.checkpointId)) {
@@ -300,11 +290,11 @@ export async function saveChallengeItems(
 
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,recommended_by_external_id,checkpoint_id,origin_note,semantic_key,title,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,NULL,$3,$4,$10,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
-        [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
+          (id,challenge_id,entry_type_id,catalog_item_id,checkpoint_id,semantic_key,title,position,metadata,created_at,updated_at)
+         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
+        [id, challengeId, catalogItemId, checkpointId,
           await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
-          position, recommender.externalId],
+          position],
       );
       ids.push(id);
     }
@@ -320,6 +310,7 @@ export async function updateChallengeItem(
   itemId: string,
   body: Record<string, unknown>,
 ) {
+  assertNoBuiltInRecommendation(body);
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) {
@@ -367,13 +358,12 @@ export async function updateChallengeItem(
     }
 
     const current = await oneOrNull<{
-      title: string; recommended_by_user_id: string | null;
-      recommended_by_external_id: string | null;
-      catalog_item_id: string | null; origin_note: string | null; checkpoint_id: string | null;
+      title: string;
+      catalog_item_id: string | null; checkpoint_id: string | null;
       opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     }>(
       client,
-      `SELECT title, recommended_by_user_id, recommended_by_external_id, catalog_item_id, origin_note, checkpoint_id,
+      `SELECT title, catalog_item_id, checkpoint_id,
               opens_at, due_at, schedule_precision
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
@@ -405,49 +395,16 @@ export async function updateChallengeItem(
         ))?.kind ?? "")) {
         throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
       }
-      // A member, a saved external name, or a free-text note — never more
-      // than one (Phase 6: `challenge_items_recommender_exclusive_check`).
-      const touchesRecommender = Object.hasOwn(body, "recommendedByUserId")
-        || Object.hasOwn(body, "recommendedByExternalId")
-        || Object.hasOwn(body, "originNote");
-      let recommendedBy = current.recommended_by_user_id;
-      let recommendedByExternal = current.recommended_by_external_id;
-      let originNote = current.origin_note;
-      if (touchesRecommender) {
-        const wantedUser = typeof body.recommendedByUserId === "string" ? body.recommendedByUserId : "";
-        const wantedExternal = typeof body.recommendedByExternalId === "string" ? body.recommendedByExternalId : "";
-        const wantedNote = typeof body.originNote === "string" ? body.originNote.trim() : "";
-        if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
-          throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota (não mais de uma).");
-        }
-        if (wantedUser || wantedExternal || wantedNote) await assertRecommendationsAllowed(client, access.challenge.group_id);
-        recommendedBy = null;
-        recommendedByExternal = null;
-        originNote = null;
-        if (wantedUser) {
-          const member = await oneOrNull<{ user_id: string }>(client,
-            "SELECT user_id FROM group_members WHERE group_id=$1 AND user_id=$2 AND removed_at IS NULL",
-            [access.challenge.group_id, wantedUser]);
-          if (!member) throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
-          recommendedBy = wantedUser;
-        } else if (wantedExternal) {
-          await assertRecommenderInGroup(client, wantedExternal, access.challenge.group_id);
-          recommendedByExternal = wantedExternal;
-        } else if (wantedNote) {
-          originNote = stringValue({ originNote: wantedNote }, "originNote", { max: 200, optional: true }) ?? null;
-        }
-      }
       const schedule = resolveItemSchedule(body, access.challenge.time_zone, {
         opensAt: current.opens_at, dueAt: current.due_at, schedulePrecision: current.schedule_precision,
       });
       await client.query(
         `UPDATE challenge_items
-            SET title = $3, recommended_by_user_id = $4,
-                origin_note = $5, checkpoint_id = $6, opens_at = $7, due_at = $8,
-                schedule_precision = $9, recommended_by_external_id = $10, updated_at = now()
+            SET title = $3, checkpoint_id = $4, opens_at = $5, due_at = $6,
+                schedule_precision = $7, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
-        [itemId, challengeId, title, recommendedBy, originNote, checkpointId,
-          schedule.opensAt, schedule.dueAt, schedule.schedulePrecision, recommendedByExternal],
+        [itemId, challengeId, title, checkpointId,
+          schedule.opensAt, schedule.dueAt, schedule.schedulePrecision],
       );
       // Autor, ano, gênero principal, páginas e duração vivem no item do acervo
       // compartilhado, não no item do desafio — atualizá-los aqui é o que deixa
@@ -474,13 +431,11 @@ export async function updateChallengeItem(
         { title: current.title },
         {
           title,
-          ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
           ...(schedule.touched ? { opensAt: schedule.opensAt, dueAt: schedule.dueAt, schedulePrecision: schedule.schedulePrecision } : {}),
         },
       );
       return {
         id: itemId, title,
-        ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
         opensAt: schedule.opensAt?.toISOString() ?? null,
         dueAt: schedule.dueAt?.toISOString() ?? null,
         schedulePrecision: schedule.schedulePrecision,

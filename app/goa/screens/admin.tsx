@@ -677,7 +677,6 @@ export function ItemEditorDialog({
   /** The library this item's catalogue entry belongs to — decides which properties it can hold. */
   library: Pick<ChallengeLibraryRef, "id" | "kind"> | null;
   scope: CatalogScope;
-  recommendationsEnabled: boolean;
   onCancel: () => void;
   /** Takes the item out (with its entries, to the bin); `entryCount` warns how many go with it. */
   onRemove?: () => Promise<void>;
@@ -694,7 +693,7 @@ export function ItemEditorDialog({
   }
   return (
     <SharedItemEditorDialog
-      item={{ ...item.catalogItem, title: item.title, recommendedBy: item.recommendedBy, originNote: item.originNote }}
+      item={{ ...item.catalogItem, title: item.title }}
       library={item.catalogItem ? library : null}
       maxTitleLength={200}
       requireAuthor

@@ -10,7 +10,7 @@ export type MetricOperation =
   | "spread"
   | "consensus"
   | "surprise"
-  | "indicator_bias";
+ ;
 
 export interface MetricRow {
   id: string;

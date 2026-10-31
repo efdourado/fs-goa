@@ -22,7 +22,6 @@ export interface DocPerson {
   color: DocColor;
   isMe: boolean;
   entryCount: number;
-  recommendedCount: number;
   ratingAvg: number | null;
 }
 
@@ -69,7 +68,6 @@ export interface DocItem {
   subtitle: string | null;
   meta: string[];
   year: number | null;
-  recommender: { name: string; personKey: string | null } | null;
   note: string | null;
   chapter: number;
   entries: DocEntry[];
@@ -155,7 +153,6 @@ export interface ExportModel {
   sessionMode: boolean;
   ratingMax: number;
   hasRatings: boolean;
-  hasRecommenders: boolean;
   champion: DocItem | null;
   disappointment: DocItem | null;
   overallAvg: number | null;
@@ -242,7 +239,7 @@ export function buildExportModel(input: {
     if (people.has(key)) return;
     people.set(key, {
       key, name, color: PERSON_COLORS[people.size % PERSON_COLORS.length], isMe: key === userId,
-      entryCount: 0, recommendedCount: 0, ratingAvg: null,
+      entryCount: 0, ratingAvg: null,
     });
   };
   for (const participant of challenge.participants) {
@@ -355,9 +352,6 @@ export function buildExportModel(input: {
       .sort((a, b) => personIndex(a.personKey) - personIndex(b.personKey));
 
     const catalog = item.catalogItem;
-    const recommender = item.recommendedBy
-      ? { name: item.recommendedBy.name, personKey: item.recommendedBy.kind === "member" && people.has(item.recommendedBy.id) ? item.recommendedBy.id : null }
-      : null;
     return {
       id: item.id,
       number: index + 1,
@@ -369,8 +363,7 @@ export function buildExportModel(input: {
         catalog?.mainGenre ?? null,
       ].filter((part): part is string => Boolean(part)),
       year: catalog?.year ?? null,
-      recommender,
-      note: item.originNote?.trim() || null,
+      note: null,
       chapter: chapterOf.get(item.id) ?? 0,
       entries: rows,
       progress,
@@ -451,15 +444,11 @@ export function buildExportModel(input: {
     const person = people.get(doc.personKey);
     if (person) person.entryCount += 1;
   }
-  for (const item of items) {
-    const key = item.recommender?.personKey;
-    if (key && people.has(key)) people.get(key)!.recommendedCount += 1;
-  }
   for (const person of people.values()) {
     person.ratingAvg = mean(items.flatMap((item) => item.ratings.filter((rating) => rating.personKey === person.key).map((rating) => rating.value)));
   }
   // Nobody who never wrote a thing (and no empty "group") crowds the cover.
-  const activePeople = [...people.values()].filter((person) => person.entryCount > 0 || person.recommendedCount > 0 || (person.key !== SHARED_PERSON && people.size <= 6));
+  const activePeople = [...people.values()].filter((person) => person.entryCount > 0 || (person.key !== SHARED_PERSON && people.size <= 6));
 
   const rated = items.filter((item) => item.ratingAvg !== null);
   const byRating = rated.slice().sort((a, b) => (b.ratingAvg ?? 0) - (a.ratingAvg ?? 0) || a.number - b.number);
@@ -494,7 +483,6 @@ export function buildExportModel(input: {
     sessionMode,
     ratingMax,
     hasRatings: rated.length > 0,
-    hasRecommenders: items.some((item) => item.recommender),
     champion,
     disappointment,
     overallAvg: mean(items.flatMap((item) => item.ratings.map((rating) => rating.value))),

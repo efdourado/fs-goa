@@ -5,7 +5,7 @@ import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import { writeAudit } from "./domain/audit";
 import { ensurePersonalWorkspace } from "./domain/challenges";
-import { hideRecommenderOnNewLibrary, publicId, semanticKey } from "./domain/shared";
+import { publicId, semanticKey } from "./domain/shared";
 import type { CatalogKind } from "./catalog";
 
 // Duplicated (not imported) from `catalog.ts` on purpose: it keeps this module
@@ -53,14 +53,12 @@ async function ensureCatalogLibrary(
   kind: string,
   actorUserId: string,
 ): Promise<void> {
-  const created = await client.query<{ id: string }>(
+  await client.query<{ id: string }>(
     `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (group_id, kind) DO NOTHING RETURNING id`,
     [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
   );
-  // Made just now (not already there): it starts without "who recommended it".
-  if (created.rows[0]) await hideRecommenderOnNewLibrary(client, created.rows[0].id);
 }
 
 /**

@@ -125,7 +125,6 @@
       "bayesian_average": "Nota ajustada",
       "spread": "Polarización",
       "surprise": "Sorpresa × decepción",
-      "indicator_bias": "Sesgo del recomendador",
       "median": "Mediana",
       "consensus": "Consenso"
     },
@@ -430,7 +429,6 @@
     "pages": "{count} páginas",
     "byAuthor": "por {name}",
     "historyTitle": "Historial",
-    "recommendedBy": "recomendado por {name}",
     "noRounds": "Este ítem aún no ha entrado en ninguna ronda visible.",
     "status": {
       "draft": "borrador",
@@ -445,8 +443,6 @@
     "specGenre": "Género",
     "specRuntime": "Duración",
     "specPages": "Páginas",
-    "specRecommendedBy": "Recomendado por",
-    "specOrigin": "Origen",
     "ratingTitle": "Nota del grupo",
     "outOfFive": "de 5",
     "ratingSummary": "{ratings, plural, one {# valoración} other {# valoraciones}} en {rounds, plural, one {# desafío} other {# desafíos}}.",
@@ -468,12 +464,10 @@
     },
     "noGenre": "Sin género",
     "addItem": "Añadir ítem",
-    "recommendedBy": "recomendado por {name}",
     "origin": "vía {text}",
     "averageRating": "media {value}",
     "reusedNotice": "Ya estaba en la colección.",
     "addedNotice": "Añadido.",
-    "recommenderNone": "Sin recomendación",
     "noMatches": "Nada con ese filtro",
     "notInChallenge": "en ningún desafío",
     "select": "Seleccionar",
@@ -508,7 +502,6 @@
     "showOnly": "Mostrar solo",
     "notRatedFilter": "Aún sin nota",
     "unusedOnly": "En ningún desafío",
-    "recommenderHeading": "Recomendado por",
     "chooseLibrary": "Elegir una biblioteca",
     "removeFilter": "Quitar el filtro: {name}",
     "hideIndex": "Ocultar filtros",
@@ -527,7 +520,6 @@
     "edit": "editar",
     "untitled": "Sin título",
     "needsAttention": "Falta algo, ábrelo para corregirlo",
-    "pickedBy": "recomendado por {name}",
     "pagesCount": "{count} páginas",
     "doneEditing": "Listo",
     "titleLabel": "Título de la película",
@@ -537,7 +529,6 @@
     "authorPlaceholder": "Ej.: Ursula K. Le Guin",
     "authorRequired": "Indica el autor de cada libro.",
     "byAuthor": "por {name}",
-    "recommendedBy": "Recomendado por",
     "hideDetails": "Mostrar menos",
     "remove": "quitar",
     "year": "Año",
@@ -1023,7 +1014,6 @@
     },
     "back": "Volver",
     "manage": "Gestionar",
-    "recommendedBy": "Recomendado por {name}",
     "byAuthor": "por {name}",
     "groupCompletion": "{done} de {total} completados",
     "groupLastRegister": "{days, plural, =0 {Último registro hoy} =1 {Último registro ayer} other {Último registro hace # días}}",
@@ -1572,7 +1562,6 @@
       "pageCount": "Páginas",
       "runtimeMinutes": "Duración (min)",
       "mainGenre": "Género principal",
-      "recommendedBy": "Recomendado por",
       "origin": "Origen"
     },
     "badgeInvalid": "inválido",
@@ -1600,7 +1589,6 @@
       "bottomItems": "Notas más bajas",
       "surprise": "Mayor sorpresa",
       "disappointment": "Mayor decepción",
-      "indication": "Recomendaciones vs. grupo",
       "none": "Todavía no hay datos suficientes."
     },
     "affinity": {
@@ -1648,8 +1636,7 @@
       "bayesian_average": "Una media justa para clasificar. Un elemento con pocas notas se acerca a la media general de toda la lista, así que un solo voto entusiasta no lo pone arriba. Cuantas más notas tiene, más se acerca a su propia media simple (la cifra simple aparece debajo). Fórmula: (n × media del elemento + {weight} × media general) ÷ (n + {weight}), donde n es el número de notas del elemento.",
       "spread": "Cuánto discrepan las notas (desviación estándar poblacional): cuanto mayor, más se dividió el grupo.",
       "consensus": "Cuánto coincide el grupo, de 0 a 100 (100 significa que todos dieron la misma nota).",
-      "surprise": "Nota menos expectativa, en pares donde la misma persona dio ambas respuestas para el mismo elemento. Positivo significa que superó lo esperado.",
-      "indicator_bias": "La media de los elementos que recomendó cada persona menos la media general, cuánto gustaron sus recomendaciones."
+      "surprise": "Nota menos expectativa, en pares donde la misma persona dio ambas respuestas para el mismo elemento. Positivo significa que superó lo esperado."
     },
     "explainMinimum": "Solo se muestra a partir de {minimum, plural, one {# registro} other {# registros}}."
   },
@@ -1763,8 +1750,7 @@
       "number": "Número",
       "date": "Fecha",
       "boolean": "Sí o no",
-      "schedule": "Fecha",
-      "recommender": "Persona"
+      "schedule": "Fecha"
     },
     "hidden": "apagada",
     "moveUp": "Subir",
@@ -1803,22 +1789,6 @@
     "propertiesHeading": "Propiedades",
     "showAll": "Mostrar todas (+{count})",
     "showFewer": "Mostrar menos"
-  },
-  "recommenders": {
-    "label": "Recomendado por",
-    "none": "Nadie en particular",
-    "members": "Miembros",
-    "saved": "Nombres guardados",
-    "addOutside": "Alguien de fuera del grupo…",
-    "writeNote": "Escribir una nota…",
-    "outsideHint": "Guarda su nombre para poder elegirlo otra vez. Queda privado a este espacio y nunca aparece en un enlace público.",
-    "namePlaceholder": "Nombre de la persona",
-    "nameLabel": "Nombre de la persona",
-    "nameRequired": "Escribe un nombre.",
-    "saveName": "Guardar nombre",
-    "saving": "Guardando…",
-    "cancel": "Cancelar",
-    "notePlaceholder": "p. ej.: un blog, un podcast, un amigo de un amigo"
   },
   "catalogAdd": {
     "title": "Añadir un ítem",
@@ -1994,7 +1964,6 @@
     "itemsTitle": "El registro",
     "itemsLede": "{items, plural, one {# ítem} other {# ítems}}{chapters, plural, =0 {} one {} other {, en # bloques}}. Cada tarjeta guarda todo lo que se escribió sobre él.",
     "chapter": "Bloque {n}",
-    "recommendedBy": "Recomendó",
     "about": "Sobre:",
     "tiles": {
       "rating": "Nota",
@@ -2390,8 +2359,7 @@
       "pages": "Páginas",
       "year": "Año",
       "genre": "Género",
-      "author": "Autor o director",
-      "recommender": "Recomendado por"
+      "author": "Autor o director"
     }
   },
   "you": {

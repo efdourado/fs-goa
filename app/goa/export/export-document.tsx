@@ -319,13 +319,6 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   item: DocItem; chapter: DocChapter; model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showWhen: boolean;
 }) {
   const multiPeople = model.people.length > 1;
-  const recommender = item.recommender;
-  const by = recommender ? (
-    <div className={`xd-by ${stageTone(chapter)}`}>
-      <span>{doc.t("recommendedBy")}</span>
-      <strong>{recommender.name.split(" ")[0]}</strong>
-    </div>
-  ) : null;
   const number = <span className="xd-num">{String(item.number).padStart(2, "0")}</span>;
   const meta = item.subtitle || item.meta.length ? <p>{[item.subtitle, ...item.meta].filter(Boolean).join(" · ")}</p> : null;
   // Nothing logged yet: the title and a line saying so — no empty tiles.
@@ -335,7 +328,6 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         <header className="xd-card-head">
           {number}
           <div className="xd-card-title"><h3>{item.title}</h3>{meta}<p className="xd-card-empty">{doc.t("noEntries")}</p></div>
-          {by}
         </header>
       </article>
     );
@@ -361,7 +353,6 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
       <header className="xd-card-head">
         {number}
         <div className="xd-card-title"><h3>{item.title}</h3>{meta}</div>
-        {by}
       </header>
       {/* The tiles share the row: three in thirds, two in halves, one across the whole card. */}
       <div className="xd-tiles" style={{ "--xd-tiles": tiles.length } as CSSProperties}>

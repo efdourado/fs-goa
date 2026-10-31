@@ -23,7 +23,6 @@ import { generateDailyCheckpoints } from "./items";
 import { challengeRatingFieldIds } from "./rating";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
-import { recommenderVisibleSql } from "../domain/shared";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 import { deleteCheckpointsHard } from "../hard-delete";
 
@@ -42,47 +41,33 @@ function windowStatus(
 type ChallengeStatus = "draft" | "active" | "closed";
 
 /**
- * The round's items (with their catalogue facts + a privacy-masked recommender),
+ * The round's items (with their catalogue facts),
  * shaped for the client. Shared by the in-group detail and the public template
  * preview.
  */
 async function detailItems(
   client: PoolClient,
   challengeId: string,
-  groupId: string,
   status: ChallengeStatus,
   isPublic = false,
-  recommendationsEnabled = true,
 ) {
   const result = await client.query<{
     id: string; title: string;
     position: number; opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
-    checkpoint_id: string | null; origin_note: string | null;
+    checkpoint_id: string | null;
     catalog_item_id: string | null; catalog_kind: string | null; catalog_title: string | null;
     catalog_author: string | null; catalog_year: number | null;
     catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
     scheduled_at: Date | null; scheduled_end_at: Date | null;
     scheduled_precision: "date" | "datetime"; scheduled_time_zone: string | null;
-    recommended_by_id: string | null; recommended_by_name: string | null;
-    recommended_by_external_id: string | null; recommended_by_external_name: string | null;
     revealed_at: Date | null; sealed_user_ids: string[] | null;
-    recommender_visible: boolean;
   }>(
-    // A recommender who left the group (or whose account is gone) never shows
-    // their name to the group again — `recommended_by_id` goes null right
-    // along with it, same as a deleted account already reads "Conta removida".
-    // An external name has no membership to lose, so it always shows here —
-    // it's excluded only from the *public* rendering (Phase 6), below.
-    `SELECT i.id, i.title, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
+    `SELECT i.id, i.title, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id,
             i.catalog_item_id, ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
-            ${recommenderVisibleSql("ci")} AS recommender_visible,
             ci.scheduled_precision, ci.scheduled_time_zone,
-            CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
-            CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
-            i.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
             i.revealed_at,
             -- Who has answered a sealed (until_reveal) type for this item — ids only, never the value.
             (SELECT array_agg(DISTINCT se.participant_user_id) FROM entries se
@@ -90,29 +75,18 @@ async function detailItems(
               WHERE se.item_id = i.id AND se.deleted_at IS NULL AND se.participant_user_id IS NOT NULL) AS sealed_user_ids
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
-       LEFT JOIN users ru ON ru.id = i.recommended_by_user_id
-       LEFT JOIN catalog_recommenders cr ON cr.id = i.recommended_by_external_id
-       LEFT JOIN group_members active_recommender
-         ON active_recommender.group_id = $2
-        AND active_recommender.user_id = i.recommended_by_user_id
-        AND active_recommender.removed_at IS NULL
       WHERE i.challenge_id = $1 AND i.archived_at IS NULL ORDER BY i.position`,
-    [challengeId, groupId],
+    [challengeId],
   );
   // Custom property values of each item's catalog entry — the item editor shows them in the
   // library's own terms. Never part of a public preview.
   const attributes = isPublic
     ? new Map<string, never[]>()
     : await attributeValuesForItems(client, result.rows.flatMap((row) => (row.catalog_item_id ? [row.catalog_item_id] : [])));
-  // Who suggested an item is group-private: a group that switched recommendations off never shows it, and the
-  // public template preview never names anyone — member or outside name, nor the free-text origin.
-  const showWho = recommendationsEnabled && !isPublic;
   return result.rows.map((item) => ({
     id: item.id, title: item.title,
     position: item.position,
     checkpointId: item.checkpoint_id ?? null,
-    // Whatever was recorded stays stored, just unseen.
-    originNote: showWho && item.recommender_visible ? item.origin_note ?? null : null,
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
     schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
@@ -132,11 +106,6 @@ async function detailItems(
           attributes: attributes.get(item.catalog_item_id) ?? [],
         }
       : null,
-    recommendedBy: !(showWho && item.recommender_visible) ? null : item.recommended_by_id
-      ? { kind: "member" as const, id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
-      : item.recommended_by_external_id
-        ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
-        : null,
   }));
 }
 
@@ -297,10 +266,7 @@ export async function buildChallengeDetail(
     ? []
     : (await readChallengeLibraries(client, challengeId, ch.group_id, ch.recipe_key))
         .map(({ id, kind, source, label }) => ({ id, kind, source, label }));
-  const recommendationsEnabled = (await oneOrNull<{ recommendations_enabled: boolean }>(
-    client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [ch.group_id],
-  ))?.recommendations_enabled ?? true;
-  const roundItems = await detailItems(client, challengeId, ch.group_id, ch.status, viewer.userId === null, recommendationsEnabled);
+  const roundItems = await detailItems(client, challengeId, ch.status, viewer.userId === null);
   const items = submissionMode === "daily" && ch.start_date === null
     ? []
     : roundItems.length
@@ -336,7 +302,6 @@ export async function buildChallengeDetail(
     viewerNameConsent: participants.find((row) => row.id === viewer.userId)?.name_consent ?? false,
     fields: primaryFields,
     libraries,
-    recommendationsEnabled,
     entryTypes,
     items,
     checkpoints,

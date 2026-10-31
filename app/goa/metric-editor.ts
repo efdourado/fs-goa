@@ -3,7 +3,7 @@ import { recipeCatalogKind } from "./utils";
 
 export const metricOperations: Metric["operation"][] = [
   "sum", "average", "median", "count", "min", "max", "completion_rate",
-  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
+  "bayesian_average", "spread", "consensus", "surprise",
 ];
 export function metricNeedsField(operation: Metric["operation"]) {
   return operation !== "count" && operation !== "completion_rate";
@@ -39,7 +39,6 @@ export function metricGroupings(challenge: Pick<ChallengeDetail, "recipeKey" | "
     spread: ["none", "item", "checkpoint", "catalog_year", "catalog_genre", "catalog_author"],
     consensus: ["none", "item", "checkpoint", "catalog_year", "catalog_genre", "catalog_author"],
     surprise: ["none", "item"],
-    indicator_bias: ["none", "participant"],
   };
   return base.filter((group) => !allowed[operation] || allowed[operation]!.includes(group));
 }

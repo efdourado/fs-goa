@@ -41,7 +41,7 @@ async function groupRatingRows(client: Pick<PoolClient, "query">, groupId: strin
     genre: string | null; author: string | null; year: number | null; runtime: number | null; pages: number | null;
   }>(
     `SELECT c.id AS challenge_id, it.id AS item_id, e.entry_type_id, cat.id AS catalog_item_id, cat.kind, e.participant_user_id AS person_id,
-            er.value, er.lo, er.hi, (it.recommended_by_user_id = e.participant_user_id) IS TRUE AS nominated,
+            er.value, er.lo, er.hi, false AS nominated,
             t.visibility_policy AS visibility, c.status = 'closed' AS closed,
             cat.main_genre AS genre, cat.author, cat.year, cat.runtime_minutes AS runtime, cat.page_count AS pages
        FROM challenges c
@@ -75,7 +75,7 @@ async function groupRatingRows(client: Pick<PoolClient, "query">, groupId: strin
     value: Math.max(0, Math.min(1, row.value)),
     lo: row.lo,
     hi: row.hi,
-    nominated: row.nominated,
+    nominated: false,
     visibility: row.visibility,
     closed: row.closed,
     traits: { genre: row.genre, director: row.author, era: eraOf(row.year), length: lengthOf(row.runtime, row.pages) },

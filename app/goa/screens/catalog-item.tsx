@@ -18,7 +18,7 @@ interface CatalogItemEditing {
 }
 
 /** The "Edit" control and its dialog. Its own component so the libraries load only when someone may actually edit. */
-function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemDetail; scope: CatalogScope; recommendationsEnabled: boolean; editing: CatalogItemEditing; onSaved: () => void; onRemove?: () => Promise<void> }) {
+function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemDetail; scope: CatalogScope; editing: CatalogItemEditing; onSaved: () => void; onRemove?: () => Promise<void> }) {
   const t = useTranslations("catalog");
   const { data: libraries } = useCatalogLibraries(scope);
   const [open, setOpen] = useState(false);
@@ -51,7 +51,7 @@ function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemD
 
 export function CatalogItemScreen({
   scope,
-  recommendationsEnabled = true,
+
   detailPath,
   itemId,
   onBack,
@@ -61,7 +61,6 @@ export function CatalogItemScreen({
   editing,
 }: {
   scope: CatalogScope;
-  recommendationsEnabled?: boolean;
   detailPath: string;
   itemId: Id;
   onBack: () => void;
@@ -97,8 +96,8 @@ export function CatalogItemScreen({
   if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} hint={error} action={<Button variant="secondary" onClick={onBack}>{backLabel ?? t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
 
-  return <CatalogItemPage item={item} library={library} properties={properties} recommendationsEnabled={recommendationsEnabled} onBack={onBack} backLabel={backLabel} onOpenChallenge={onOpenChallenge} editAction={editing ? (
-    <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
+  return <CatalogItemPage item={item} library={library} properties={properties} onBack={onBack} backLabel={backLabel} onOpenChallenge={onOpenChallenge} editAction={editing ? (
+    <EditItemAction item={item} scope={scope} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
   ) : undefined} />;
 }
 
@@ -114,11 +113,10 @@ function ItemProperties({ properties, label }: { properties: ItemProperty[]; lab
 }
 
 /** Item identity and properties share one collection panel, followed by the rating and timeline. */
-export function CatalogItemPage({ item, library, properties, recommendationsEnabled = true, onBack, backLabel, onOpenChallenge, editAction }: {
+export function CatalogItemPage({ item, library, properties, onBack, backLabel, onOpenChallenge, editAction }: {
   item: CatalogItemDetail;
   library: CatalogLibrary | null;
   properties?: LibraryProperty[] | null;
-  recommendationsEnabled?: boolean;
   onBack: () => void;
   backLabel?: string;
   onOpenChallenge: (id: Id) => void;
@@ -142,8 +140,6 @@ export function CatalogItemPage({ item, library, properties, recommendationsEnab
     ...native("runtime_minutes", t("specRuntime"), formatRuntime(item.runtimeMinutes)),
     ...native("scheduled_at", t("specWhen"), item.scheduledAt ? f.eventWhen(item.scheduledAt) : null),
     ...(item.attributes ?? []).map((attribute) => ({ key: `attribute:${attribute.key}`, label: attribute.label, value: attribute.type === "boolean" ? attribute.value ? tc("yes") : tc("no") : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value) })),
-    ...(recommendationsEnabled && item.recommendedBy ? [{ key: "recommended_by", label: t("specRecommendedBy"), value: item.recommendedBy.name }] : []),
-    ...(recommendationsEnabled && !item.recommendedBy && item.originNote ? [{ key: "origin", label: t("specOrigin"), value: item.originNote }] : []),
   ];
   const creator = allProperties.find((property) => ["author", "attribute:direcao", "attribute:director"].includes(property.key));
   const details = allProperties.filter((property) => property !== creator);
@@ -172,7 +168,7 @@ export function CatalogItemPage({ item, library, properties, recommendationsEnab
             <span className="catalog-item-historyDot" aria-hidden="true" />
             <div className="catalog-item-historyText">
               <button type="button" className="catalog-item-roundTitle" onClick={() => onOpenChallenge(round.challengeId)}>{round.title}</button>
-              <p>{[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : null, t(`status.${round.status}`), round.recommendedBy ? t("recommendedBy", { name: round.recommendedBy }) : null].filter(Boolean).join(" · ")}</p>
+              <p>{[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : null, t(`status.${round.status}`)].filter(Boolean).join(" · ")}</p>
               {round.ratingAvg !== null ? <div className="catalog-item-ratingTrack" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.min(100, round.ratingAvg / 5 * 100))}%` }} /></div> : null}
             </div>
             {round.ratingAvg !== null ? <div className="catalog-item-roundRating"><strong>{round.ratingAvg}</strong><span>{t("roundRatings", { count: round.ratingCount })}</span></div> : null}

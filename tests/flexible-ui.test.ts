@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
+import { assertNoBuiltInRecommendation } from "../lib/goa/domain/item-input";
 import { describe, test } from "node:test";
 
 import { bodyFromValues, builtInProperties, valuesFromItem } from "../app/goa/property-inputs";
-import {
-  NO_RECOMMENDER,
-  recommenderBody,
-  recommenderFromItem,
-  sameRecommender,
-} from "../app/goa/recommender-picker";
 import {
   instantToDateKey,
   instantToWallClock,
@@ -44,35 +39,6 @@ describe("item schedule in the challenge's own time zone", () => {
     // 23:30 in São Paulo on the 14th is already the 15th in Tokyo.
     assert.equal(instantToDateKey("2026-03-15T02:30:00.000Z", "America/Sao_Paulo"), "2026-03-14");
     assert.equal(instantToDateKey("2026-03-15T02:30:00.000Z", "Asia/Tokyo"), "2026-03-15");
-  });
-});
-
-describe("recommender values", () => {
-  test("a new item sends only what was chosen; an edit blanks the others so the old one is cleared", () => {
-    assert.deepEqual(recommenderBody({ kind: "member", userId: "u1" }, "item", false), { recommendedByUserId: "u1" });
-    assert.deepEqual(recommenderBody({ kind: "member", userId: "u1" }, "item", true), {
-      recommendedByUserId: "u1", recommendedByExternalId: "", originNote: "",
-    });
-    assert.deepEqual(recommenderBody(NO_RECOMMENDER, "catalog", true), {
-      catalogRecommendedByUserId: "", catalogRecommendedByExternalId: "", catalogOriginNote: "",
-    });
-    assert.deepEqual(recommenderBody(NO_RECOMMENDER, "item", false), {});
-  });
-
-  test("a saved outside name and a note use their own keys and never collide", () => {
-    assert.deepEqual(recommenderBody({ kind: "external", recommenderId: "r1" }, "catalog", false), { catalogRecommendedByExternalId: "r1" });
-    assert.deepEqual(recommenderBody({ kind: "note", text: "  a podcast " }, "item", false), { originNote: "a podcast" });
-    // An empty note is nothing, not a blank note.
-    assert.deepEqual(recommenderBody({ kind: "note", text: "  " }, "item", false), {});
-  });
-
-  test("an existing item's recommender reads back the way it was stored", () => {
-    assert.deepEqual(recommenderFromItem({ kind: "member", id: "u1", name: "Ana" }), { kind: "member", userId: "u1" });
-    assert.deepEqual(recommenderFromItem({ kind: "external", id: "r1", name: "Bia" }), { kind: "external", recommenderId: "r1" });
-    assert.deepEqual(recommenderFromItem(null, "via a blog"), { kind: "note", text: "via a blog" });
-    assert.deepEqual(recommenderFromItem(null, "   "), NO_RECOMMENDER);
-    assert.ok(sameRecommender({ kind: "note", text: "x " }, { kind: "note", text: "x" }));
-    assert.ok(!sameRecommender({ kind: "member", userId: "a" }, { kind: "external", recommenderId: "a" }));
   });
 });
 
@@ -213,5 +179,16 @@ describe("showing a saved answer", () => {
     const select = { id: "s", key: "s", label: "S", type: "select", required: false, config: { options: [{ id: "o1", label: "Win" }] } } as ChallengeField;
     assert.equal(displayAnswer(select, "o1", words), "Win");
     assert.equal(displayAnswer({ ...select, type: "rating" }, 3.5, words), "3,5");
+  });
+});
+
+describe("retired built-in recommendations", () => {
+  test("legacy assignment inputs are refused instead of silently retaining the old flow", () => {
+    for (const key of ["recommendedByUserId", "recommendedByExternalId", "originNote", "catalogRecommendedByUserId", "catalogRecommendedByExternalId", "catalogOriginNote"]) {
+      assert.throws(() => assertNoBuiltInRecommendation({ [key]: "legacy" }), /Indicações não são uma propriedade fixa/);
+    }
+  });
+  test("user-created properties with recommendation names remain ordinary properties", () => {
+    assert.doesNotThrow(() => assertNoBuiltInRecommendation({ title: "Film", attributes: { recommendedBy: "Ana", originNote: "Book club" } }));
   });
 });

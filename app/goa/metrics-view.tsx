@@ -12,7 +12,7 @@ const DEFAULT_PRIOR_WEIGHT = 4;
 
 const EXPLAINED_OPERATIONS = new Set<Metric["operation"]>([
   "sum", "average", "count", "min", "max", "median", "completion_rate",
-  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
+  "bayesian_average", "spread", "consensus", "surprise",
 ]);
 
 /** A collapsed "how is this number calculated" note — the formula in plain words. */

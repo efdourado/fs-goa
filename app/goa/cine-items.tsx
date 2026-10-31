@@ -8,11 +8,6 @@ import { Dialog, FormDialog, ModalActions } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
-import {
-  NO_RECOMMENDER,
-  type RecommenderValue,
-  useRecommenderSource,
-} from "./recommender-picker";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass } from "./ui";
 import { formatRuntime } from "./utils";
@@ -25,8 +20,6 @@ export interface CineRow {
   /** The library the item belongs to (`libraryId` is null for a built-in that has no row yet). */
   libraryKind: string;
   libraryId: Id | null;
-  /** A member, a saved outside name or a note — one at most. */
-  recommender: RecommenderValue;
   author: string;
   year: string;
   pages: string;
@@ -46,7 +39,6 @@ function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     title,
     libraryKind: "",
     libraryId: null,
-    recommender: NO_RECOMMENDER,
     author: "",
     year: "",
     pages: "",
@@ -187,7 +179,6 @@ interface EditorShared {
   scope: CatalogScope;
   /** The challenge's library (one per challenge); the first entry is used. */
   libraries: readonly EditorLibrary[];
-  recommendationsEnabled?: boolean;
   /** Bump to re-read the library's properties after they were edited elsewhere. */
   refreshKey?: number;
   /** The zone a new event date starts in — the browser's when left out. */
@@ -203,7 +194,7 @@ function useEditorProperties({ libraries, refreshKey = 0 }: Pick<EditorShared, "
 }
 
 /**
- * Every property of the given rows, one card each: the name, then the author or who recommended it (each with its
+ * Every property of the given rows, one card each: the name and the library properties (each with its
  * label), and the rest folded under "+N more" at the bottom of the card.
  */
 function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
@@ -414,8 +405,8 @@ export function ItemsAddBox({
   );
 }
 
-/** One line about an item under its title in the list: author, year, length, genre and who recommended it. */
-function useRowSummary(members: Member[]) {
+/** One line about an item under its title in the list: author, year, length, genre. */
+function useRowSummary() {
   const t = useTranslations("cineItems");
   return (row: CineRow): string => {
     const bits: string[] = [];
@@ -425,10 +416,6 @@ function useRowSummary(members: Member[]) {
     if (runtime) bits.push(runtime);
     if (row.pages) bits.push(t("pagesCount", { count: Number(row.pages) }));
     if (row.mainGenre) bits.push(row.mainGenre);
-    if (row.recommender.kind === "member") {
-      const name = members.find((member) => member.id === (row.recommender as { userId: Id }).userId)?.name;
-      if (name) bits.push(t("pickedBy", { name }));
-    }
     return bits.join(" · ");
   };
 }
@@ -502,10 +489,9 @@ export function CineItemsEditor({
   const t = useTranslations("cineItems");
   const { problemOf, loaded } = useEditorProperties(shared);
   const tOrganise = useTranslations("organise");
-  const { recommenders } = useRecommenderSource(shared.scope, shared.recommendationsEnabled !== false);
-  const summary = useRowSummary(shared.members);
+  const summary = useRowSummary();
   const [organising, setOrganising] = useState(false);
-  const organiseInput = organiseFromRows(value, loaded.get(shared.libraries[0]?.kind ?? "") ?? [], shared.members, recommenders, (key) => tOrganise(`property.${key}`));
+  const organiseInput = organiseFromRows(value, loaded.get(shared.libraries[0]?.kind ?? "") ?? [], (key) => tOrganise(`property.${key}`));
   const problem = problemOf(value);
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   const [localAdding, setLocalAdding] = useState(false);

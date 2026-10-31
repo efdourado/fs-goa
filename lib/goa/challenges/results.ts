@@ -6,9 +6,9 @@ import { inTransaction, oneOrNull, withClient } from "../../db";
 // through the barrel here would form an import cycle.
 import { challengeAccess } from "../domain/access";
 import { writeAudit } from "../domain/audit";
-import { asRecord, challengeHidesRecommender, publicId, semanticKey } from "../domain/shared";
+import { asRecord, publicId, semanticKey } from "../domain/shared";
 import { ApiError, stringValue } from "../../http";
-import { bayesianAverage, consensus, indicatorBias, mean, meanDelta, median, spread } from "../analysis";
+import { bayesianAverage, consensus, mean, meanDelta, median, spread } from "../analysis";
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
@@ -27,10 +27,9 @@ interface SeriesEntry {
   value: number | null;
   sampleSize: number;
   formattedValue: string;
-  /** Item-grouped rows only: who recommended it, the catalogue year, and the
+  /** Item-grouped rows only: the catalogue year and the
    *  plain (un-adjusted) average — shown next to the shrunk `bayesian_average`
    *  so the group can see the raw math behind the adjusted number. */
-  recommendedBy?: string | null;
   year?: number | null;
   rawValue?: number | null;
   rawFormattedValue?: string;
@@ -75,7 +74,6 @@ interface RatingRow {
   catalog_year: number | null;
   catalog_author: string | null;
   catalog_genre: string | null;
-  recommended_by_name: string | null;
   checkpoint_id: string | null;
   checkpoint_title: string | null;
   checkpoint_position: number | null;
@@ -110,8 +108,7 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
   const fieldIds = composite?.fieldIds ?? null;
   // A participant who has since left the challenge (or the group, or whose
   // account is gone) keeps contributing to the numbers but not the name — the
-  // per-person breakdown labels them generically instead. Same rule for
-  // whoever recommended the item.
+  // per-person breakdown labels them generically instead.
   const value = composite
     ? `${composite.combineOp === "sum" ? "SUM" : "AVG"}(ev.number_scaled::float8 / (10 ^ f.number_scale))`
     : "(ev.number_scaled::float8 / (10 ^ f.number_scale))";
@@ -121,9 +118,6 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
             e.participant_user_id AS participant_id,
             CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
             cat.year AS catalog_year, cat.author AS catalog_author, cat.main_genre AS catalog_genre,
-            CASE WHEN ci.recommended_by_user_id IS NULL THEN NULL
-                 WHEN active_recommender.user_id IS NOT NULL THEN recommender.display_name
-                 ELSE 'Quem já saiu' END AS recommended_by_name,
             cc.id AS checkpoint_id, cc.title AS checkpoint_title, cc.position AS checkpoint_position
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
@@ -138,26 +132,16 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
        LEFT JOIN users u ON u.id = e.participant_user_id
        LEFT JOIN challenge_participants cp
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
-       LEFT JOIN users recommender ON recommender.id = ci.recommended_by_user_id
-       LEFT JOIN group_members active_recommender
-         ON active_recommender.group_id = c.group_id
-        AND active_recommender.user_id = ci.recommended_by_user_id
-        AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ${fieldIds ? "ev.field_id = ANY($2::text[])" : "ev.field_id = $2"}
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL
         AND ($3::text IS NULL OR e.item_id = $3) AND ${unsealedEntrySql("e")}
       ${fieldIds
         ? `GROUP BY e.id, e.item_id, ci.title, e.participant_user_id, cp.user_id, u.display_name,
-                    cat.year, cat.author, cat.main_genre, ci.recommended_by_user_id,
-                    active_recommender.user_id, recommender.display_name,
+                    cat.year, cat.author, cat.main_genre,
                     cc.id, cc.title, cc.position`
         : ""}`,
     [metric.challenge_id, fieldIds ?? metric.field_id, metricScope(metric).itemId],
   );
-  // A library that switched "who recommended it" off shows no recommender beside its items here either.
-  if (result.rows.some((row) => row.recommended_by_name) && await challengeHidesRecommender(client, metric.challenge_id)) {
-    return result.rows.map((row) => ({ ...row, recommended_by_name: null }));
-  }
   return result.rows;
 }
 
@@ -262,8 +246,6 @@ function explainMetric(
         return { formula: "consenso = max(0, 1 − desvio ÷ (amplitude ÷ 2)) × 100.", sample: `mínimo ${Math.max(2, minSample)} avaliações; 100 = unanimidade.` };
       case "surprise":
         return { formula: "surpresa = avaliação − expectativa, em respostas pareadas da mesma pessoa e item.", sample: `${n} par(es) avaliação/expectativa.` };
-      case "indicator_bias":
-        return { formula: "desempenho = média dos itens indicados pela pessoa − média global.", sample: `${n} indicação(ões) avaliada(s).` };
       default:
         return { formula: "", sample: `n = ${n}.` };
     }
@@ -493,7 +475,6 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   const dp = metric.decimal_places;
 
   if (metric.operation === "surprise") return computeSurprise(client, metric, minSample, dp);
-  if (metric.operation === "indicator_bias") return computeIndicatorBias(client, metric, minSample, dp);
 
   const rows = await ratingRows(client, metric);
   const all = rows.map((row) => row.value);
@@ -539,7 +520,7 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
     // A ranking of titles by their rating ranks by the Goa score, not the plain average (see goa-score.ts).
     const score = scores?.[id];
     const grouped = score && plain.value !== null ? { ...plain, value: roundTo(score.value, dp) } : plain;
-    // Every row in an item bucket shares the same item, so its recommender and
+    // Every row in an item bucket shares the same item, so its catalogue year and
     // year are constant within the bucket — read them off the first row.
     const first = metric.group_by === "item" ? bucket.rows[0] : undefined;
     const raw = metric.operation === "bayesian_average"
@@ -551,7 +532,7 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
       value: grouped.value,
       sampleSize: grouped.sampleSize,
       formattedValue: formatValue(grouped.value, dp),
-      ...(first ? { recommendedBy: first.recommended_by_name, year: first.catalog_year } : {}),
+      ...(first ? { year: first.catalog_year } : {}),
       ...(raw ? { rawValue: raw.value, rawFormattedValue: formatValue(raw.value, dp) } : {}),
     });
   }
@@ -693,65 +674,12 @@ async function computeSurprise(
   return { value: overall.value, sampleSize: overall.sampleSize, series };
 }
 
-async function computeIndicatorBias(
-  client: PoolClient,
-  metric: MetricRow,
-  minSample: number,
-  decimalPlaces: number,
-): Promise<ValueResult> {
-  const all = await ratingRows(client, metric);
-  const groupMean = mean(all.map((row) => row.value)) ?? 0;
-  const picks = await client.query<{ person: string; person_name: string | null; value: number }>(
-    // Same anonymity rule as everywhere else: a recommender no longer in the
-    // group keeps their bias score, loses their name.
-    `SELECT ci.recommended_by_user_id AS person,
-            CASE WHEN active_recommender.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS person_name,
-            (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value
-       FROM entry_values ev
-       JOIN entries e ON e.id = ev.entry_id
-       JOIN challenge_fields f ON f.id = ev.field_id
-       JOIN challenge_items ci ON ci.id = e.item_id AND ci.recommended_by_user_id IS NOT NULL
-       JOIN users u ON u.id = ci.recommended_by_user_id
-       JOIN challenges c ON c.id = e.challenge_id
-       LEFT JOIN group_members active_recommender
-         ON active_recommender.group_id = c.group_id
-        AND active_recommender.user_id = ci.recommended_by_user_id
-        AND active_recommender.removed_at IS NULL
-      WHERE e.challenge_id = $1 AND ev.field_id = $2
-        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND ${unsealedEntrySql("e")}`,
-    [metric.challenge_id, metric.field_id],
-  );
-  const byPerson = new Map<string, { label: string; values: number[] }>();
-  for (const row of picks.rows) {
-    const bucket = byPerson.get(row.person) ?? { label: row.person_name ?? "—", values: [] };
-    bucket.values.push(row.value);
-    byPerson.set(row.person, bucket);
-  }
-  const series: SeriesEntry[] = [...byPerson].map(([id, bucket]) => {
-    const bias = indicatorBias(bucket.values, groupMean, { decimalPlaces, minSample });
-    return {
-      key: id,
-      label: bucket.label,
-      value: bias.value,
-      sampleSize: bias.sampleSize,
-      formattedValue: formatValue(bias.value, decimalPlaces),
-    };
-  });
-  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY) || a.label.localeCompare(b.label, "pt-BR"));
-  const values = series.map((entry) => entry.value).filter((value): value is number => value !== null);
-  return {
-    value: values.length ? mean(values.map(Math.abs)) ?? null : null,
-    sampleSize: picks.rows.length,
-    series: metric.group_by === "participant" ? series : undefined,
-  };
-}
-
 export async function metricsForChallenge(client: PoolClient, challengeId: string) {
   const metrics = await client.query<MetricRow>(
     `SELECT id, challenge_id, entry_type_id, field_id, semantic_key, label, operation,
             group_by, decimal_places, visible_during_challenge, position, settings
        FROM challenge_metrics
-      WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position, created_at`,
+      WHERE challenge_id = $1 AND archived_at IS NULL AND operation <> 'indicator_bias' ORDER BY position, created_at`,
     [challengeId],
   );
   const calculated: Array<Record<string, unknown>> = [];
@@ -963,11 +891,11 @@ export async function resultForChallenge(
 
 const METRIC_OPERATIONS = new Set([
   "sum", "average", "count", "min", "max", "median", "completion_rate",
-  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
+  "bayesian_average", "spread", "consensus", "surprise",
 ]);
 const NUMERIC_FIELD_OPS = new Set([
   "sum", "average", "min", "max", "median",
-  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
+  "bayesian_average", "spread", "consensus", "surprise",
 ]);
 // `day`/`week` stay refused: the compute path only expands item/participant/
 // checkpoint/catalog_* into a series, so they would be silently ignored today.
@@ -975,14 +903,13 @@ const GROUP_BY_VALUES = new Set([
   "none", "participant", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre",
 ]);
 // Analyses that compare people — meaningless for a value the whole group shares.
-const SHARED_UNSUPPORTED_OPS = new Set(["spread", "consensus", "surprise", "indicator_bias", "bayesian_average"]);
+const SHARED_UNSUPPORTED_OPS = new Set(["spread", "consensus", "surprise", "bayesian_average"]);
 // Which groupings each analysis op accepts — the rest are refused as incoherent
 // combinations (V1 §9 "recusa combinações inválidas").
 const GROUP_BY_BY_OP: Record<string, Set<string>> = {
   spread: new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]),
   consensus: new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]),
   surprise: new Set(["none", "item"]),
-  indicator_bias: new Set(["none", "participant"]),
   // Count fans out into a real series; completion rate only computes its total.
   count: new Set(["none", "item", "participant", "checkpoint"]),
   completion_rate: new Set(["none"]),
@@ -1380,7 +1307,7 @@ export async function curateResults(
     const availableMetrics = await client.query<MetricRow>(
       `SELECT id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
               decimal_places,visible_during_challenge,position,settings
-         FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL
+         FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL AND operation <> 'indicator_bias'
           AND ($2::text[] = '{}'::text[] OR id=ANY($2::text[])) ORDER BY position`,
       [challengeId, metricIds],
     );
@@ -1532,19 +1459,7 @@ export async function maskShowcaseIdentities(
     participants.rows.filter((row) => anonymized || !row.name_consent).map((row) => row.id),
   );
 
-  // Who recommended each item — an item-grouped ranking shows this name next to
-  // the film, so it needs the same masking as a per-person series.
-  const recommenderByItem = new Map<string, string>(
-    (await client.query<{ id: string; recommended_by_user_id: string | null }>(
-      "SELECT id, recommended_by_user_id FROM challenge_items WHERE challenge_id = $1 AND recommended_by_user_id IS NOT NULL",
-      [challengeId],
-    )).rows.map((row) => [row.id, row.recommended_by_user_id as string]),
-  );
-
-  // Every id that could carry a name in the payload — so a departed member who
-  // was still rated (or recommended a film) also gets a stable "Participante N" label.
   const seriesIds = new Set<string>(maskedIds);
-  for (const recommenderId of recommenderByItem.values()) seriesIds.add(recommenderId);
   for (const metric of metricList) {
     if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) continue;
     for (const row of metric.series as Array<{ key?: unknown }>) if (typeof row.key === "string") seriesIds.add(row.key);
@@ -1588,20 +1503,10 @@ export async function maskShowcaseIdentities(
     typeof id === "string" ? labelById.get(id) ?? roster.get(id) ?? "Participante ?" : "Participante ?";
 
   const participantNames = participants.rows.map((row) => labelById.get(row.id) ?? row.display_name);
-  // An item-grouped row's `recommendedBy` is a real display name — swap it for the
-  // masked label when that recommender is masked.
-  const maskRecommender = (row: Record<string, unknown>): Record<string, unknown> => {
-    if (!("recommendedBy" in row) || typeof row.key !== "string") return row;
-    const recommenderId = recommenderByItem.get(row.key);
-    if (recommenderId && isMasked(recommenderId)) {
-      return { ...row, recommendedBy: labelById.get(recommenderId) ?? "Participante ?" };
-    }
-    return row;
-  };
   const metrics = await Promise.all(metricList.map(async (metric) => {
     if (!Array.isArray(metric.series)) return metric;
     if (metric?.groupBy !== "participant") {
-      return { ...metric, series: (metric.series as Array<Record<string, unknown>>).map(maskRecommender) };
+      return { ...metric, series: (metric.series as Array<Record<string, unknown>>).map((entry) => { const row = { ...entry }; delete row.recommendedBy; return row; }) };
     }
     return {
       ...metric,

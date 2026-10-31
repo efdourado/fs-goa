@@ -125,7 +125,6 @@
       "bayesian_average": "Adjusted rating",
       "spread": "Polarisation",
       "surprise": "Surprise vs. letdown",
-      "indicator_bias": "Curator bias",
       "median": "Median",
       "consensus": "Consensus"
     },
@@ -430,7 +429,6 @@
     "pages": "{count} pages",
     "byAuthor": "by {name}",
     "historyTitle": "History",
-    "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
     "status": {
       "draft": "draft",
@@ -445,8 +443,6 @@
     "specGenre": "Genre",
     "specRuntime": "Runtime",
     "specPages": "Pages",
-    "specRecommendedBy": "Recommended by",
-    "specOrigin": "Origin",
     "ratingTitle": "Group rating",
     "outOfFive": "out of 5",
     "ratingSummary": "{ratings, plural, one {# rating} other {# ratings}} across {rounds, plural, one {# challenge} other {# challenges}}.",
@@ -468,12 +464,10 @@
     },
     "noGenre": "No genre",
     "addItem": "Add item",
-    "recommendedBy": "recommended by {name}",
     "origin": "via {text}",
     "averageRating": "average {value}",
     "reusedNotice": "Already in your catalogue.",
     "addedNotice": "Added.",
-    "recommenderNone": "No recommender",
     "noMatches": "Nothing matches",
     "notInChallenge": "not in any challenge",
     "select": "Select",
@@ -508,7 +502,6 @@
     "showOnly": "Show only",
     "notRatedFilter": "Not rated yet",
     "unusedOnly": "In no challenge",
-    "recommenderHeading": "Recommended by",
     "chooseLibrary": "Choose a library",
     "removeFilter": "Remove filter: {name}",
     "hideIndex": "Hide filters",
@@ -527,7 +520,6 @@
     "edit": "edit",
     "untitled": "Untitled",
     "needsAttention": "Missing something, open it to fix",
-    "pickedBy": "picked by {name}",
     "pagesCount": "{count} pages",
     "doneEditing": "Done",
     "titleLabel": "Film title",
@@ -537,7 +529,6 @@
     "authorPlaceholder": "e.g. Ursula K. Le Guin",
     "authorRequired": "Add the author of each book.",
     "byAuthor": "by {name}",
-    "recommendedBy": "Recommended by",
     "hideDetails": "Show less",
     "remove": "remove",
     "year": "Year",
@@ -1023,7 +1014,6 @@
     },
     "back": "Back",
     "manage": "Manage",
-    "recommendedBy": "Recommended by {name}",
     "byAuthor": "by {name}",
     "groupCompletion": "{done} of {total} completed",
     "groupLastRegister": "{days, plural, =0 {Last entry today} =1 {Last entry yesterday} other {Last entry # days ago}}",
@@ -1572,7 +1562,6 @@
       "pageCount": "Pages",
       "runtimeMinutes": "Runtime (min)",
       "mainGenre": "Main genre",
-      "recommendedBy": "Recommended by",
       "origin": "Origin"
     },
     "badgeInvalid": "invalid",
@@ -1600,7 +1589,6 @@
       "bottomItems": "Lowest",
       "surprise": "Biggest surprise",
       "disappointment": "Biggest letdown",
-      "indication": "Own picks vs. group",
       "none": "Not enough data yet."
     },
     "affinity": {
@@ -1648,8 +1636,7 @@
       "bayesian_average": "A fair average for ranking. An item with only a few ratings is pulled toward the overall average of the whole list, so a single enthusiastic vote can't put it on top. The more ratings it has, the closer it gets to its own simple average (the plain figure is shown underneath). Formula: (n × item average + {weight} × overall average) ÷ (n + {weight}), where n is the item's number of ratings.",
       "spread": "How much the ratings disagree (population standard deviation): the higher it is, the more the group was divided.",
       "consensus": "How much the group agrees, from 0 to 100 (100 means everyone gave the same rating).",
-      "surprise": "Rating minus expectation, using pairs where the same person gave both for the same item. Positive means it beat expectations.",
-      "indicator_bias": "The average of the items each person recommended minus the overall average, how well their recommendations landed."
+      "surprise": "Rating minus expectation, using pairs where the same person gave both for the same item. Positive means it beat expectations."
     },
     "explainMinimum": "Only shown once there are at least {minimum, plural, one {# record} other {# records}}."
   },
@@ -1763,8 +1750,7 @@
       "number": "Number",
       "date": "Date",
       "boolean": "Yes or no",
-      "schedule": "Date",
-      "recommender": "Person"
+      "schedule": "Date"
     },
     "hidden": "off",
     "moveUp": "Move up",
@@ -1803,22 +1789,6 @@
     "propertiesHeading": "Properties",
     "showAll": "Show all (+{count})",
     "showFewer": "Show fewer"
-  },
-  "recommenders": {
-    "label": "Recommended by",
-    "none": "Nobody in particular",
-    "members": "Members",
-    "saved": "Saved names",
-    "addOutside": "Someone outside the group…",
-    "writeNote": "Write a note…",
-    "outsideHint": "Save their name so you can pick it again. It stays private to this space and never appears on a public link.",
-    "namePlaceholder": "Their name",
-    "nameLabel": "Their name",
-    "nameRequired": "Type a name.",
-    "saveName": "Save name",
-    "saving": "Saving…",
-    "cancel": "Cancel",
-    "notePlaceholder": "e.g. a blog, a podcast, a friend of a friend"
   },
   "catalogAdd": {
     "title": "Add an item",
@@ -1994,7 +1964,6 @@
     "itemsTitle": "The log",
     "itemsLede": "{items, plural, one {# item} other {# items}}{chapters, plural, =0 {} one {} other {, in # parts}}. Each card keeps everything written about it.",
     "chapter": "Part {n}",
-    "recommendedBy": "Picked by",
     "about": "About:",
     "tiles": {
       "rating": "Score",
@@ -2390,8 +2359,7 @@
       "pages": "Pages",
       "year": "Year",
       "genre": "Genre",
-      "author": "Author or director",
-      "recommender": "Recommended by"
+      "author": "Author or director"
     }
   },
   "you": {

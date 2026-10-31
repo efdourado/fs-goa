@@ -1,3 +1,4 @@
+import { assertNoBuiltInRecommendation } from "./item-input";
 import { requireGroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
@@ -14,7 +15,6 @@ import {
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
 import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/libraries";
-import { resolveItemRecommender } from "../challenges/recommender";
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
@@ -260,16 +260,6 @@ export async function createChallenge(
 
     if (wantsItems) {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");
-      const memberIds = options.personal
-        ? new Set([session.user.id])
-        : new Set(
-            (
-              await client.query<{ user_id: string }>(
-                "SELECT user_id FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
-                [groupId],
-              )
-            ).rows.map((row) => row.user_id),
-          );
       // The one library this challenge draws from, stored on the challenge itself (one per challenge, see
       // docs/architecture.md). Cinema/Estante/Library track their fixed one; Tables the workspace's own Tables
       // library (which the person creates first, never on their behalf); `custom` the one the caller names.
@@ -356,8 +346,7 @@ export async function createChallenge(
           });
         }
 
-        // A member, a saved outside name or a free-text note — at most one.
-        const recommender = await resolveItemRecommender(client, groupId, item, memberIds);
+        assertNoBuiltInRecommendation(item);
 
         let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
         for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {
@@ -367,9 +356,9 @@ export async function createChallenge(
 
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,NULL,$3,$4,$9,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, recommender.userId, recommender.note, itemKey, itemTitle, index, recommender.externalId],
+            (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, position, metadata, created_at, updated_at)
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, itemKey, itemTitle, index],
         );
       }
     }

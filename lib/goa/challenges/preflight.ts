@@ -29,7 +29,7 @@ export interface PreflightReport {
 }
 
 const NUMERIC_OPS = new Set([
-  "sum", "average", "min", "max", "bayesian_average", "spread", "surprise", "indicator_bias",
+  "sum", "average", "min", "max", "bayesian_average", "spread", "surprise",
 ]);
 
 /**

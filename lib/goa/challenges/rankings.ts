@@ -6,7 +6,6 @@ import { unsealedEntrySql } from "./reveal";
 import {
   compositeAffinity,
   directAffinity,
-  indicatorBias,
   mean,
   median,
   spread,
@@ -34,7 +33,6 @@ interface RatingFact {
   year: number | null;
   genre: string | null;
   runtime: number | null;
-  recommendedBy: string | null;
 }
 
 /**
@@ -70,14 +68,13 @@ async function ratingFields(client: PoolClient, challengeId: string): Promise<{ 
 async function ratingFacts(client: PoolClient, challengeId: string, fieldIds: string[]): Promise<RatingFact[]> {
   const result = await client.query<{
     participant_id: string; participant_name: string | null; item_id: string; item_title: string | null;
-    value: number; year: number | null; genre: string | null; runtime: number | null; recommended_by: string | null;
+    value: number; year: number | null; genre: string | null; runtime: number | null;
   }>(
     `SELECT e.participant_user_id AS participant_id,
             CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
             e.item_id, ci.title AS item_title,
             avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
-            cat.year, cat.main_genre AS genre, cat.runtime_minutes AS runtime,
-            ci.recommended_by_user_id AS recommended_by
+            cat.year, cat.main_genre AS genre, cat.runtime_minutes AS runtime
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
@@ -90,7 +87,7 @@ async function ratingFacts(client: PoolClient, challengeId: string, fieldIds: st
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND e.item_id IS NOT NULL
         AND ${unsealedEntrySql("e")}
       GROUP BY e.id, e.participant_user_id, cp.user_id, u.display_name, e.item_id, ci.title,
-               cat.year, cat.main_genre, cat.runtime_minutes, ci.recommended_by_user_id`,
+               cat.year, cat.main_genre, cat.runtime_minutes`,
     [challengeId, fieldIds],
   );
   return result.rows.map((row) => ({
@@ -102,7 +99,6 @@ async function ratingFacts(client: PoolClient, challengeId: string, fieldIds: st
     year: row.year,
     genre: row.genre,
     runtime: row.runtime,
-    recommendedBy: row.recommended_by,
   }));
 }
 
@@ -121,7 +117,6 @@ export interface PersonalRanking {
   bottomItems: Array<{ title: string; value: number }>;
   biggestSurprise: { title: string; delta: number } | null;
   biggestDisappointment: { title: string; delta: number } | null;
-  indicationPerformance: number | null;
 }
 
 export interface AffinityPair {
@@ -236,7 +231,6 @@ export async function computeRankings(
     "SELECT count(*)::int AS count FROM challenge_items WHERE challenge_id = $1 AND archived_at IS NULL",
     [challengeId],
   ))?.count ?? 0;
-  const globalMean = mean(facts.map((fact) => fact.value)) ?? 0;
 
   // Expectation pairs for surprise/disappointment.
   const expectationRows = await client.query<{ participant_id: string; item_id: string; item_title: string | null; delta: number }>(
@@ -274,7 +268,6 @@ export async function computeRankings(
     const myExpectations = expectationRows.rows.filter((row) => row.participant_id === userId);
     const surprise = [...myExpectations].sort((a, b) => b.delta - a.delta)[0];
     const disappointment = [...myExpectations].sort((a, b) => a.delta - b.delta)[0];
-    const myPicks = facts.filter((fact) => fact.recommendedBy === userId).map((fact) => fact.value);
 
     personal.push({
       userId,
@@ -290,7 +283,6 @@ export async function computeRankings(
       bottomItems: sorted.slice(-3).reverse().map((fact) => ({ title: fact.itemTitle, value: fact.value })),
       biggestSurprise: surprise && surprise.delta > 0 ? { title: surprise.item_title ?? "—", delta: round(surprise.delta) } : null,
       biggestDisappointment: disappointment && disappointment.delta < 0 ? { title: disappointment.item_title ?? "—", delta: round(disappointment.delta) } : null,
-      indicationPerformance: myPicks.length ? indicatorBias(myPicks, globalMean).value : null,
     });
   }
   personal.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));

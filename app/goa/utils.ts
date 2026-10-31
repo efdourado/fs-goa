@@ -30,7 +30,7 @@ type MetricTheme = "ranking" | "people" | "debate";
  */
 export function metricTheme(metric: { operation: MetricOperation; groupBy?: Metric["groupBy"] }): MetricTheme {
   if (metric.operation === "spread" || metric.operation === "surprise") return "debate";
-  if (metric.operation === "indicator_bias" || metric.groupBy === "participant") return "people";
+  if (metric.groupBy === "participant") return "people";
   return "ranking";
 }
 

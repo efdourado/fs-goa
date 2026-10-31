@@ -17,7 +17,6 @@ import {
   useLibraryName,
 } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
-import { recommenderLine } from "../recommender-picker";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
@@ -26,7 +25,7 @@ type Sort = "recent" | "title" | "rating" | "date";
 
 /** How many rows a library shows at first, and how many more each "Show more" adds. */
 const PAGE_SIZE = 30;
-/** A filter list (genres, recommenders) shows this many before its own "+ N more". */
+/** A filter list (genres) shows this many before its own "+ N more". */
 const FACET_SIZE = 6;
 
 // A computer's index can fold away for a wider list; the choice is remembered on this device. Read through an
@@ -107,7 +106,7 @@ export function CatalogWorkspaceScreen({
   subtitle,
   backLabel,
   canManage,
-  recommendationsEnabled,
+
   onBack,
   onOpenItem,
 }: {
@@ -117,7 +116,6 @@ export function CatalogWorkspaceScreen({
   backLabel: string;
   canManage: boolean;
   members: Member[];
-  recommendationsEnabled: boolean;
   onBack: () => void;
   onOpenItem: (itemId: Id) => void;
 }) {
@@ -132,7 +130,6 @@ export function CatalogWorkspaceScreen({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
-  const [recommenderFilter, setRecommenderFilter] = useState("");
   const [query, setQuery] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
   const [unratedOnly, setUnratedOnly] = useState(false);
@@ -212,19 +209,11 @@ export function CatalogWorkspaceScreen({
   }
 
   function clearFilters() {
-    setRecommenderFilter("");
     setGenres([]);
     setUnratedOnly(false);
     setUnusedOnly(false);
   }
 
-  // Who brought things into this library, for the "recommended by" filter.
-  const recommenders = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const item of scoped) if (item.recommendedBy) seen.set(`${item.recommendedBy.kind}:${item.recommendedBy.id}`, item.recommendedBy.name);
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [scoped]);
-  const activeFilter = recommenderFilter && (recommenderFilter === "none" || recommenders.some(([key]) => key === recommenderFilter)) ? recommenderFilter : "";
   const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
@@ -237,10 +226,8 @@ export function CatalogWorkspaceScreen({
     if (unratedOnly && item.ratingAvg !== null && item.ratingAvg !== undefined) return false;
     if (activeGenres.length && !activeGenres.includes(item.mainGenre?.trim() ?? "")) return false;
     if (needle && ![item.title, item.author, item.mainGenre].some((field) => field?.toLocaleLowerCase().includes(needle))) return false;
-    if (!activeFilter) return true;
-    if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
-    return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter, onlyUnused, unratedOnly, activeGenres, needle]);
+    return true;
+  }), [scoped, onlyUnused, unratedOnly, activeGenres, needle]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const activeSort: Sort = sort === "date" && !hasDates ? "recent" : sort;
@@ -262,7 +249,7 @@ export function CatalogWorkspaceScreen({
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
   const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
 
-  /** What sets an item apart, minus whatever the cover's top slot already carries (year by default) and who recommended it. */
+  /** What sets an item apart, minus whatever the cover's top slot already carries (year by default). */
   function detailsFor(item: CatalogItem): string[] {
     const topSlot = library?.coverTopProperty ?? "none";
     const custom = (item.attributes ?? [])
@@ -285,7 +272,6 @@ export function CatalogWorkspaceScreen({
   function metaFor(item: CatalogItem): string[] {
     return [
       ...detailsFor(item),
-      recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
     ].filter((part): part is string => Boolean(part));
   }
 
@@ -326,11 +312,9 @@ export function CatalogWorkspaceScreen({
     ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
   ];
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
-  const recommenderName = (key: string) => (key === "none" ? t("recommenderNone") : recommenders.find(([entry]) => entry === key)?.[1] ?? "");
   // What narrows the list, each removable on its own from the toolbar.
   const activeChips: Array<{ key: string; label: string; remove: () => void }> = [
     ...activeGenres.map((genre) => ({ key: `genre:${genre}`, label: genre, remove: () => setGenres(activeGenres.filter((entry) => entry !== genre)) })),
-    ...(activeFilter ? [{ key: "recommender", label: recommenderName(activeFilter), remove: () => setRecommenderFilter("") }] : []),
     ...(unratedOnly ? [{ key: "unrated", label: t("notRatedFilter"), remove: () => setUnratedOnly(false) }] : []),
     ...(onlyUnused ? [{ key: "unused", label: t("unusedOnly"), remove: () => setUnusedOnly(false) }] : []),
   ];
@@ -407,14 +391,6 @@ export function CatalogWorkspaceScreen({
             const on = activeGenres.includes(genre);
             return <IndexRow key={genre} box label={genre} on={on} count={scoped.filter((item) => item.mainGenre?.trim() === genre).length} onClick={() => setGenres(on ? activeGenres.filter((entry) => entry !== genre) : [...activeGenres, genre])} />;
           })}
-        </div>
-      ) : null}
-      {recommendationsEnabled && recommenders.length ? (
-        <div>
-          <p className={facetHeading}>{t("recommenderHeading")}</p>
-          {facetRows("recommender", [...recommenders, ["none", t("recommenderNone")] as [string, string]], ([key, name]) => (
-            <IndexRow key={key} box label={name} on={activeFilter === key} onClick={() => setRecommenderFilter(activeFilter === key ? "" : key)} />
-          ))}
         </div>
       ) : null}
       <div>
@@ -527,7 +503,7 @@ export function CatalogWorkspaceScreen({
               </div>
               {/* Sort and Select are left off phones for now. */}
               <div className="flex flex-1 items-center justify-end gap-2 max-sm:hidden sm:flex-none">
-                
+
                 {scoped.length ? <CompactSelect<Sort> className="max-sm:hidden" label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} /> : null}
                 {canManage && scoped.length ? (
                   <button type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={cx(chipClass(selecting), "max-sm:hidden")}>

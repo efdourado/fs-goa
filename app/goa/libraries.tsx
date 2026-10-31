@@ -7,7 +7,7 @@ import { API_PATHS, apiRequest } from "./api";
 import { CACHE_KEYS, readCache, writeCache } from "./cache";
 import { useGoaFormat } from "./format";
 import { RecipeIcon, type RecipeIconName } from "./recipe-icons";
-import type { CatalogItem, CatalogLibrary, CatalogRecommender, Id } from "./types";
+import type { CatalogItem, CatalogLibrary, Id } from "./types";
 import { choicePillClass, cx } from "./ui";
 
 /** Where a catalogue lives: the caller's own space, or one group's. */
@@ -153,15 +153,9 @@ export function useCatalogShelf(scope: CatalogScope): CatalogShelfData | null {
 }
 
 const pickLibraries = (raw: { libraries: CatalogLibrary[] }) => raw.libraries;
-const pickRecommenders = (raw: { recommenders: CatalogRecommender[] }) => raw.recommenders;
 
 export function useCatalogLibraries(scope: CatalogScope): Loaded<CatalogLibrary[]> {
   return useScopedList(API_PATHS.catalogWorkspace(scope).libraries, pickLibraries);
-}
-
-export function useCatalogRecommenders(scope: CatalogScope, enabled = true): Loaded<CatalogRecommender[]> {
-  // A disabled feature must not even ask — the path is empty and the hook stays idle.
-  return useScopedList(enabled ? API_PATHS.catalogWorkspace(scope).recommenders : "", pickRecommenders);
 }
 
 /** A row of pill buttons for choosing which library something belongs to, with an optional "new library" tail. */

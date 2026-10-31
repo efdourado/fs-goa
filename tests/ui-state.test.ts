@@ -695,7 +695,8 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
       { id: "rating", name: "Avaliação", purpose: "rating", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: true, fields: [{ id: "f-nota", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }] },
     ],
     fields: [],
-    items: [{ id: "i1", title: "Parasita", position: 0, catalogItem: { year: 2019 } }],
+    items: [{ id: "i1", title: "Parasita", position: 0, catalogItem: { year: 2019, mainGenre: "Drama", runtimeMinutes: 132,
+      attributes: [{ key: "direcao", label: "Direção", type: "text", value: "Bong Joon-ho" }, { key: "views", label: "Revisitas", type: "number", value: 0 }, { key: "seen", label: "Já visto", type: "boolean", value: false }] } }, { id: "i2", title: "Outro filme", position: 1, catalogItem: { year: 2024, mainGenre: "Comédia" } }],
     checkpoints: [],
     metrics: [],
     ruleSections: [],
@@ -713,6 +714,11 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
     onSaveEntry: async () => undefined,
   }));
 
+  assert.match(html, /<h2[^>]*>Parasita<\/h2>/);
+  assert.match(html, /2019 · Drama · 2h12 · Bong Joon-ho · 0 · Não/);
+  assert.equal(html.match(/2019 · Drama/g)?.length, 1, "item properties appear beside the rating form, not in the picker");
+  assert.ok(html.indexOf("2019 · Drama") > html.indexOf(">Parasita</h2>"));
+  assert.ok(html.indexOf("Bong Joon-ho") < html.indexOf("Salvar respostas"));
   assert.match(html, /Salvar respostas/, "um único botão salva as duas seções obrigatórias de uma vez");
   assert.doesNotMatch(html, /Salvar registro/, "cada seção não carrega mais o próprio botão de salvar");
 });

@@ -8,8 +8,8 @@ import { counterField, logRange } from "../checkin-days";
 import { CheckinLog, type LogCounter, type LogRecord } from "../checkin-log";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
+import { useLibraryProperties } from "../property-inputs";
 import { useDoneItems } from "../use-done-items";
-import { recommenderLine } from "../recommender-picker";
 import { RatingSlider } from "../rating-slider";
 import { isSealed, RevealPanel, sealedRatingType } from "../reveal";
 import { ChallengeResults, useChallengeStory, usePreviewStory } from "../story/for-challenge";
@@ -28,6 +28,7 @@ import type {
   ChallengeField,
   ChallengeItem,
   ChallengeItemInput,
+  ChallengeLibraryRef,
   Entry,
   EntryTypeView,
   FieldConfig,
@@ -1352,6 +1353,37 @@ function SharedAnswersSummary({ types, entries, itemId }: { types: EntryTypeView
   );
 }
 
+/** Full item context belongs beside the response form, while the picker stays compact. */
+function SelectedItemProperties({ item, library }: { item: ChallengeItem; library: ChallengeLibraryRef | null }) {
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const { properties } = useLibraryProperties(library);
+  const catalog = item.catalogItem;
+  if (!catalog) return null;
+
+  const native = (key: string, value: string | number | null | undefined) => {
+    const property = properties?.find((entry) => entry.storage === "native" && entry.key === key);
+    return property?.hidden || value === null || value === undefined || value === "" ? [] : [String(value)];
+  };
+  const details = [
+    ...native("author", catalog.author),
+    ...native("year", catalog.year),
+    ...native("main_genre", catalog.mainGenre),
+    ...native("page_count", catalog.pageCount),
+    ...native("runtime_minutes", formatRuntime(catalog.runtimeMinutes)),
+    ...native("scheduled_at", catalog.scheduledAt ? f.eventWhen(catalog.scheduledAt) : null),
+    ...(catalog.attributes ?? []).flatMap((attribute) => {
+      const property = properties?.find((entry) => entry.storage === "attribute" && (entry.attributeKey ?? entry.key) === attribute.key);
+      if (property?.hidden || attribute.value === "") return [];
+      return [attribute.type === "boolean" ? attribute.value ? tc("yes") : tc("no") : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value)];
+    }),
+  ];
+  if (!details.length) return null;
+  return <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)] [overflow-wrap:anywhere]">
+    {details.join(" · ")}
+  </p>;
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -1406,7 +1438,6 @@ export function ParticipantChallengeScreen({
   itemTools?: {
     members: Member[];
     scope: CatalogScope;
-    recommendationsEnabled: boolean;
     onAdd: (items: ChallengeItemInput[]) => Promise<void>;
     onUpdate: (itemId: Id, payload: Record<string, unknown>) => Promise<void>;
     onRemove: (itemId: Id) => Promise<void>;
@@ -1418,7 +1449,6 @@ export function ParticipantChallengeScreen({
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
-  const showRecommenders = challenge.recommendationsEnabled !== false;
   // Adding and editing items from Today: only on a running list with its library, for whoever manages it.
   const canAddItems = Boolean(itemTools) && !preview && challenge.submissionMode === "item" && challenge.status !== "closed" && Boolean(challenge.libraries?.length);
   const [addingItems, setAddingItems] = useState(false);
@@ -1669,18 +1699,6 @@ export function ParticipantChallengeScreen({
       ? [{ id: "today" }, { id: "grupo" }, { id: "results" }]
       : [{ id: "today" }, { id: "results" }];
 
-  // Extra detail for a picker row — only worth showing where there's room
-  // for it (widened once the picker moved out of the narrow Today sidebar).
-  const metaForItem = (item: ChallengeItem): string | undefined =>
-    [
-      item.catalogItem?.scheduledAt ? f.eventWhen(item.catalogItem.scheduledAt) : null,
-      item.catalogItem?.author ? t("byAuthor", { name: item.catalogItem.author }) : null,
-      showRecommenders ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
-      item.catalogItem?.year === null || item.catalogItem?.year === undefined ? null : String(item.catalogItem.year),
-      item.catalogItem?.mainGenre || null,
-      formatRuntime(item.catalogItem?.runtimeMinutes),
-    ].filter(Boolean).join(" · ") || undefined;
-
   // The picker on Today drives which checkpoint the form is filling; each row
   // ends with the rating this participant gave it.
   const checkpointPicker = sessionSpec ? null : sessionMode && sortedSessions.length > 1 ? (
@@ -1694,7 +1712,7 @@ export function ParticipantChallengeScreen({
         const label = boundItem?.title ?? session.title;
         return {
           id: session.id,
-          label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
+          label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 || canAddItems ? (
@@ -1716,7 +1734,7 @@ export function ParticipantChallengeScreen({
         const progress = !pages || !bookCount ? null
           : done || (read ?? 0) >= pages ? t("bookDone")
             : read === undefined ? null : t(item.catalogItem?.kind === "book" ? "bookProgress" : "countProgress", { page: read, total: pages, left: pages - read });
-        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
+        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? undefined, rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
@@ -1808,12 +1826,13 @@ export function ParticipantChallengeScreen({
               <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
                 {/* A habit's log names the day itself, so its card needs no "Check-in for …" title on top. */}
                 {showLog && !selectedItem ? null : <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-2xl font-light tracking-[-0.04em]">
+                  <div className="min-w-0 flex-1">
+                    <h2 className={cx("font-light tracking-[-0.04em]", selectedItem ? "text-xl sm:text-[22px]" : "text-2xl")}>
                       {selectedItem
                         ? selectedItem.title
                         : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                     </h2>
+                    {selectedItem ? <SelectedItemProperties item={selectedItem} library={(challenge.libraries ?? []).find((library) => library.kind === selectedItem.catalogItem?.kind) ?? null} /> : null}
                   </div>
                   {selectedItem?.dueAt
                     ? <span className={cx("flex-none rounded-full px-3 py-2 text-xs font-medium", selectedItem.status === "past_due" ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--wash)] text-[var(--muted)]")}>
@@ -1907,7 +1926,7 @@ export function ParticipantChallengeScreen({
                   </h2>
                 : null
               }
-              
+
               {selectedItem && sharedTypes.length ? <SharedAnswersSummary types={sharedTypes} entries={entries} itemId={selectedItem.id} /> : null}
               <div className="divide-y divide-[var(--line)]">
                 {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
@@ -1967,7 +1986,7 @@ export function ParticipantChallengeScreen({
           members={itemTools.members}
           scope={itemTools.scope}
           libraries={challenge.libraries ?? []}
-          recommendationsEnabled={itemTools.recommendationsEnabled}
+
           timeZone={timeZone}
           onClose={() => setAddingItems(false)}
           onAdd={async (items) => { await itemTools.onAdd(items); setAddingItems(false); }}
@@ -1980,7 +1999,7 @@ export function ParticipantChallengeScreen({
           members={itemTools.members}
           library={(challenge.libraries ?? []).find((library) => library.kind === editingItem.catalogItem?.kind) ?? null}
           scope={itemTools.scope}
-          recommendationsEnabled={itemTools.recommendationsEnabled}
+
           onCancel={() => setEditingItem(null)}
           onSave={async (payload) => { await itemTools.onUpdate(editingItem.id, payload); setEditingItem(null); }}
           entryCount={entries.filter((entry) => itemIdForEntry(entry) === editingItem.id).length}

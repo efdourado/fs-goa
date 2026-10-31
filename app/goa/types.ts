@@ -95,8 +95,6 @@ export interface GroupSummary {
   pendingRequests?: PendingGroupRequest[];
   /** People banned from the group — only sent to those who run it. */
   banned?: Array<{ id: Id; name: string; username: string }>;
-  /** When off, "who recommended it" is hidden and never asked for in this group. */
-  recommendationsEnabled?: boolean;
 }
 
 interface FieldOption {
@@ -191,17 +189,6 @@ export interface LibraryProperty {
   attributeKey?: string;
 }
 
-/** A person who recommends things but isn't in the workspace — saved by name, private to it. */
-export interface CatalogRecommender {
-  id: Id;
-  displayName: string;
-}
-
-/** Where an item came from: a member, a saved outside name, or nobody in particular. */
-export type RecommenderRef =
-  | { kind: "member"; id: Id; name: string }
-  | { kind: "external"; id: Id; name: string };
-
 export interface CatalogAttributeValue {
   key: string;
   label: string;
@@ -248,8 +235,6 @@ export interface CatalogItem {
   ratingCount?: number;
   /** Custom attributes this group/person defined for this kind — never global. */
   attributes?: CatalogAttributeValue[];
-  recommendedBy?: RecommenderRef | null;
-  originNote?: string | null;
 }
 
 export interface CatalogRoundHistory {
@@ -258,7 +243,6 @@ export interface CatalogRoundHistory {
   status: ChallengeStatus;
   startsOn?: string | null;
   endsOn?: string | null;
-  recommendedBy?: string | null;
   ratingAvg: number | null;
   ratingCount: number;
 }
@@ -281,9 +265,6 @@ export interface ChallengeItem {
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
   catalogItem?: Pick<CatalogItem, "id" | "kind" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre" | "scheduledAt" | "attributes"> | null;
-  recommendedBy?: RecommenderRef | null;
-  /** Free-text provenance for an item nobody in the group recommended. */
-  originNote?: string | null;
   /** When the group revealed this item's sealed (`until_reveal`) answers — null while still sealed. */
   revealedAt?: string | null;
   /** Who has answered a sealed type for this item — ids only; the values stay hidden until the reveal. */
@@ -359,7 +340,7 @@ export interface Entry {
 
 export type MetricOperation =
   | "sum" | "average" | "count" | "min" | "max" | "median" | "completion_rate"
-  | "bayesian_average" | "spread" | "consensus" | "surprise" | "indicator_bias";
+  | "bayesian_average" | "spread" | "consensus" | "surprise";
 
 export type MetricGroupBy =
   | "none" | "participant" | "item" | "checkpoint" | "day" | "week"
@@ -371,8 +352,6 @@ export interface MetricSeriesEntry {
   value: number | null;
   formattedValue?: string;
   sampleSize: number;
-  /** Item-grouped rows only. */
-  recommendedBy?: string | null;
   year?: number | null;
   /** Present when `value` is a bayesian-adjusted average — the plain average for comparison. */
   rawValue?: number | null;
@@ -432,7 +411,6 @@ export interface PersonalRanking {
   bottomItems: Array<{ title: string; value: number }>;
   biggestSurprise: { title: string; delta: number } | null;
   biggestDisappointment: { title: string; delta: number } | null;
-  indicationPerformance: number | null;
 }
 
 export interface AffinityPair {
@@ -564,8 +542,6 @@ export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
   /** Every library the challenge draws items from, in the order they were linked. */
   libraries?: ChallengeLibraryRef[];
-  /** False when the group switched recommendations off — `recommendedBy` / `originNote` then arrive empty. */
-  recommendationsEnabled?: boolean;
   entryTypes: EntryTypeView[];
   items: ChallengeItem[];
   /** Dated sessions, always present (empty for undated rounds), independent of `items`. */
@@ -756,14 +732,9 @@ export interface ChallengeItemInput {
   title: string;
   position: number;
   catalogItemId?: Id;
-  recommendedByUserId?: Id;
-  /** Free-text provenance when no participant recommended it. */
-  originNote?: string;
   /** Which of the challenge's libraries this item belongs to (`libraryKind` for a built-in with no id yet). */
   libraryId?: Id;
   libraryKind?: string;
-  /** A saved outside recommender (mutually exclusive with `recommendedByUserId` / `originNote`). */
-  recommendedByExternalId?: Id;
   /** Values for the library's custom properties, keyed by their attribute key. */
   attributes?: Record<string, string | number | boolean>;
   /** Checkpoint (week/session) this item is organised under. */
@@ -800,10 +771,6 @@ export interface ImportPreviewRow {
     runtimeMinutes: number | null;
     mainGenre: string | null;
   };
-  recommendation:
-    | { kind: "participant"; userId: Id; name: string }
-    | { kind: "origin"; text: string }
-    | null;
   existingCatalogItemId: Id | null;
   duplicateInChallenge: boolean;
   unknownKeys: string[];

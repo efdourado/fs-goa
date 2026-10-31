@@ -36,7 +36,7 @@ lib/
   goa/domain/           grupos, convites, criação de desafios, acesso, auditoria
   goa/challenges/       tudo de um desafio: receitas, tipos e campos, itens, etapas, registros,
                         revelação, métricas, pontuação, publicação, modelos, cópia
-  goa/catalog*.ts       bibliotecas, acervo, propriedades, indicadores
+  goa/catalog*.ts       bibliotecas, acervo, propriedades
   goa/analysis.ts       estatística pura (bayes, mediana, desvio, consenso, afinidade)
   goa/trash.ts purge.ts lixeira e exclusão definitiva
   goa/taste.ts          mapa de gosto do grupo
@@ -58,7 +58,7 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
 │   └── Acervo (catalog_items), identidade estável entre rodadas; propriedades nativas + atributos tipados
 └── Desafio (challenges), receita, período opcional, draft → active → closed
     ├── challenge_libraries, a biblioteca de onde vêm os itens (uma por desafio)
-    ├── challenge_items, o item nesta rodada (+ quem indicou, etapa, revelado em)
+    ├── challenge_items, o item nesta rodada (+ etapa, revelado em)
     ├── challenge_checkpoints, etapas (dia, semana, sessão, marco)
     ├── entry_types, o que se registra, em eixos independentes:
     │     purpose (rating · progress · completion · expectation · checkin)
@@ -76,6 +76,10 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
 - **Uma biblioteca por desafio** (migração `0061`): a receita define a sua (ou, em `custom`, quem cria
   escolhe), e ela só pode ser trocada enquanto o desafio não tem itens. Misturar bibliotecas foi removido
   de propósito: uma biblioteca já pode ser qualquer coisa, e as próximas features contam com isso.
+- **Indicações são campos criados pela pessoa**, não uma propriedade nativa do item ou da biblioteca.
+  Os antigos endpoints de indicadores, filtros, atribuições e métricas de viés foram removidos. As colunas
+  históricas permanecem no banco para não apagar dados durante esta limpeza; não são lidas nem gravadas
+  pelo fluxo de itens e não afetam a pontuação. A exclusão de conta/membro ainda limpa essas referências.
 - **Identidade do acervo**: filme e livro casam por título (+autor/ano); outras
   bibliotecas nunca fundem por título, a pessoa escolhe.
 - **Visibilidade** é por tipo de registro e aplicada em `listEntries`: autor e

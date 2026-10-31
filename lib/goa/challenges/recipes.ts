@@ -270,15 +270,6 @@ const cineMetrics: RecipeMetric[] = [
     settings: { minSample: 2, bayesPriorWeight: 4 },
   },
   { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
-  {
-    key: "vies_indicador",
-    label: "Viés do indicador",
-    operation: "indicator_bias",
-    fieldKey: "nota",
-    groupBy: "participant",
-    needsGroup: true,
-    settings: { minSample: 1 },
-  },
   completionMetric,
 ];
 
@@ -333,15 +324,6 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
         settings: { minSample: 3, bayesPriorWeight: 4 },
       },
       { key: "polarizacao", label: "Polarização por livro", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
-      {
-        key: "vies_indicador",
-        label: "Viés do indicador",
-        operation: "indicator_bias",
-        fieldKey: "nota",
-        groupBy: "participant",
-        needsGroup: true,
-        settings: { minSample: 1 },
-      },
       completionMetric,
     ],
   },

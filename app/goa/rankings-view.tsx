@@ -67,7 +67,6 @@ function PersonProfile({ person }: { person: PersonalRanking }) {
       ) : <p className="text-sm text-[var(--muted)]">{mean !== null ? fmt(mean) : "—"}</p>}
       <div className="flex flex-wrap gap-2 text-xs">
         {person.consistency !== null ? <span className="rounded-full bg-[var(--wash)] px-2.5 py-1">σ {fmt(person.consistency)}</span> : null}
-        {person.indicationPerformance !== null ? <span className="rounded-full bg-[var(--wash)] px-2.5 py-1">{t("rankings.indication").toLocaleLowerCase()} {signed(person.indicationPerformance)}</span> : null}
       </div>
       {person.topItems.length || person.bottomItems.length ? (
         <p className="text-sm">

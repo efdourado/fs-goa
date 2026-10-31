@@ -12,14 +12,6 @@ const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route
 const { dateKeyInTimeZone } = await import("../../lib/goa/domain/shared");
 const adminPool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
 
-/**
- * New libraries start without "who recommended it" (the property is hidden until switched on); the tests
- * about recommendations switch it back on for every library that exists at that point (the values were kept).
- */
-async function showRecommenders() {
-  await adminPool.query("UPDATE catalog_native_property_configs SET hidden = false WHERE property_key = 'recommended_by'");
-}
-
 type ClientSession = { cookie: string; csrf: string; user: { id: string; name: string; username: string } };
 
 async function call(
@@ -80,6 +72,8 @@ before(async () => {
     throw new Error("O teste de integração se recusa a limpar um banco que não seja goa_test.");
   }
   await adminPool.query("TRUNCATE users CASCADE");
+  // Login throttles have no user FK, so repeated test runs must reset them explicitly.
+  await adminPool.query("TRUNCATE login_attempts, rate_limits");
 });
 
 after(async () => {
@@ -135,7 +129,6 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     id: groupId,
     name: "Clube do Sofá Editado",
     description: "Cinema, conversa e bons hábitos.",
-    recommendationsEnabled: true,
   });
 
   await adminPool.query(
@@ -1608,7 +1601,7 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   assert.equal(sharedTransferred.rows[0]?.deleted_at, null, "o grupo transferido continua vivo");
 });
 
-test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", async () => {
+test("fase 1a: acervo do grupo e identidade do filme entre rodadas", async () => {
   const owner = await register("Clara", "clara_cat");
   const friend = await register("Dan", "dan_cat");
   const groupId = (await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube" } })).body as { id: string };
@@ -1624,7 +1617,7 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
       participantIds: [owner.user.id, friend.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [
-        { title: "Aftersun", recommendedByUserId: friend.user.id, year: 2022, mainGenre: "drama" },
+        { title: "Aftersun", year: 2022, mainGenre: "drama" },
         { title: "  perfect days ", year: 2023 },
       ],
     },
@@ -1640,11 +1633,9 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   assert.ok(aftersun);
   assert.equal(aftersun.year, 2022);
   assert.equal(aftersun.mainGenre, "drama");
-
-  await showRecommenders();
   const detail = await call("GET", `/api/challenges/${firstId}`, { session: owner });
   const items = (detail.body as { items: Array<{ title: string; catalogItem: { id: string; year: number | null } | null; recommendedBy: { name: string } | null }> }).items;
-  assert.equal(items[0].recommendedBy?.name, "Dan");
+  assert.equal(Object.hasOwn(items[0], "recommendedBy"), false);
   assert.equal(items[0].catalogItem?.id, aftersun.id);
 
   // segunda rodada reusa o mesmo filme por título → mesma identidade no acervo
@@ -1688,14 +1679,14 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   assert.equal(dunes.length, 1, "Dune 1984 e Dune 2021 são o mesmo filme");
   assert.equal(dunes[0].year, 2021, "o ano acompanha o lançamento mais recente");
 
-  // indicador precisa ser membro do grupo
+  // The retired built-in recommendation key is refused even for a valid member.
   const badRecommender = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
       recipe: "cinema", title: "Rodada ruim", ...period,
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
-      items: [{ title: "Qualquer", recommendedByUserId: "user-que-nao-existe" }],
+      items: [{ title: "Qualquer", recommendedByUserId: owner.user.id }],
     },
   });
   assert.equal(badRecommender.response.status, 400);
@@ -2081,126 +2072,6 @@ test("agenda do item (fase 5): data só ou data e hora, nunca um prazo que bloqu
   assert.equal(scored.response.status, 201, JSON.stringify(scored.body));
 });
 
-test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada por espaço e fora dos modelos públicos", async () => {
-  const admin = await register("Curadora", "curadora_indica");
-  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
-  const owner = await login("curadora_indica");
-  const other = await register("Outra", "outra_indica");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cine" } })).body as { id: string }).id;
-  const otherGid = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro grupo" } })).body as { id: string }).id;
-
-  const saved = await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana do trabalho" } });
-  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
-  const anaId = (saved.body as { id: string }).id;
-  const foreign = await call("POST", `/api/groups/${otherGid}/catalog/recommenders`, { session: other, body: { displayName: "Gente de outro grupo" } });
-  const foreignId = (foreign.body as { id: string }).id;
-
-  const listed = await call("GET", `/api/groups/${gid}/catalog/recommenders`, { session: owner });
-  assert.deepEqual((listed.body as { recommenders: Array<{ displayName: string }> }).recommenders.map((r) => r.displayName), ["Ana do trabalho"]);
-
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Indicados", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
-  });
-  const cid = (created.body as { id: string }).id;
-  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
-
-  // atribui pela escolha "nome salvo"
-  const assigned = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
-  assert.equal(assigned.response.status, 200, JSON.stringify(assigned.body));
-  await showRecommenders();
-  const inGroup = await call("GET", `/api/challenges/${cid}`, { session: owner });
-  assert.deepEqual(
-    (inGroup.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy,
-    { kind: "external", id: anaId, name: "Ana do trabalho" },
-  );
-
-  // um nome de outro espaço nunca pode ser atribuído, e as escolhas são exclusivas
-  const crossWorkspace = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: foreignId } });
-  assert.equal(crossWorkspace.response.status, 400, JSON.stringify(crossWorkspace.body));
-  const both = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, {
-    session: owner, body: { recommendedByExternalId: anaId, originNote: "achei num artigo" },
-  });
-  assert.equal(both.response.status, 400, JSON.stringify(both.body));
-
-  // renomear a pessoa não muda a atribuição — só o rótulo
-  const renamed = await call("PATCH", `/api/catalog/recommenders/${anaId}`, { session: owner, body: { displayName: "Ana (RH)" } });
-  assert.equal(renamed.response.status, 200, JSON.stringify(renamed.body));
-  const afterRename = await call("GET", `/api/challenges/${cid}`, { session: owner });
-  assert.deepEqual(
-    (afterRename.body as { items: Array<{ recommendedBy: { id: string; name: string } | null }> }).items[0].recommendedBy,
-    { kind: "external", id: anaId, name: "Ana (RH)" },
-  );
-
-  // a recomendação do item do desafio e a do acervo são atribuições independentes
-  const catalogItem = await call("POST", `/api/groups/${gid}/catalog/items`, {
-    session: owner, body: { kind: "other", title: "Documentário X", catalogRecommendedByExternalId: anaId },
-  });
-  assert.equal(catalogItem.response.status, 201, JSON.stringify(catalogItem.body));
-  await showRecommenders();
-  const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
-  const docs = (catalog.body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> }).items.find((item) => item.title === "Documentário X");
-  assert.equal(docs?.recommendedBy?.name, "Ana (RH)");
-  const aftersunEntry = (catalog.body as { items: Array<{ title: string; recommendedBy: unknown }> }).items.find((item) => item.title === "Aftersun");
-  assert.equal(aftersunEntry?.recommendedBy, null, "o item do desafio recomendado por Ana não vira a recomendação do acervo");
-
-  // fora dos modelos públicos: o nome externo nunca aparece
-  const published = await call("POST", `/api/challenges/${cid}/template`, { session: owner, body: {} });
-  assert.equal(published.response.status, 200, JSON.stringify(published.body));
-  const publicDetail = await call("GET", `/api/templates/${cid}`);
-  assert.equal(publicDetail.response.status, 200, JSON.stringify(publicDetail.body));
-  assert.equal(
-    (publicDetail.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy, null,
-    "o modelo público não expõe o nome externo",
-  );
-  assert.equal(JSON.stringify(publicDetail.body).includes("Ana"), false, "o nome não vaza em nenhum outro campo do modelo público");
-
-  // nem quem indicou sendo membro do grupo: nome e id ficam dentro do grupo
-  const byMember = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByUserId: owner.user.id } });
-  assert.equal(byMember.response.status, 200, JSON.stringify(byMember.body));
-  const inGroupMember = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ recommendedBy: { kind: string } | null }> };
-  assert.equal(inGroupMember.items[0].recommendedBy?.kind, "member", "dentro do grupo a indicação aparece");
-  const publicMember = await call("GET", `/api/templates/${cid}`);
-  assert.equal((publicMember.body as { items: Array<{ recommendedBy: unknown; originNote: unknown }> }).items[0].recommendedBy, null, "o modelo público não diz qual membro indicou");
-  assert.equal(JSON.stringify(publicMember.body).includes(owner.user.name), false, "o nome do membro não vaza no modelo público");
-  assert.equal(JSON.stringify(publicMember.body).includes(owner.user.id), false, "nem o id do membro");
-  await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
-
-  // desligar a indicação esconde a capacidade, sem apagar o dado
-  const disabled = await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: false } });
-  assert.equal(disabled.response.status, 200, JSON.stringify(disabled.body));
-  assert.equal((disabled.body as { recommendationsEnabled: boolean }).recommendationsEnabled, false);
-  // …a atribuição continua guardada, só deixa de ser mostrada a qualquer pessoa do grupo
-  const stored = await adminPool.query<{ recommended_by_external_id: string | null }>(
-    "SELECT recommended_by_external_id FROM challenge_items WHERE id = $1", [itemId],
-  );
-  assert.equal(stored.rows[0].recommended_by_external_id, anaId, "a atribuição continua guardada");
-  const hidden = await call("GET", `/api/challenges/${cid}`, { session: owner });
-  assert.equal((hidden.body as { recommendationsEnabled: boolean }).recommendationsEnabled, false);
-  assert.equal((hidden.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy, null, "desligado, o nome não é mais mostrado");
-  const hiddenCatalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
-  assert.equal(
-    (hiddenCatalog.body as { items: Array<{ title: string; recommendedBy: unknown }> }).items.find((item) => item.title === "Documentário X")?.recommendedBy,
-    null, "nem no acervo",
-  );
-  // e enquanto estiver desligado, também não dá para registrar uma nova indicação
-  const refused = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
-  assert.equal(refused.response.status, 409, JSON.stringify(refused.body));
-  assert.equal((refused.body as { error: string }).error, "recommendations_disabled");
-  const refusedNew = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Sem indicação", participantIds: [owner.user.id], items: [{ title: "Solaris", originNote: "um blog" }] },
-  });
-  assert.equal(refusedNew.response.status, 409, JSON.stringify(refusedNew.body));
-  // limpar continua permitido, e religar traz tudo de volta
-  const cleared = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: "", originNote: "" } });
-  assert.equal(cleared.response.status, 200, JSON.stringify(cleared.body));
-  await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: true } });
-  const catalogBack = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
-  assert.equal(
-    (catalogBack.body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> }).items.find((item) => item.title === "Documentário X")?.recommendedBy?.name,
-    "Ana (RH)", "religado, a indicação do acervo volta",
-  );
-});
-
 test("Tables (fase 7): a biblioteca só existe quando a pessoa a cria, três notas 0–5 e comentário opcional, sem campos forçados", async () => {
   const owner = await register("Bruna", "bruna_tables");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;
@@ -2397,7 +2268,6 @@ test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo comparti
   const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
 
   const library = (await call("POST", `/api/groups/${srcGid}/catalog/libraries`, { session: owner, body: { label: "Futebol" } })).body as { id: string; kind: string };
-  const ana = (await call("POST", `/api/groups/${srcGid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana do trabalho" } })).body as { id: string };
   const created = await call("POST", `/api/groups/${srcGid}/challenges`, {
     session: owner,
     body: { recipe: "custom", title: "Copa", libraryId: library.id, participantIds: [owner.user.id], items: [{ title: "Brasil x Argentina" }] },
@@ -2405,7 +2275,7 @@ test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo comparti
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
-  await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: ana.id } });
+  await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { } });
   const shared = await call("POST", `/api/challenges/${cid}/entry-types`, {
     session: owner,
     body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
@@ -2592,7 +2462,7 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { label: null, hidden: false } });
   const overrides = await adminPool.query<{ property_key: string }>("SELECT property_key FROM catalog_native_property_configs WHERE library_id = $1", [screens.id]);
   // (the "who recommended it" row is the library's own default: it starts switched off)
-  assert.deepEqual(overrides.rows.map((row) => row.property_key).sort(), ["recommended_by", "title"]);
+  assert.deepEqual(overrides.rows.map((row) => row.property_key).sort(), ["title"]);
 
   // uma propriedade personalizada usa exatamente a mesma chamada
   const def = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { kind: "film", label: "Diretor" } });
@@ -3163,7 +3033,7 @@ type SeriesRow = {
 };
 type ApiMetric = { id: string; label: string; operation: string; groupBy: string; minSample?: number; value: number | null; series?: SeriesRow[] };
 
-test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática", async () => {
+test("motor de análise: ranking ajustado, surpresa e vitrine automática", async () => {
   const owner = await register("Ana", "ana_an");
   const bob = await register("Bruno", "bruno_an");
   const carol = await register("Carla", "carla_an");
@@ -3181,7 +3051,7 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
       recipe: "cinema", title: "Ciclo 1", startsOn: "2026-08-01", endsOn: "2026-12-31",
       participantIds: [owner.user.id, bob.user.id, carol.user.id],
       items: [
-        { title: "Solaris", recommendedByUserId: owner.user.id },
+        { title: "Solaris", },
         { title: "Persona" },
       ],
     },
@@ -3234,9 +3104,7 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   const solarisSurprise = surprise.series!.find((s) => s.label === "Solaris")!;
   assert.ok(solarisSurprise.value !== null && solarisSurprise.value > 0, "Solaris superou a expectativa");
 
-  const bias = metrics.find((m) => m.operation === "indicator_bias")!;
-  const anaBias = bias.series!.find((s) => s.label === "Ana");
-  assert.ok(anaBias && anaBias.value !== null, "viés do indicador calculado para quem indicou");
+  assert.equal(metrics.some((metric) => metric.operation === "indicator_bias"), false);
 
   // a vitrine foi gerada sozinha ao encerrar — só os blocos derivados (métricas,
   // rankings, comentários). Nenhum texto é gerado: nem manchete, nem resumo.
@@ -3806,7 +3674,7 @@ test("membro sai do grupo e leva tudo o que era dele; o responsável não sai", 
       title: "Rodada com três",
       submissionMode: "item",
       participantIds: [owner.user.id, keeper.user.id, purger.user.id],
-      items: [{ title: "Primeiro filme", recommendedByUserId: keeper.user.id }],
+      items: [{ title: "Primeiro filme", }],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
     },
   });
@@ -3860,7 +3728,7 @@ test("membro sai do grupo e leva tudo o que era dele; o responsável não sai", 
     items: Array<{ recommendedBy: { name: string } | null }>;
     metrics: ApiMetric[];
   };
-  assert.equal(detailAfterLeave.items[0].recommendedBy, null, "indicação de quem saiu não aparece mais");
+  assert.equal(Object.hasOwn(detailAfterLeave.items[0], "recommendedBy"), false);
   const byPersonSeries = detailAfterLeave.metrics.find((metric) => metric.label === "Nota por pessoa")!.series!;
   assert.ok(!byPersonSeries.some((row) => row.label === "Quem já saiu" || row.value === 4), "a nota de quem saiu não conta mais");
 
@@ -4346,7 +4214,7 @@ test("amostra mínima de uma métrica é configurável — um grupo pequeno pode
   assert.equal(loweredSeries.find((row) => row.label === "Só um voto")!.value, 4.93, "com amostra mínima 1, o voto único já conta (pela pontuação Goa)");
 });
 
-test("um ranking por item traz quem indicou, o ano do catálogo e a média crua ao lado da nota ajustada", async () => {
+test("um ranking por item traz o ano do catálogo e a média crua sem indicação fixa", async () => {
   const owner = await register("Dona Ranking Rico", "dona_ranking_rico");
   const keeper = await register("Indica Filme", "indica_filme_rico");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Ranking Rico" } })).body as { id: string }).id;
@@ -4358,7 +4226,7 @@ test("um ranking por item traz quem indicou, o ano do catálogo e a média crua 
     body: {
       recipe: "cinema", title: "Ranking rico", participantIds: [owner.user.id, keeper.user.id],
       items: [
-        { title: "Aftersun", year: 2022, recommendedByUserId: keeper.user.id },
+        { title: "Aftersun", year: 2022, },
         { title: "Filme Contraponto", year: 2020 },
       ],
     },
@@ -4385,12 +4253,10 @@ test("um ranking por item traz quem indicou, o ano do catálogo e a média crua 
     body: { label: "Ranking com 1 voto", operation: "bayesian_average", fieldId: notaField, groupBy: "item", minSample: 1 },
   });
   assert.equal(customRanking.response.status, 201, JSON.stringify(customRanking.body));
-
-  await showRecommenders();
   const withRanking = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
   const ranking = withRanking.metrics.find((metric) => metric.label === "Ranking com 1 voto")!;
   const row = ranking.series!.find((entry) => entry.label === "Aftersun")!;
-  assert.equal(row.recommendedBy, "Indica Filme", "a linha do ranking traz quem indicou o filme");
+  assert.equal(Object.hasOwn(row, "recommendedBy"), false);
   assert.equal(row.year, 2022, "e o ano do catálogo");
   assert.ok(row.rawValue !== undefined && row.rawValue !== null, "traz a média crua por trás do ajuste bayesiano");
   assert.notEqual(row.rawValue, row.value, "com uma amostra de 1, a média crua e a ajustada divergem (o ajuste encolhe rumo à média geral)");
@@ -4596,14 +4462,12 @@ test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desc
   assert.equal(previewBody.summary.total, 4);
   assert.equal(previewBody.summary.invalid, 1, "a linha sem título é inválida");
   assert.equal(previewBody.summary.duplicatesInChallenge, 1, "'Filme Já Existe' já é um item ativo");
-  assert.deepEqual(previewBody.summary.unknownKeys, ["notes", "vibe"], "chaves fora do mapa conhecido são listadas");
+  assert.deepEqual(previewBody.summary.unknownKeys, ["indicadoPor", "notes", "origem", "vibe"], "chaves fora do mapa conhecido são listadas");
   assert.equal(previewBody.rows[0].mapped.year, 2022, "'ano' foi mapeado para year");
-  assert.equal(previewBody.rows[0].recommendation?.kind, "participant", "'indicadoPor' bateu com um participante");
-  assert.equal(previewBody.rows[0].recommendation?.name, "Curador Import");
+  assert.ok(!("recommendation" in previewBody.rows[0]));
   assert.equal(previewBody.rows[1].duplicateInChallenge, true);
   assert.equal(previewBody.rows[2].valid, false);
-  assert.equal(previewBody.rows[3].recommendation?.kind, "origin", "origem externa vira texto, não participante");
-  assert.equal(previewBody.rows[3].recommendation?.text, "lista de um blog");
+  assert.ok(!("recommendation" in previewBody.rows[3]));
 
   const stillOne = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] };
   assert.equal(stillOne.items.length, 1, "a prévia não escreve nada");
@@ -4617,28 +4481,27 @@ test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desc
   const afterPartial = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] };
   assert.equal(afterPartial.items.length, 1, "nada da lista parcial foi criado");
 
-  // Commit consistente: indicação por participante e origem textual convivem.
+  // The commit only accepts real item properties.
   const commit = await call("POST", `/api/challenges/${challengeId}/items`, {
     session: owner,
     body: {
       items: [
-        { title: "Aftersun", year: 2022, recommendedByUserId: keeper.user.id },
-        { title: "Achado na Internet", originNote: "lista de um blog" },
+        { title: "Aftersun", year: 2022, },
+        { title: "Achado na Internet", },
       ],
     },
   });
   assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
-  await showRecommenders();
   const finalDetail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     items: Array<{ title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
   };
   assert.equal(finalDetail.items.length, 3);
   const aftersun = finalDetail.items.find((item) => item.title === "Aftersun")!;
-  assert.equal(aftersun.recommendedBy?.name, "Curador Import");
-  assert.equal(aftersun.originNote, null);
+  assert.equal(Object.hasOwn(aftersun, "recommendedBy"), false);
+  assert.equal(Object.hasOwn(aftersun, "originNote"), false);
   const online = finalDetail.items.find((item) => item.title === "Achado na Internet")!;
-  assert.equal(online.recommendedBy, null);
-  assert.equal(online.originNote, "lista de um blog");
+  assert.equal(Object.hasOwn(online, "recommendedBy"), false);
+  assert.equal(Object.hasOwn(online, "originNote"), false);
 
   // O limite da operação vale.
   const tooMany = await call("POST", `/api/challenges/${challengeId}/items/preview`, {
@@ -5164,7 +5027,7 @@ test("rankings pessoais e afinidade direta com três contas; afinidade composta 
   }
   const items = Array.from({ length: 6 }, (_, i) => ({
     title: `F${i}`, year: 2000 + i, mainGenre: i % 2 === 0 ? "drama" : "ficção",
-    ...(i === 0 ? { recommendedByUserId: bob.user.id } : {}),
+    ...(i === 0 ? { } : {}),
   }));
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
@@ -5213,7 +5076,7 @@ test("rankings pessoais e afinidade direta com três contas; afinidade composta 
   assert.ok(bruno.ratingsMedian !== null, "traz mediana pessoal");
   assert.ok(bruno.consistency !== null, "e a consistência (desvio das próprias notas)");
   assert.ok(bruno.topItems.length > 0, "e o top pessoal");
-  assert.ok(bruno.indicationPerformance !== null, "Bruno indicou F0 — tem desempenho de indicação");
+  assert.equal(Object.hasOwn(bruno, "indicationPerformance"), false);
   assert.ok(bruno.biggestSurprise !== null, "e a maior surpresa (avaliação acima da expectativa)");
 
   const affinity = result.result.affinity!;
@@ -5281,48 +5144,6 @@ test("mudar a anonimização atualiza a vitrine já publicada ao vivo, sem tirar
   const anonNames = (anon.body as { challenge: { participants: string[] } }).challenge.participants;
   assert.ok(!anonNames.includes("Bento Anon"), "agora todo mundo aparece anonimizado, imediatamente");
   assert.ok(anonNames.every((name) => /^Participante \d+$/.test(name)));
-});
-
-test("publicação anônima mascara o nome de quem indicou o filme no ranking, não só os participantes", async () => {
-  const owner = await register("Marta Indica", "marta_indica_anon");
-  const b = await register("Beto Indica", "beto_indica_anon");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Indica" } })).body as { id: string }).id;
-  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
-  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
-  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "cinema", title: "Ciclo com indicações", participantIds: [owner.user.id, b.user.id],
-      items: [
-        { title: "O Filme da Marta", recommendedByUserId: owner.user.id },
-        { title: "O Filme do Beto", recommendedByUserId: b.user.id },
-        { title: "O Filme do Beto 2", recommendedByUserId: b.user.id },
-      ],
-    },
-  });
-  const challengeId = (challenge.body as { id: string }).id;
-  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
-    items: Array<{ id: string; title: string }>;
-  };
-  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
-  const nota = rating.fields.find((f) => f.key === "nota")!.id;
-  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
-  await call("POST", `/api/challenges/${challengeId}/metrics`, {
-    session: owner, body: { label: "Ranking", operation: "bayesian_average", fieldId: nota, groupBy: "item", minSample: 1 },
-  });
-  for (const item of d.items) {
-    for (const s of [owner, b]) {
-      await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: item.id, entryTypeId: rating.id, values: { [nota]: 4 } } });
-    }
-  }
-  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { metricIds: [], comments: [], anonymizeParticipants: true } });
-  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
-  const token = (pub.body as { url: string }).url.split("/results/")[1];
-  const dump = JSON.stringify((await call("GET", `/api/results/${token}`)).body);
-  assert.doesNotMatch(dump, /Marta Indica|Beto Indica/, "nenhum nome real de indicador aparece na vitrine anônima");
-  assert.match(dump, /"recommendedBy":"Participante \d+"/, "a indicação vira rótulo genérico");
 });
 
 test("o fio público: nomes mascarados pelas mesmas regras, nenhum id real e nenhuma palavra", async () => {
@@ -5893,28 +5714,24 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   assert.deepEqual(pv.summary.unknownKeys, ["diretorx", "vibe"]);
   assert.equal(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] }).items.length, 1, "a prévia não grava nada");
 
-  // 6. Indicação opcional a cada filme (participante quando possível, texto de origem quando não).
+  // 6. The list carries only item properties and user-defined attributes.
   const toCommit: Array<Record<string, unknown>> = films
     .filter((film) => film.title !== "Filme 07")
     .map((film, i) => ({
       title: film.title,
       runtimeMinutes: 90 + (i % 4) * 15,
-      ...(i % 3 === 0 ? { recommendedByUserId: everyone[i % everyone.length].user.id } : { originNote: "lista de um blog" }),
       ...(i < 2 ? { attributes: { [attrKey]: `Diretor ${i}` } } : {}),
     }));
   toCommit.push({ title: "Filme 31", runtimeMinutes: 100 });
   const commit = await call("POST", `/api/challenges/${challengeId}/items`, { session: owner, body: { items: toCommit } });
   assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
-
-  await showRecommenders();
   let detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     entryTypes: Array<{ id: string; purpose: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
     items: Array<{ id: string; title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
     checkpoints: Array<{ id: string; title: string; totalRuntimeMinutes: number | null; itemCount: number }>;
   };
   assert.equal(detail.items.length, 31, "30 filmes + Filme 31");
-  assert.ok(detail.items.some((it) => it.recommendedBy), "alguns filmes têm indicador participante");
-  assert.ok(detail.items.some((it) => it.originNote), "outros têm origem textual");
+  assert.ok(detail.items.every((item) => !Object.hasOwn(item, "recommendedBy") && !Object.hasOwn(item, "originNote")));
 
   // 7. Distribuir filmes entre os checkpoints.
   const itemId = (title: string) => detail.items.find((it) => it.title === title)!.id;
@@ -7139,76 +6956,6 @@ test("lixeira pessoal: mostra o desafio pessoal binado e um fantasma pré-regist
   assert.equal(stillWorks.response.status, 201, "o fantasma não conta para o limite do espaço pessoal");
 });
 
-test("indicações em itens novos: nome salvo na criação e na adição, isolado por espaço, e o acervo de filme guarda a primeira indicação", async () => {
-  const owner = await register("Dora", "dora_indica");
-  const other = await register("Enzo", "enzo_indica");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessão da Tarde" } })).body as { id: string }).id;
-  const otherGid = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro" } })).body as { id: string }).id;
-  const ana = ((await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana" } })).body as { id: string }).id;
-  const foreign = ((await call("POST", `/api/groups/${otherGid}/catalog/recommenders`, { session: other, body: { displayName: "Alheia" } })).body as { id: string }).id;
-
-  const boot = await call("GET", "/api/bootstrap", { session: owner });
-  assert.equal(
-    (boot.body as { groups: Array<{ id: string; recommendationsEnabled: boolean }> }).groups.find((group) => group.id === gid)?.recommendationsEnabled,
-    true, "o bootstrap diz se o grupo usa indicações",
-  );
-
-  // na criação: um nome salvo por item, no mesmo lugar em que um membro ou uma nota já cabiam
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "cinema", title: "Indicados", participantIds: [owner.user.id],
-      items: [{ title: "Aftersun", recommendedByExternalId: ana }, { title: "Solaris", originNote: "um blog" }, { title: "Stalker" }],
-    },
-  });
-  assert.equal(created.response.status, 201, JSON.stringify(created.body));
-  const cid = (created.body as { id: string }).id;
-  await showRecommenders();
-  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
-    items: Array<{ title: string; recommendedBy: { kind: string; name: string } | null; originNote: string | null }>;
-  };
-  const byTitle = new Map(detail.items.map((item) => [item.title, item]));
-  assert.deepEqual(byTitle.get("Aftersun")?.recommendedBy, { kind: "external", id: ana, name: "Ana" });
-  assert.equal(byTitle.get("Solaris")?.originNote, "um blog");
-  assert.equal(byTitle.get("Stalker")?.recommendedBy, null);
-
-  // nome de outro espaço, ou duas origens de uma vez: recusado, e nada é criado pela metade
-  const crossWorkspace = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Alheio", participantIds: [owner.user.id], items: [{ title: "X", recommendedByExternalId: foreign }] },
-  });
-  assert.equal(crossWorkspace.response.status, 400, JSON.stringify(crossWorkspace.body));
-  const both = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Duas", participantIds: [owner.user.id], items: [{ title: "X", recommendedByExternalId: ana, originNote: "e um blog" }] },
-  });
-  assert.equal(both.response.status, 400, JSON.stringify(both.body));
-
-  // adicionando depois, em lote e um a um
-  const batch = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { items: [{ title: "Nostalgia", recommendedByExternalId: ana }] } });
-  assert.equal(batch.response.status, 201, JSON.stringify(batch.body));
-  const single = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Espelho", recommendedByExternalId: ana } });
-  assert.equal(single.response.status, 201, JSON.stringify(single.body));
-  const later = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> };
-  assert.equal(later.items.find((item) => item.title === "Nostalgia")?.recommendedBy?.name, "Ana");
-  assert.equal(later.items.find((item) => item.title === "Espelho")?.recommendedBy?.name, "Ana");
-
-  // acervo de filme: a primeira indicação fica; uma segunda adição do mesmo título não a sobrescreve
-  const first = await call("POST", `/api/groups/${gid}/catalog/items`, {
-    session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByUserId: owner.user.id },
-  });
-  assert.equal(first.response.status, 201, JSON.stringify(first.body));
-  const again = await call("POST", `/api/groups/${gid}/catalog/items`, {
-    session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByExternalId: ana },
-  });
-  assert.equal(again.response.status, 201, JSON.stringify(again.body));
-  assert.equal((again.body as { id: string }).id, (first.body as { id: string }).id, "filme repetido reaproveita o mesmo item");
-  const personaId = (first.body as { id: string }).id;
-  const item = (await call("GET", `/api/groups/${gid}/catalog/${personaId}`, { session: owner })).body as {
-    recommendedBy: { kind: string; name: string } | null; originNote: string | null;
-  };
-  assert.equal(item.recommendedBy?.kind, "member", "o detalhe do item do acervo mostra quem indicou");
-  assert.equal(item.recommendedBy?.name, "Dora");
-});
-
 test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchimento de uma resposta compartilhada muda depois", async () => {
   const owner = await register("Fábio", "fabio_biblio");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolê" } })).body as { id: string }).id;
@@ -7221,7 +6968,7 @@ test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchiment
     libraries: Array<{ id: string | null; kind: string; source: string }>; recommendationsEnabled: boolean;
   };
   assert.deepEqual(cinemaDetail.libraries.map((library) => [library.kind, library.source]), [["film", "screens"]]);
-  assert.equal(cinemaDetail.recommendationsEnabled, true);
+  assert.equal(Object.hasOwn(cinemaDetail, "recommendationsEnabled"), false);
 
   await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } });
   const tables = await call("POST", `/api/groups/${gid}/challenges`, {
@@ -8701,12 +8448,11 @@ test("varredura de vazamento: nenhuma porta pública traz username, e-mail, id d
     const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: zelda, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
     await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
   }
-  const external = (await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: zelda, body: { displayName: "Tia Externa" } })).body as { id: string };
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: zelda,
     body: {
       recipe: "cinema", title: "Cine Vaza", participantIds: people.map((person) => person.user.id),
-      items: [{ title: "Filme Um", recommendedByUserId: clara.user.id }, { title: "Filme Dois" }, { title: "Filme Tres", recommendedByUserId: davi.user.id }],
+      items: [{ title: "Filme Um", }, { title: "Filme Dois" }, { title: "Filme Tres", }],
     },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
@@ -8714,7 +8460,7 @@ test("varredura de vazamento: nenhuma porta pública traz username, e-mail, id d
   type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }> };
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: zelda })).body as Detail;
   const second = detail.items.find((item) => item.title === "Filme Dois")!;
-  await call("PATCH", `/api/challenges/${cid}/items/${second.id}`, { session: zelda, body: { recommendedByExternalId: external.id, originNote: "origem-secreta" } });
+  await call("PATCH", `/api/challenges/${cid}/items/${second.id}`, { session: zelda, body: { } });
   const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
   const nota = rating.fields.find((field) => field.key === "nota")!.id;
   const comentario = rating.fields.find((field) => field.key === "comentario")!.id;
@@ -8976,7 +8722,7 @@ test("banir: tudo da pessoa some do grupo, ela não volta por convite, dois admi
   await call("PATCH", `/api/groups/${gid}/members/${admin.user.id}`, { session: owner, body: { role: "admin" } });
   const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
-    body: { recipe: "cinema", title: "Antes do ban", participantIds: [owner.user.id, admin.user.id, target.user.id], items: [{ title: "Filme do Tito", recommendedByUserId: target.user.id }] },
+    body: { recipe: "cinema", title: "Antes do ban", participantIds: [owner.user.id, admin.user.id, target.user.id], items: [{ title: "Filme do Tito", }] },
   })).body as { id: string }).id;
   type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; recommendedBy: unknown }>; participants: Array<{ id: string }> };
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
@@ -9008,7 +8754,7 @@ test("banir: tudo da pessoa some do grupo, ela não volta por convite, dois admi
   );
   assert.deepEqual(left.rows[0], { entries: 0, parts: 0, active: 0 }, "nada dele fica");
   const after = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
-  assert.equal(after.items[0].recommendedBy, null, "nem a indicação");
+  assert.equal(Object.hasOwn(after.items[0], "recommendedBy"), false);
   assert.ok(!after.participants.some((person) => person.id === target.user.id));
   assert.ok(!JSON.stringify((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body).includes(target.user.id));
   assert.equal((await call("GET", `/api/challenges/${cid}`, { session: target })).response.status >= 400, true, "ele não vê mais o desafio");
@@ -9307,4 +9053,38 @@ test("propriedades: tipos vazios editáveis, remoção sem switch e topo automá
   assert.equal(await top(film.id), "year");
   const detail = (await call("GET", `/api/groups/${gid}/catalog/${(item.body as { id: string }).id}`, { session: owner })).body as { attributes: Array<{ key: string; value: unknown }> };
   assert.equal(detail.attributes.find((value) => value.key === first.key)?.value, 12, "o tipo recusado não altera valores existentes");
+});
+
+test("retired recommendation flow: old assignments stay out of item payloads and old APIs cannot assign them", async () => {
+  const owner = await register("Rita Campos", "rita_legacy_recs");
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Campos livres" } });
+  assert.equal(group.response.status, 201, JSON.stringify(group.body));
+  const gid = (group.body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: {
+    recipe: "cinema", title: "Cinema sem indicação fixa", participantIds: [owner.user.id], items: [{ title: "Aftersun", year: 2022, mainGenre: "Drama" }],
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.equal(detail.response.status, 200, JSON.stringify(detail.body));
+  const first = (detail.body as { items: Array<{ id: string; catalogItem: { id: string } }> }).items[0];
+  await adminPool.query("UPDATE challenge_items SET recommended_by_user_id=$2 WHERE id=$1", [first.id, owner.user.id]);
+  await adminPool.query("UPDATE catalog_items SET recommended_by_user_id=$2 WHERE id=$1", [first.catalogItem.id, owner.user.id]);
+  for (const path of [`/api/challenges/${cid}`, `/api/groups/${gid}/catalog`, `/api/groups/${gid}/catalog/${first.catalogItem.id}`]) {
+    const response = await call("GET", path, { session: owner });
+    assert.equal(response.response.status, 200, JSON.stringify(response.body));
+    assert.doesNotMatch(JSON.stringify(response.body), /"recommendedBy"|"originNote"|"recommendationsEnabled"/);
+  }
+  for (const path of [`/api/challenges/${cid}/items/${first.id}`, `/api/catalog/${first.catalogItem.id}`]) {
+    const changed = await call("PATCH", path, { session: owner, body: { recommendedByUserId: owner.user.id } });
+    assert.equal(changed.response.status, 400, JSON.stringify(changed.body));
+    assert.equal((changed.body as { error: string }).error, "retired_property");
+  }
+  const refused = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: {
+    recipe: "cinema", title: "No fixed recommendation", items: [{ title: "Film", recommendedByUserId: owner.user.id }],
+  } });
+  assert.equal(refused.response.status, 400, JSON.stringify(refused.body));
+  assert.equal((refused.body as { error: string }).error, "retired_property");
+  assert.equal((await call("GET", `/api/groups/${gid}/catalog/recommenders`, { session: owner })).response.status, 404);
+  assert.equal((await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Outside person" } })).response.status, 404);
 });

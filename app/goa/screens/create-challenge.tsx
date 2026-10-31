@@ -157,7 +157,6 @@ export function CreateChallengeScreen({
   const [newLibrary, setNewLibrary] = useState(false);
   const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
   const { data: libraries, reload: reloadLibraries } = useCatalogLibraries(scope);
-  const recommendationsEnabled = personal || group?.recommendationsEnabled !== false;
   const itemInputs = cineRowsToInput(cineItems);
   const recipe = recipeFor(structure, pickedKind, recordingMode, answerScope);
   const tracksCatalog = structure !== "daily";
@@ -684,7 +683,7 @@ export function CreateChallengeScreen({
                 members={personal ? [] : group?.members ?? []}
                 scope={scope}
                 libraries={itemLibraries}
-                recommendationsEnabled={recommendationsEnabled}
+
                 onProblem={setItemProblem}
                 addDialogOpen={itemsAdding}
                 onAddDialogOpenChange={setItemsAdding}

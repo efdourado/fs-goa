@@ -52,7 +52,8 @@ test("o placar sai das notas: média por item, campeão, maior decepção e méd
   assert.equal(model.champion?.title, "John Wick");
   assert.equal(model.disappointment?.title, "Gente Grande");
   assert.equal(model.overallAvg, (3 + 2 + 5 + 4.5) / 4);
-  assert.deepEqual(model.people.map((person) => [person.name, person.recommendedCount]), [["Vivi", 4], ["Dudu", 3]]);
+  assert.deepEqual(model.people.map((person) => person.name), ["Vivi", "Dudu"]);
+  assert.ok(model.chapters.flatMap((chapter) => chapter.items).every((item) => !("recommender" in item)));
 });
 
 test("sete itens sem sessões viram blocos de cores seguidas; o progresso de cada dia vira uma linha com total", () => {

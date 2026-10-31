@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import type { CineRow } from "./cine-items";
 import { FormDialog } from "./dialog";
 import { organiseList, suggestedTraits, type OrganiseItem, type Trait, usableTraits } from "./organize-list";
-import type { CatalogRecommender, ChallengeItem, Id, LibraryProperty, Member } from "./types";
+import type { ChallengeItem, Id, LibraryProperty } from "./types";
 import { cx } from "./ui";
 
 /** What the organiser reads: each item's values, the properties on offer, and a title to show per key. */
@@ -16,10 +16,9 @@ export interface OrganiseInput {
   titles: Record<string, string>;
 }
 
-type Labels = (key: "runtime" | "pages" | "year" | "genre" | "author" | "recommender") => string;
+type Labels = (key: "runtime" | "pages" | "year" | "genre" | "author") => string;
 
-const NATIVE: Array<{ key: "runtime" | "pages" | "year" | "genre" | "author" | "recommender"; kind: Trait["kind"]; fair?: boolean }> = [
-  { key: "recommender", kind: "category", fair: true },
+const NATIVE: Array<{ key: "runtime" | "pages" | "year" | "genre" | "author"; kind: Trait["kind"]; fair?: boolean }> = [
   { key: "runtime", kind: "number" },
   { key: "pages", kind: "number" },
   { key: "genre", kind: "category" },
@@ -37,7 +36,7 @@ function customTraits(properties: LibraryProperty[]): Trait[] {
 const asNumber = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number.isFinite(Number(value)) ? Number(value) : null);
 
 /** The wizard's rows (a challenge being created). */
-export function organiseFromRows(rows: CineRow[], properties: LibraryProperty[], members: Member[], recommenders: CatalogRecommender[], label: Labels): OrganiseInput {
+export function organiseFromRows(rows: CineRow[], properties: LibraryProperty[], label: Labels): OrganiseInput {
   const items = rows.map((row): OrganiseItem => ({
     key: row.key,
     values: {
@@ -46,9 +45,6 @@ export function organiseFromRows(rows: CineRow[], properties: LibraryProperty[],
       year: asNumber(row.year),
       genre: row.mainGenre || null,
       author: row.author || null,
-      recommender: row.recommender.kind === "member" ? members.find((member) => member.id === (row.recommender as { userId: Id }).userId)?.name ?? null
-        : row.recommender.kind === "external" ? recommenders.find((person) => person.id === (row.recommender as { recommenderId: Id }).recommenderId)?.displayName ?? null
-          : null,
       ...Object.fromEntries(customTraits(properties).map((trait) => {
         const raw = row.extra[trait.key.slice(5)];
         return [trait.key, trait.kind === "number" ? asNumber(raw) : raw === undefined || raw === "" ? null : String(raw)];
@@ -76,7 +72,6 @@ export function organiseFromItems(challengeItems: ChallengeItem[], properties: L
         year: catalog?.year ?? null,
         genre: catalog?.mainGenre ?? null,
         author: catalog?.author ?? null,
-        recommender: item.recommendedBy?.name ?? null,
         ...Object.fromEntries(customTraits(properties).map((trait) => {
           const raw = attributes.get(trait.key.slice(5));
           return [trait.key, trait.kind === "number" ? asNumber(raw) : raw === undefined || raw === "" ? null : String(raw)];

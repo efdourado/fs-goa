@@ -172,8 +172,7 @@ async function copyAttributeValues(
  * the template is. Round items re-resolve against the target group's catalog
  * (skipped entirely for a "structure only" copy, which still recreates the
  * libraries and their properties). Day-by-day checkpoints are left out — those
- * regenerate from the period. No entries, participants, results, share tokens, or
- * recommenders (member, saved name, or note) come across.
+ * regenerate from the period. No entries, participants, results, or share tokens come across.
  *
  * Shared by "duplicate this challenge" and "duplicate this template". Callers own
  * every access check and their own audit/bookkeeping rows; this function only
@@ -378,7 +377,7 @@ export async function copyChallengeStructure(
   const metrics = await client.query<MetricRow>(
     `SELECT id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
             decimal_places,visible_during_challenge,position,settings
-       FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY position`, [sourceChallengeId]);
+       FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL AND operation <> 'indicator_bias' ORDER BY position`, [sourceChallengeId]);
   for (const source of metrics.rows) {
     // `settings.fieldIds` (a multi-field metric, e.g. Tables' "Nota geral") names fields by id — those ids
     // belong to the source challenge, so they need the same remap `field_id` itself just got.

@@ -82,7 +82,6 @@ export const API_PATHS = {
     libraries: scope === "personal" ? "/api/personal/catalog/libraries" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/libraries`,
     /** The libraries, their item counts and the newest few items of each — all a page's shelf needs, in one request. */
     shelf: scope === "personal" ? "/api/personal/catalog/shelf" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/shelf`,
-    recommenders: scope === "personal" ? "/api/personal/catalog/recommenders" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/recommenders`,
     attributes: scope === "personal" ? "/api/personal/catalog-attributes" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog-attributes`,
     search: (query: { libraryId?: Id; kind?: string; title: string }) =>
       scope === "personal"

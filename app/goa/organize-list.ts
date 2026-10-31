@@ -4,9 +4,9 @@
  * Goa doesn't need to know what a property means, only its kind:
  *  - a number (runtime, pages, an "Attention" 1–5) is put on 0–1 within this list, and two high ones side by
  *    side cost a penalty (three 3-hour films don't end up back to back; low values never cost anything);
- *  - a category (genre, director, who recommended it) costs when the same value repeats right next to itself,
- *    and a little when it repeats one item apart. Who recommended it also gets a fairness term, so nobody's
- *    picks all land at the start.
+ *  - a category (genre, director, a custom category) costs when the same value repeats right next to itself,
+ *    and a little when it repeats one item apart. An optional fairness term spreads each category's values
+ *    throughout the list.
  * Every chosen property weighs the same. The order is found greedily from several starting points, then
  * improved by swapping pairs; the same input always gives the same order, and `attempt` asks for another.
  * Pinned items (already logged, on a running challenge) keep their place; the rest fill the free slots.
@@ -18,7 +18,7 @@ export interface Trait {
   key: string;
   label: string;
   kind: TraitKind;
-  /** Spread so nobody's items cluster at the start or the end (who recommended it). */
+  /** Spread so the same values do not cluster at the start or the end. */
   fair?: boolean;
 }
 
