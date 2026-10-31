@@ -342,7 +342,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 .catalog-item-libraryLabel { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; line-height:1.5; margin-bottom:20px; overflow-wrap:anywhere; }
 .catalog-item-libraryLabel svg { flex:none; }
 .catalog-item-identityRow { display:flex; align-items:center; gap:12px; }
-.catalog-item-identityRow h1 { min-width:0; margin:0; overflow-wrap:anywhere; font-size:36px; line-height:1.18; letter-spacing:-.045em; font-weight:300; }
+.catalog-item-identityRow h1 { min-width:0; margin:0; overflow-wrap:anywhere; font-size:28px; line-height:1.25; letter-spacing:-.035em; font-weight:300; }
 .catalog-item-creator { margin:12px 0 0; font-size:16px; line-height:1.6; overflow-wrap:anywhere; }
 .catalog-item-creator > span { color:var(--muted); font-size:12px; margin-right:10px; }
 .catalog-item-properties { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 24px; min-width:0; margin:26px 0 0; padding-top:24px; border-top:1px solid var(--line); }
@@ -378,7 +378,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   .catalog-item-page { padding:28px 35px 96px; }
   .catalog-item-back { margin-bottom:30px; }
   .catalog-item-info { padding:30px 34px 34px; }
-  .catalog-item-identityRow h1 { font-size:48px; }
+  .catalog-item-identityRow h1 { font-size:36px; }
   .catalog-item-properties { grid-template-columns:repeat(3,minmax(0,1fr)); gap:26px 36px; margin-top:30px; padding-top:28px; }
   .catalog-item-rating { gap:28px; margin-top:40px; }
   .catalog-item-rating p { font-size:20px; }
@@ -387,7 +387,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 @container (max-width:340px) {
   .catalog-item-page { padding-inline:16px; }
   .catalog-item-info { padding:22px 18px 24px; }
-  .catalog-item-identityRow h1 { font-size:32px; }
+  .catalog-item-identityRow h1 { font-size:26px; }
   .catalog-item-properties { gap:20px 18px; }
   .catalog-item-rating { gap:18px; }
   .catalog-item-rating p { font-size:15px; }

@@ -165,9 +165,9 @@ export function CatalogItemPage({ item, library, properties, recommendationsEnab
         <p>{t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}</p>
       </section> : null}
 
-      <section className="catalog-item-history">
+      {rounds.length ? <section className="catalog-item-history">
         <h2>{t("historyTitle")}</h2>
-        {rounds.length ? <ol>
+        <ol>
           {rounds.map((round) => <li key={round.challengeId} data-active={round.status === "active"}>
             <span className="catalog-item-historyDot" aria-hidden="true" />
             <div className="catalog-item-historyText">
@@ -177,8 +177,8 @@ export function CatalogItemPage({ item, library, properties, recommendationsEnab
             </div>
             {round.ratingAvg !== null ? <div className="catalog-item-roundRating"><strong>{round.ratingAvg}</strong><span>{t("roundRatings", { count: round.ratingCount })}</span></div> : null}
           </li>)}
-        </ol> : <p>{t("noRounds")}</p>}
-      </section>
+        </ol>
+      </section> : null}
     </main>
   </div>;
 }

@@ -77,5 +77,5 @@ test("collection details respect property names and visibility and retain zero a
   assert.match(html, /<dt>Exemplares<\/dt><dd>0<\/dd>/);
   assert.match(html, /<dt>Lido<\/dt><dd>Não<\/dd>/);
   assert.doesNotMatch(html, /role="img"/);
-  assert.match(html, /Histórico/);
+  assert.doesNotMatch(html, /catalog-item-history|Histórico/);
 });
