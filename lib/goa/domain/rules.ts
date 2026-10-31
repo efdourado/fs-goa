@@ -48,13 +48,14 @@ function parseTopics(value: unknown): ChallengeRuleTopic[] {
 export function parseRuleSections(
   value: unknown,
   legacyRules?: unknown,
+  maxSections = MAX_RULE_SECTIONS,
 ): ChallengeRuleSection[] {
   if (value === undefined || value === null) return legacyRuleSections(legacyRules);
   if (!Array.isArray(value)) {
     throw new ApiError(400, "invalid_rules", "As regras precisam ser uma lista de títulos e descrições.");
   }
-  if (value.length > MAX_RULE_SECTIONS) {
-    throw new ApiError(400, "rule_limit", `Use no máximo ${MAX_RULE_SECTIONS} regras.`);
+  if (value.length > maxSections) {
+    throw new ApiError(400, "rule_limit", `Use no máximo ${maxSections} regras.`);
   }
 
   const sections = value.map((item) => {

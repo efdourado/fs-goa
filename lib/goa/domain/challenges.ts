@@ -20,6 +20,7 @@ import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { seedFieldMetrics } from "../challenges/auto-metrics";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
+import { MAX_CHALLENGE_RULES } from "./rule-limits";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
 
 /** The libraries a create request names (`libraries[]`, or the single `libraryId` / `libraryKind`); more than one is refused. */
@@ -45,7 +46,7 @@ export async function createChallenge(
 ) {
   const title = stringValue(body, "title", { min: 1, max: 160 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-  const ruleSections = parseRuleSections(body.ruleSections, body.rules);
+  const ruleSections = parseRuleSections(body.ruleSections, body.rules, MAX_CHALLENGE_RULES);
   const rules = rulesCompatibilityText(ruleSections);
   const { startDate, endDate } = dateRange(
     Object.hasOwn(body, "startsOn") ? body.startsOn : body.startDate,

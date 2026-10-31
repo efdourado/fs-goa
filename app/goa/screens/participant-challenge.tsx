@@ -20,7 +20,7 @@ import dynamic from "next/dynamic";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
-import { RuleSectionsView, visibleRuleSections } from "../rules";
+import { ChallengeCoverRules, visibleRuleSections } from "../rules";
 import { instantToDateKey } from "../schedule";
 import type {
   CatalogAttributeValue,
@@ -1728,43 +1728,45 @@ export function ParticipantChallengeScreen({
       <div className={cx("mb-5 flex items-center sm:hidden", tabs.length > 1 && "hidden")}>
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
       </div>
-      <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
-        <div className="relative z-10">
-          <div className="flex items-center justify-between gap-3">
-            {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
-            {livingList ? null : <span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span>}
+      <section className="relative isolate min-w-0 overflow-hidden rounded-[28px] text-[var(--spotlight-ink)]">
+        <div className="relative overflow-hidden bg-[var(--spotlight)] p-6 sm:p-9">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between gap-3">
+              {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
+              {livingList ? null : <span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span>}
+            </div>
+            <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
+            {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
+            {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+            {!preview
+              ? (
+                <ChallengeCardActions
+                  onExport={() => setExporting(true)}
+                  shareToken={challenge.result?.shareToken}
+                  extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
+                  // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
+                  end={onAdmin ? (
+                    <button type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
+                      <SlidersIcon className="h-[18px] w-[18px] flex-none sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">{t("manage")}</span>
+                    </button>
+                  ) : undefined}
+                />
+              )
+              : (
+                // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
+                <div className="mt-8 flex flex-wrap gap-2">
+                  {previewActions}
+                  {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} /> : null}
+                </div>
+              )}
           </div>
-          <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
-          {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
-          {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
-          {!preview
-            ? (
-              <ChallengeCardActions
-                onExport={() => setExporting(true)}
-                shareToken={challenge.result?.shareToken}
-                extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
-                // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
-                end={onAdmin ? (
-                  <button type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
-                    <SlidersIcon className="h-[18px] w-[18px] flex-none sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">{t("manage")}</span>
-                  </button>
-                ) : undefined}
-              />
-            )
-            : (
-              // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
-              <div className="mt-8 flex flex-wrap gap-2">
-                {previewActions}
-                {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} /> : null}
-              </div>
-            )}
+          <span className="pointer-events-none absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
         </div>
-        <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
+        <ChallengeCoverRules rules={ruleSections} />
       </section>
 
       {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">{t("scheduledTitle", { date: f.date(challenge.startsOn, longDate) })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("scheduledBody")}</p></section> : null}
-      <RuleSectionsView rules={ruleSections} />
       {/* The Cronograma grid only matters where a checkpoint drives what's on
           screen — Today (picking one to log), or a template preview (which
           collapses everything to "results" but still wants the schedule as

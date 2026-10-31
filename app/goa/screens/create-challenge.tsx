@@ -11,6 +11,7 @@ import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { NewLibraryDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, useCatalogLibraries } from "../libraries";
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
+import { MAX_CHALLENGE_RULES } from "../../../lib/goa/domain/rule-limits";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeResponseInput, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
 import { AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage } from "../ui";
@@ -323,6 +324,7 @@ export function CreateChallengeScreen({
   function detailsProblem(): string | null {
     if (scheduleMode === "period" && (!startsOn || !endsOn)) return t("errPeriod");
     if (scheduleMode === "period" && endsOn < startsOn) return t("errEndBeforeStart");
+    if (ruleSections.length > MAX_CHALLENGE_RULES) return t("errRuleLimit", { max: MAX_CHALLENGE_RULES });
     if (ruleSections.some((rule) =>
       !rule.title.trim() || !rule.description.trim()
       || (rule.topics ?? []).some((topic) => !topic.title.trim() || !topic.description.trim())

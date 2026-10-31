@@ -393,3 +393,16 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   .catalog-item-rating p { font-size:15px; }
   .catalog-item-roundRating span { max-width:62px; }
 }
+
+/* The upper half stays on the cover; opening the rules completes the small side curves. */
+.challenge-ticket-waist {
+  --ticket-notch:clamp(8px,1.5vw,14px);
+  --ticket-curve-center:100%;
+  mask:
+    radial-gradient(ellipse var(--ticket-notch) 24px at 0 var(--ticket-curve-center),transparent 98%,#000 100%) left / 51% 100% no-repeat,
+    radial-gradient(ellipse var(--ticket-notch) 24px at 100% var(--ticket-curve-center),transparent 98%,#000 100%) right / 51% 100% no-repeat;
+}
+.challenge-ticket-waist-lower {
+  --ticket-curve-center:0%;
+  height:24px;
+}

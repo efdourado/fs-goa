@@ -569,6 +569,7 @@
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
     "errNoAuthor": "Add the author of each book.",
+    "errRuleLimit": "Use up to {max} rules per challenge.",
     "errRules": "Fill in the title and description of every rule and topic, or remove the empty ones.",
     "errNoFields": "Add at least one field.",
     "errProgressProperty": "Choose a number property to track.",
@@ -1218,6 +1219,8 @@
     "shareCopied": "Copied"
   },
   "rules": {
+    "coverLabel": "Rules · {count}",
+    "limit": "{count} / {max} rules",
     "legacyTitle": "Challenge rules",
     "viewTitle": "Rules to follow:",
     "ruleN": "Rule {n}",

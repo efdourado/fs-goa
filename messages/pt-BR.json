@@ -569,6 +569,7 @@
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
     "errEndBeforeStart": "A data final deve ser igual ou posterior ao início.",
     "errNoAuthor": "Informe o autor de cada livro.",
+    "errRuleLimit": "Use até {max} regras por desafio.",
     "errRules": "Preencha o título e a descrição de cada regra e tópico, ou remova os vazios.",
     "errNoFields": "Adicione pelo menos um campo.",
     "errProgressProperty": "Escolha uma propriedade numérica para acompanhar.",
@@ -1218,6 +1219,8 @@
     "shareCopied": "Copiado"
   },
   "rules": {
+    "coverLabel": "Regras · {count}",
+    "limit": "{count} / {max} regras",
     "legacyTitle": "Regras do desafio",
     "viewTitle": "Regras a serem seguidas:",
     "ruleN": "Regra {n}",

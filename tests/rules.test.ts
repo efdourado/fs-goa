@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { ChallengeCoverRules } from "../app/goa/rules";
+import { MAX_CHALLENGE_RULES } from "../lib/goa/domain/rule-limits";
+import { renderWithIntl } from "./helpers/intl";
 
 import { parseRuleSections, rulesCompatibilityText } from "../lib/goa/domain/rules";
 
@@ -77,4 +81,31 @@ test("rejeita regras incompletas, formatos inválidos e limites excessivos", () 
     title: `Regra ${index + 1}`,
     description: "x".repeat(2_000),
   }))));
+});
+
+test("new challenges allow ten rules and existing challenges can still load twenty", () => {
+  const rules = Array.from({ length: 20 }, (_, index) => ({ title: `Rule ${index + 1}`, description: "Description" }));
+  assert.equal(parseRuleSections(rules.slice(0, MAX_CHALLENGE_RULES), undefined, MAX_CHALLENGE_RULES).length, 10);
+  assert.throws(() => parseRuleSections(rules.slice(0, 11), undefined, MAX_CHALLENGE_RULES), /10 regras/);
+  assert.equal(parseRuleSections(rules).length, 20);
+});
+
+test("cover rules start folded in a bounded scroll region and retain the ticket waist when empty", () => {
+  const html = renderWithIntl(createElement(ChallengeCoverRules, { rules: [{ title: "Respect deadlines", description: "Submit before midnight." }] }));
+  assert.match(html, /challenge-ticket-bottom/);
+  assert.match(html, /challenge-ticket-waist-lower/);
+  assert.ok(html.indexOf("challenge-ticket-waist-lower") > html.indexOf("</summary>"));
+  assert.ok(html.indexOf("challenge-ticket-waist-lower") < html.indexOf("</details>"));
+  assert.match(html, /<details[^>]*>/);
+  assert.doesNotMatch(html, /<details[^>]*\sopen(?:[\s=>])/);
+  assert.match(html, /<summary/);
+  assert.match(html, /max-h-\[min\(20rem,50dvh\)\] overflow-x-hidden overflow-y-auto/);
+  assert.doesNotMatch(html, /class="h-80/);
+  const summary = html.match(/<summary[^>]*>(.*?)<\/summary>/)?.[1] ?? "";
+  assert.match(summary, /<svg/);
+  assert.doesNotMatch(summary, /<span/);
+  assert.match(html, /Respect deadlines/);
+  const empty = renderWithIntl(createElement(ChallengeCoverRules, { rules: [] }));
+  assert.match(empty, /challenge-ticket-waist/);
+  assert.doesNotMatch(empty, /<summary|<details|role="region"/);
 });

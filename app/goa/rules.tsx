@@ -3,10 +3,10 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { MAX_CHALLENGE_RULES } from "../../lib/goa/domain/rule-limits";
 import type { ChallengeRule, RuleTopic } from "./types";
 import { AddRow, Button, ChevronIcon, CircleMinusIcon, cx, inputClass, labelClass, rowIconClass, StartLine } from "./ui";
 
-const MAX_RULES = 20;
 const MAX_TOPICS_PER_RULE = 12;
 
 export function visibleRuleSections(
@@ -62,6 +62,7 @@ export function RuleSectionsEditor({
   }
 
   function addRule() {
+    if (disabled || value.length >= MAX_CHALLENGE_RULES) return;
     onChange([...value, { title: "", description: "" }]);
     setOpen(value.length);
   }
@@ -72,7 +73,7 @@ export function RuleSectionsEditor({
   }
 
   // Empty: the same dotted line Etapas starts with.
-  if (!value.length) return disabled ? null : <StartLine label={t("ruleWord")} ariaLabel={t("addRule")} onClick={addRule} />;
+  if (!value.length) return disabled ? null : <div><StartLine label={t("ruleWord")} ariaLabel={t("addRule")} onClick={addRule} /><p className="mt-2 text-xs text-[var(--muted)]">{t("limit", { count: 0, max: MAX_CHALLENGE_RULES })}</p></div>;
 
   // A folding list, like Etapas: one row per rule (number, title, a line of it), opened one at a time to edit;
   // order and removal sit on the row. A rule missing its title or text says so while folded, since Save needs both.
@@ -126,33 +127,34 @@ export function RuleSectionsEditor({
           );
         })}
       </ol>
-      {!disabled && value.length < MAX_RULES ? <AddRow label={t("ruleWord")} ariaLabel={t("addRule")} onClick={addRule} /> : null}
+      <p className="mt-3 text-xs text-[var(--muted)]" aria-live="polite">{t("limit", { count: value.length, max: Math.max(MAX_CHALLENGE_RULES, value.length) })}</p>
+      {!disabled && value.length < MAX_CHALLENGE_RULES ? <AddRow label={t("ruleWord")} ariaLabel={t("addRule")} onClick={addRule} /> : null}
     </div>
   );
 }
 
-export function RuleSectionsView({ rules, bare = false }: { rules: ChallengeRule[]; bare?: boolean }) {
+export function RuleSectionsView({ rules, bare = false, onCover = false }: { rules: ChallengeRule[]; bare?: boolean; onCover?: boolean }) {
   const t = useTranslations("rules");
   if (!rules.length) return null;
   return (
     <section className={bare ? undefined : "mt-5 overflow-hidden rounded-[24px]"} aria-labelledby={bare ? undefined : "challenge-rules-title"}>
       {bare ? null : <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">{t("viewTitle")}</h2>}
-      <div className={cx("grid gap-3", !bare && "mt-5", rules.length > 1 && "md:grid-cols-2")}>
+      <div className={cx("grid grid-cols-1 gap-3", !bare && "mt-5")}>
         {rules.map((rule, index) => (
-          <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5" key={`${rule.title}-${index}`}>
+          <article className={cx("min-w-0 rounded-2xl border p-5", onCover ? "border-white/15 bg-white/5" : "border-[var(--line)] bg-[var(--paper)]")} key={`${rule.title}-${index}`}>
             <div className="flex items-start gap-3">
-              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--ink)] text-xs font-black text-[var(--paper)]" aria-hidden="true">{index + 1}</span>
-              <div className="min-w-0">
+              <span className={cx("grid h-8 w-8 flex-none place-items-center rounded-full text-xs font-black", onCover ? "bg-white/15 text-white" : "bg-[var(--ink)] text-[var(--paper)]")} aria-hidden="true">{index + 1}</span>
+              <div className="min-w-0 [overflow-wrap:anywhere]">
                 <h3 className="text-lg font-light tracking-[-0.02em]">{rule.title}</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{rule.description}</p>
+                <p className={cx("mt-2 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/70" : "text-[var(--muted)]")}>{rule.description}</p>
                 {rule.topics?.length ? (
                   <div className="mt-4 space-y-3 rounded-l-md border-l-2 border-[color-mix(in_srgb,var(--muted)_45%,var(--line))] pl-4">
                     {rule.topics.map((topic, topicIndex) => (
                       <div key={`${topic.title}-${topicIndex}`}>
-                        <h4 className="text-sm font-light text-[var(--ink)]">
-                          <span className="text-[var(--muted)]">{index + 1}.{topicIndex + 1}</span> {topic.title}
+                        <h4 className={cx("text-sm font-light", onCover ? "text-white" : "text-[var(--ink)]")}>
+                          <span className={onCover ? "text-white/55" : "text-[var(--muted)]"}>{index + 1}.{topicIndex + 1}</span> {topic.title}
                         </h4>
-                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{topic.description}</p>
+                        <p className={cx("mt-1 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/70" : "text-[var(--muted)]")}>{topic.description}</p>
                       </div>
                     ))}
                   </div>
@@ -164,4 +166,22 @@ export function RuleSectionsView({ rules, bare = false }: { rules: ChallengeRule
       </div>
     </section>
   );
+}
+
+/** The upper curve is always visible; expanding reveals its matching lower half. */
+export function ChallengeCoverRules({ rules }: { rules: ChallengeRule[] }) {
+  const t = useTranslations("rules");
+  return <div className="challenge-ticket-bottom min-w-0 w-full">
+    {rules.length ? <details className="challenge-cover-rules block min-w-0 w-full">
+      <summary aria-label={t("coverLabel", { count: rules.length })} className="challenge-ticket-waist flex min-h-12 cursor-pointer list-none items-center justify-center bg-[var(--spotlight)] text-white/75 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white [&::-webkit-details-marker]:hidden">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </summary>
+      <div className="challenge-ticket-waist challenge-ticket-waist-lower bg-[var(--spotlight)]" aria-hidden="true" />
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the bounded rules panel. */}
+      <div role="region" aria-label={t("legacyTitle")} tabIndex={0} className="min-w-0 max-h-[min(20rem,50dvh)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--spotlight)] px-6 pb-6 pt-3 sm:px-9 sm:pb-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+        <RuleSectionsView rules={rules} bare onCover />
+      </div>
+      <div className="h-5 bg-[var(--spotlight)]" aria-hidden="true" />
+    </details> : <div className="challenge-ticket-waist h-12 bg-[var(--spotlight)]" aria-hidden="true" />}
+  </div>;
 }
