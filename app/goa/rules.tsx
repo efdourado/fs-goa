@@ -172,9 +172,11 @@ export function RuleSectionsView({ rules, bare = false, onCover = false }: { rul
 export function ChallengeCoverRules({ rules }: { rules: ChallengeRule[] }) {
   const t = useTranslations("rules");
   return <div className="challenge-ticket-bottom min-w-0 w-full">
-    {rules.length ? <details className="challenge-cover-rules block min-w-0 w-full">
-      <summary aria-label={t("coverLabel", { count: rules.length })} className="challenge-ticket-waist flex min-h-12 cursor-pointer list-none items-center justify-center bg-[var(--spotlight)] text-white/75 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white [&::-webkit-details-marker]:hidden">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+    {rules.length ? <details className="challenge-cover-rules block min-w-0 w-full open:overflow-hidden open:rounded-b-[28px]">
+      <summary aria-label={t("coverLabel", { count: rules.length })} className="block cursor-pointer list-none text-white/75 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white [&::-webkit-details-marker]:hidden">
+        <span className="challenge-ticket-waist flex h-12 w-full items-center justify-center bg-[var(--spotlight)]" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+        </span>
       </summary>
       <div className="challenge-ticket-waist challenge-ticket-waist-lower bg-[var(--spotlight)]" aria-hidden="true" />
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the bounded rules panel. */}

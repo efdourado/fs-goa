@@ -396,11 +396,21 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 
 /* The upper half stays on the cover; opening the rules completes the small side curves. */
 .challenge-ticket-waist {
-  --ticket-notch:clamp(8px,1.5vw,14px);
+  --ticket-notch:clamp(14px,1.6vw,16px);
   --ticket-curve-center:100%;
-  mask:
-    radial-gradient(ellipse var(--ticket-notch) 24px at 0 var(--ticket-curve-center),transparent 98%,#000 100%) left / 51% 100% no-repeat,
-    radial-gradient(ellipse var(--ticket-notch) 24px at 100% var(--ticket-curve-center),transparent 98%,#000 100%) right / 51% 100% no-repeat;
+  --ticket-mask:
+    radial-gradient(ellipse var(--ticket-notch) 24px at 0 var(--ticket-curve-center),transparent 98%,#000 100%),
+    radial-gradient(ellipse var(--ticket-notch) 24px at 100% var(--ticket-curve-center),transparent 98%,#000 100%);
+  -webkit-mask-image:var(--ticket-mask);
+  mask-image:var(--ticket-mask);
+  -webkit-mask-size:51% 100%;
+  mask-size:51% 100%;
+  -webkit-mask-position:left top,right top;
+  mask-position:left top,right top;
+  -webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;
+  -webkit-mask-composite:source-over;
+  mask-composite:add;
 }
 .challenge-ticket-waist-lower {
   --ticket-curve-center:0%;

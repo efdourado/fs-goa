@@ -1728,7 +1728,7 @@ export function ParticipantChallengeScreen({
       <div className={cx("mb-5 flex items-center sm:hidden", tabs.length > 1 && "hidden")}>
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
       </div>
-      <section className="relative isolate min-w-0 overflow-hidden rounded-[28px] text-[var(--spotlight-ink)]">
+      <section className="relative isolate min-w-0 overflow-hidden rounded-[28px] text-[var(--spotlight-ink)]" style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
         <div className="relative overflow-hidden bg-[var(--spotlight)] p-6 sm:p-9">
           <div className="relative z-10">
             <div className="flex items-center justify-between gap-3">

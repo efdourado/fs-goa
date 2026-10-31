@@ -103,7 +103,8 @@ test("cover rules start folded in a bounded scroll region and retain the ticket 
   assert.doesNotMatch(html, /class="h-80/);
   const summary = html.match(/<summary[^>]*>(.*?)<\/summary>/)?.[1] ?? "";
   assert.match(summary, /<svg/);
-  assert.doesNotMatch(summary, /<span/);
+  assert.match(summary, /<span[^>]*challenge-ticket-waist/);
+  assert.equal(summary.replace(/<[^>]*>/g, "").trim(), "", "the toggle remains icon-only");
   assert.match(html, /Respect deadlines/);
   const empty = renderWithIntl(createElement(ChallengeCoverRules, { rules: [] }));
   assert.match(empty, /challenge-ticket-waist/);
