@@ -151,7 +151,7 @@ export function RuleSectionsView({ rules, bare = false, onCover = false }: { rul
               <div className={cx("mt-4 space-y-3 rounded-l-md border-l-2 pl-4", onCover ? "border-white/10" : "border-[color-mix(in_srgb,var(--muted)_45%,var(--line))]")}>
                 {rule.topics.map((topic, topicIndex) => (
                   <div key={`${topic.title}-${topicIndex}`}>
-                    <h4 className={cx("text-sm font-light", onCover ? "text-white/80" : "text-[var(--ink)]")}>
+                    <h4 className={cx("text-base font-light", onCover ? "text-white/80" : "text-[var(--ink)]")}>
                       <span className={onCover ? "text-white/50" : "text-[var(--muted)]"}>{index + 1}.{topicIndex + 1}</span> {topic.title}
                     </h4>
                     <p className={cx("mt-1 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/65" : "text-[var(--muted)]")}>{topic.description}</p>
