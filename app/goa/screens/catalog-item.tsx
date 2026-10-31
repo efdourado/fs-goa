@@ -4,12 +4,13 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { apiRequest } from "../api";
-import { ScoreRing } from "../catalog-cover";
+import { coverColors, coverToneOf, ScoreRing } from "../catalog-cover";
 import { EditCatalogItemDialog } from "../catalog-item-dialogs";
 import { useGoaFormat } from "../format";
+import { useLibraryProperties, useNativePropertyName } from "../property-inputs";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
-import type { CatalogItemDetail, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cardClass, cx, EmptyState, LoadingView, SlidersIcon } from "../ui";
+import type { CatalogItemDetail, CatalogLibrary, Id, LibraryProperty, Member } from "../types";
+import { BackButton, Button, EmptyState, LoadingView, SlidersIcon } from "../ui";
 import { formatRuntime } from "../utils";
 
 interface CatalogItemEditing {
@@ -79,6 +80,7 @@ export function CatalogItemScreen({
   const [nonce, setNonce] = useState(0);
   const { data: libraries } = useCatalogLibraries(scope);
   const library = libraries?.find((entry) => entry.kind === item?.kind) ?? null;
+  const { properties } = useLibraryProperties(library);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,15 +97,27 @@ export function CatalogItemScreen({
   if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} hint={error} action={<Button variant="secondary" onClick={onBack}>{backLabel ?? t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
 
-  return <CatalogItemPage item={item} library={library} recommendationsEnabled={recommendationsEnabled} onBack={onBack} backLabel={backLabel} onOpenChallenge={onOpenChallenge} editAction={editing ? (
+  return <CatalogItemPage item={item} library={library} properties={properties} recommendationsEnabled={recommendationsEnabled} onBack={onBack} backLabel={backLabel} onOpenChallenge={onOpenChallenge} editAction={editing ? (
     <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
   ) : undefined} />;
 }
 
-/** The rating, item identity, properties and round history each have their own section. */
-export function CatalogItemPage({ item, library, recommendationsEnabled = true, onBack, backLabel, onOpenChallenge, editAction }: {
+interface ItemProperty { key: string; label: string; value: string }
+
+function ItemProperties({ properties, label }: { properties: ItemProperty[]; label: string }) {
+  if (!properties.length) return null;
+  return <dl className="catalog-item-properties" aria-label={label}>
+    {properties.map((property) => <div key={property.key} className={property.value.length > 60 || property.value.includes("\n") ? "catalog-item-longProperty" : undefined}>
+      <dt>{property.label}</dt><dd>{property.value}</dd>
+    </div>)}
+  </dl>;
+}
+
+/** Item identity and properties share one collection panel, followed by the rating and timeline. */
+export function CatalogItemPage({ item, library, properties, recommendationsEnabled = true, onBack, backLabel, onOpenChallenge, editAction }: {
   item: CatalogItemDetail;
   library: CatalogLibrary | null;
+  properties?: LibraryProperty[] | null;
   recommendationsEnabled?: boolean;
   onBack: () => void;
   backLabel?: string;
@@ -114,97 +128,57 @@ export function CatalogItemPage({ item, library, recommendationsEnabled = true, 
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const libraryName = useLibraryName();
-  const specs: Array<{ label: string; value: string }> = [
-    item.year ? { label: t("specYear"), value: String(item.year) } : null,
-    item.scheduledAt ? { label: t("specWhen"), value: f.eventWhen(item.scheduledAt) } : null,
-    item.author ? { label: t("specAuthor"), value: item.author } : null,
-    item.mainGenre ? { label: t("specGenre"), value: item.mainGenre } : null,
-    item.runtimeMinutes ? { label: t("specRuntime"), value: formatRuntime(item.runtimeMinutes) ?? "" } : null,
-    item.pageCount ? { label: t("specPages"), value: String(item.pageCount) } : null,
-    ...(item.attributes ?? []).map((attribute) => ({
-      label: attribute.label,
-      value: attribute.type === "boolean" ? (attribute.value ? tc("yes") : tc("no")) : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value),
-    })),
-    recommendationsEnabled && item.recommendedBy ? { label: t("specRecommendedBy"), value: item.recommendedBy.name } : null,
-    recommendationsEnabled && !item.recommendedBy && item.originNote ? { label: t("specOrigin"), value: item.originNote } : null,
-  ].filter((spec): spec is { label: string; value: string } => Boolean(spec?.value));
-  const rated = item.ratingAvg !== null && item.ratingAvg !== undefined;
-  // Newest round first: what the group is doing with it now, then how it went before.
-  const rounds = [...item.rounds].reverse();
-  const dotClass: Record<string, string> = {
-    active: "bg-[var(--ok-line)] ring-[var(--ok-line)]",
-    draft: "bg-[var(--warn-line)] ring-[var(--warn-line)]",
-    closed: "bg-[var(--line)] ring-[var(--line)]",
+  const nameProperty = useNativePropertyName();
+  const native = (key: string, fallback: string, value: string | number | null | undefined): ItemProperty[] => {
+    const property = properties?.find((entry) => entry.storage === "native" && entry.key === key);
+    if (property?.hidden || value === null || value === undefined || value === "") return [];
+    return [{ key, label: property ? nameProperty(property) : fallback, value: String(value) }];
   };
+  const allProperties: ItemProperty[] = [
+    ...native("author", t("specAuthor"), item.author),
+    ...native("year", t("specYear"), item.year),
+    ...native("main_genre", t("specGenre"), item.mainGenre),
+    ...native("page_count", t("specPages"), item.pageCount),
+    ...native("runtime_minutes", t("specRuntime"), formatRuntime(item.runtimeMinutes)),
+    ...native("scheduled_at", t("specWhen"), item.scheduledAt ? f.eventWhen(item.scheduledAt) : null),
+    ...(item.attributes ?? []).map((attribute) => ({ key: `attribute:${attribute.key}`, label: attribute.label, value: attribute.type === "boolean" ? attribute.value ? tc("yes") : tc("no") : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value) })),
+    ...(recommendationsEnabled && item.recommendedBy ? [{ key: "recommended_by", label: t("specRecommendedBy"), value: item.recommendedBy.name }] : []),
+    ...(recommendationsEnabled && !item.recommendedBy && item.originNote ? [{ key: "origin", label: t("specOrigin"), value: item.originNote }] : []),
+  ];
+  const creator = allProperties.find((property) => ["author", "attribute:direcao", "attribute:director"].includes(property.key));
+  const details = allProperties.filter((property) => property !== creator);
+  const rated = item.ratingAvg !== null && item.ratingAvg !== undefined;
+  const rounds = [...item.rounds].reverse();
 
-  return (
-    <main className="mx-auto max-w-5xl px-4 pb-24 pt-5 sm:px-6 sm:pt-9">
-      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-7 sm:mb-10" />
-
-      {rated ? (
-        <section className={cx(cardClass, "mb-7 flex items-center gap-5 p-5 sm:mb-9 sm:gap-8 sm:p-7")}>
-          <ScoreRing value={item.ratingAvg} size={112} strokeWidth={2} label={t("ratedAria", { value: item.ratingAvg ?? 0 })} caption={t("outOfFive")} textClassName="text-[38px] font-light leading-none tracking-[-0.05em]" />
-          <p className="min-w-0 flex-1 text-base font-light leading-relaxed tracking-[-0.02em] sm:text-2xl">
-            {t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}
-          </p>
-        </section>
-      ) : null}
-
-      <header className="mb-7 sm:mb-10">
-        {library ? (
-          <p className="mb-3 flex items-center gap-2 text-sm text-[var(--muted)]">
-            <LibraryGlyph source={library.source} className="h-4 w-4 flex-none" />
-            <span className="min-w-0 break-words">{libraryName(library)}</span>
-          </p>
-        ) : null}
-        <div className="flex items-center gap-3">
-          <h1 className="min-w-0 break-words text-[32px] font-light leading-[1.12] tracking-[-0.04em] sm:text-5xl">{item.title}</h1>
-          {editAction}
-        </div>
+  return <div className="catalog-item-canvas">
+    <main className="catalog-item-page">
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="catalog-item-back" />
+      <header className="catalog-item-info" style={coverColors(coverToneOf(item.title))}>
+        {library ? <span className="catalog-item-libraryLabel"><LibraryGlyph source={library.source} className="h-4 w-4" />{libraryName(library)}</span> : null}
+        <div className="catalog-item-identityRow"><h1>{item.title}</h1>{editAction}</div>
+        {creator ? <p className="catalog-item-creator"><span>{creator.label}</span>{creator.value}</p> : null}
+        <ItemProperties properties={details} label={t("detailsTitle")} />
       </header>
 
-      {specs.length ? (
-        <dl className="mt-8 grid grid-cols-2 gap-x-8 gap-y-5 border-y border-[var(--line)] py-5 sm:grid-cols-3 xl:grid-cols-4">
-          {specs.map((spec) => (
-            <div key={`${spec.label}:${spec.value}`} className="min-w-0">
-              <dt className="text-[11px] text-[var(--muted)]">{spec.label}</dt>
-              <dd className="mt-1.5 break-words text-base">{spec.value}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+      {rated ? <section className="catalog-item-rating">
+        <ScoreRing value={item.ratingAvg} size={112} strokeWidth={2} label={t("ratedAria", { value: item.ratingAvg ?? 0 })} caption={t("outOfFive")} textClassName="text-[38px] font-light leading-none tracking-[-0.05em]" />
+        <p>{t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}</p>
+      </section> : null}
 
-          <section className="mt-9 sm:mt-12">
-            <h2 className="text-xl font-light tracking-[-0.03em] sm:text-2xl">{t("historyTitle")}</h2>
-            {rounds.length ? (
-              <ol className="relative mt-6 space-y-7 pl-8">
-                <span aria-hidden="true" className="absolute bottom-3 left-[6px] top-3 w-0.5 bg-[var(--line)]" />
-                {rounds.map((round) => (
-                  <li key={round.challengeId} className="relative flex items-start gap-4 sm:gap-5">
-                    <span aria-hidden="true" className={cx("absolute -left-8 top-1.5 h-3.5 w-3.5 rounded-full border-[3px] border-[var(--canvas)] ring-1", dotClass[round.status] ?? dotClass.closed)} />
-                    <div className="min-w-0 flex-1">
-                      <button type="button" onClick={() => onOpenChallenge(round.challengeId)} className="block max-w-full cursor-pointer break-words text-left text-base tracking-[-0.02em] hover:underline sm:text-[17px]">{round.title}</button>
-                      <p className="mt-1 text-[13px] text-[var(--muted)]">
-                        {[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : null, t(`status.${round.status}`),
-                          round.recommendedBy ? t("recommendedBy", { name: round.recommendedBy }) : null].filter(Boolean).join(" · ")}
-                      </p>
-                      {round.ratingAvg !== null ? (
-                        <div className="mt-3 h-2 max-w-md rounded-full bg-[var(--wash-strong)]" aria-hidden="true">
-                          <div className="h-full rounded-full bg-[var(--main)]" style={{ width: `${Math.max(2, Math.min(100, (round.ratingAvg / 5) * 100))}%` }} />
-                        </div>
-                      ) : null}
-                    </div>
-                    {round.ratingAvg === null ? null : (
-                      <div className="flex-none pt-0.5 text-right">
-                        <strong className="block text-2xl font-light tracking-[-0.04em]">{round.ratingAvg}</strong>
-                        <span className="text-xs text-[var(--muted)]">{t("roundRatings", { count: round.ratingCount })}</span>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            ) : <p className="mt-4 text-sm text-[var(--muted)]">{t("noRounds")}</p>}
-          </section>
+      <section className="catalog-item-history">
+        <h2>{t("historyTitle")}</h2>
+        {rounds.length ? <ol>
+          {rounds.map((round) => <li key={round.challengeId} data-active={round.status === "active"}>
+            <span className="catalog-item-historyDot" aria-hidden="true" />
+            <div className="catalog-item-historyText">
+              <button type="button" className="catalog-item-roundTitle" onClick={() => onOpenChallenge(round.challengeId)}>{round.title}</button>
+              <p>{[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : null, t(`status.${round.status}`), round.recommendedBy ? t("recommendedBy", { name: round.recommendedBy }) : null].filter(Boolean).join(" · ")}</p>
+              {round.ratingAvg !== null ? <div className="catalog-item-ratingTrack" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.min(100, round.ratingAvg / 5 * 100))}%` }} /></div> : null}
+            </div>
+            {round.ratingAvg !== null ? <div className="catalog-item-roundRating"><strong>{round.ratingAvg}</strong><span>{t("roundRatings", { count: round.ratingCount })}</span></div> : null}
+          </li>)}
+        </ol> : <p>{t("noRounds")}</p>}
+      </section>
     </main>
-  );
+  </div>;
 }

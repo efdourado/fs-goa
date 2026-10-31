@@ -333,3 +333,63 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 @keyframes goa-toast-in { from { opacity: 0; transform: translateX(-16px) scale(.97); } }
 @keyframes goa-toast-out { to { opacity: 0; transform: translateX(-24px) scale(.96); } }
 @media (prefers-reduced-motion: reduce) { .goa-toast, .goa-toast[data-leaving] { animation: none; } }
+
+/* Catalogue item: identity and properties together, then an unboxed rating and timeline. */
+.catalog-item-canvas { container-type:inline-size; max-width:1024px; margin-inline:auto; color:var(--ink); }
+.catalog-item-page { padding:22px 20px 96px; }
+.catalog-item-back { margin-bottom:24px; }
+.catalog-item-info { padding:24px 22px 26px; border-left:3px solid var(--cover-bg); border-radius:4px 20px 20px 4px; background:color-mix(in srgb,var(--cover-bg) 22%,var(--canvas)); }
+.catalog-item-libraryLabel { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; line-height:1.5; margin-bottom:20px; overflow-wrap:anywhere; }
+.catalog-item-libraryLabel svg { flex:none; }
+.catalog-item-identityRow { display:flex; align-items:center; gap:12px; }
+.catalog-item-identityRow h1 { min-width:0; margin:0; overflow-wrap:anywhere; font-size:36px; line-height:1.18; letter-spacing:-.045em; font-weight:300; }
+.catalog-item-creator { margin:12px 0 0; font-size:16px; line-height:1.6; overflow-wrap:anywhere; }
+.catalog-item-creator > span { color:var(--muted); font-size:12px; margin-right:10px; }
+.catalog-item-properties { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px 24px; min-width:0; margin:26px 0 0; padding-top:24px; border-top:1px solid var(--line); }
+.catalog-item-properties > div { min-width:0; }
+.catalog-item-properties dt { color:var(--muted); font-size:12px; line-height:1.6; }
+.catalog-item-properties dd { min-width:0; margin:5px 0 0; font-size:16px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.catalog-item-longProperty { grid-column:1/-1; }
+.catalog-item-rating { display:flex; align-items:center; justify-content:center; gap:24px; max-width:480px; margin:34px auto 0; }
+.catalog-item-rating p { min-width:0; flex:1; max-width:260px; font-size:17px; font-weight:300; line-height:1.65; letter-spacing:-.02em; }
+
+/* Shared timeline: the same line, dots, bars and counts as the existing item page. */
+.catalog-item-history { min-width:0; padding-top:32px; margin-top:32px; border-top:1px solid var(--line); }
+.catalog-item-history h2 { margin:0 0 24px; font-size:21px; line-height:1.3; letter-spacing:-.025em; font-weight:300; }
+.catalog-item-history ol { position:relative; list-style:none; margin:0; padding:0 0 0 28px; }
+.catalog-item-history ol::before { content:''; position:absolute; top:7px; bottom:12px; left:5px; width:1px; background:var(--line); }
+.catalog-item-history li { position:relative; display:flex; align-items:flex-start; gap:15px; margin:0 0 27px; }
+.catalog-item-history li:last-child { margin-bottom:0; }
+.catalog-item-historyDot { position:absolute; left:-28px; top:5px; width:12px; height:12px; border:3px solid var(--canvas); outline:1px solid var(--line); border-radius:50%; background:var(--line); }
+.catalog-item-history li[data-active='true'] .catalog-item-historyDot { background:var(--ok-line); outline-color:var(--ok-line); }
+.catalog-item-historyText { min-width:0; flex:1; }
+.catalog-item-roundTitle { display:block; font-size:15px; line-height:1.5; letter-spacing:-.015em; overflow-wrap:anywhere; }
+.catalog-item-historyText p { margin:5px 0 0; font-size:12px; line-height:1.65; color:var(--muted); }
+.catalog-item-ratingTrack { height:7px; overflow:hidden; border-radius:99px; background:var(--wash-strong); margin-top:12px; }
+.catalog-item-ratingTrack span { display:block; height:100%; background:var(--main); border-radius:99px; }
+.catalog-item-roundRating { display:flex; flex:none; flex-direction:column; align-items:flex-end; padding-top:3px; }
+.catalog-item-roundRating strong { font-size:23px; font-weight:300; line-height:1.05; letter-spacing:-.04em; }
+.catalog-item-roundRating span { margin-top:5px; color:var(--muted); font-size:11px; line-height:1.4; }
+
+.catalog-item-roundTitle { padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.catalog-item-roundTitle:hover { text-decoration:underline; }
+.catalog-item-roundTitle:focus-visible { outline:2px solid var(--main); outline-offset:4px; border-radius:4px; }
+@container (min-width:640px) {
+  .catalog-item-page { padding:28px 35px 96px; }
+  .catalog-item-back { margin-bottom:30px; }
+  .catalog-item-info { padding:30px 34px 34px; }
+  .catalog-item-identityRow h1 { font-size:48px; }
+  .catalog-item-properties { grid-template-columns:repeat(3,minmax(0,1fr)); gap:26px 36px; margin-top:30px; padding-top:28px; }
+  .catalog-item-rating { gap:28px; margin-top:40px; }
+  .catalog-item-rating p { font-size:20px; }
+  .catalog-item-history { margin-top:38px; }
+}
+@container (max-width:340px) {
+  .catalog-item-page { padding-inline:16px; }
+  .catalog-item-info { padding:22px 18px 24px; }
+  .catalog-item-identityRow h1 { font-size:32px; }
+  .catalog-item-properties { gap:20px 18px; }
+  .catalog-item-rating { gap:18px; }
+  .catalog-item-rating p { font-size:15px; }
+  .catalog-item-roundRating span { max-width:62px; }
+}

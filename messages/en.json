@@ -424,6 +424,7 @@
     "newLink": "New link"
   },
   "catalog": {
+    "detailsTitle": "About the item",
     "back": "Back",
     "errorTitle": "Couldn't open the item",
     "pages": "{count} pages",

@@ -424,6 +424,7 @@
     "newLink": "Nuevo enlace"
   },
   "catalog": {
+    "detailsTitle": "Sobre el ítem",
     "back": "Volver",
     "errorTitle": "No se pudo abrir el ítem",
     "pages": "{count} páginas",

@@ -41,7 +41,7 @@ test("numeric cover values include zero and custom properties can use year as th
   assert.match(html, />0<\/span>/);
 });
 
-test("item details keep original label casing and show ratings above the item name", () => {
+test("item details keep original label casing and place the rating between item details and history", () => {
   const html = renderWithIntl(createElement(CatalogItemPage, {
     item: { id: "book", kind: "book", title: "Um título longo para a página do item", ratingAvg: 4.2, ratingCount: 2,
       attributes: [{ key: "nota", label: "Minhas Observações", type: "text", value: "Uma anotação extensa que precisa caber em telas pequenas sem perder o conteúdo." }],
@@ -55,6 +55,27 @@ test("item details keep original label casing and show ratings above the item na
   assert.match(html, /Minhas Observações/);
   assert.doesNotMatch(html, /uppercase/);
   assert.match(html, /aria-label="Editar item"/);
-  assert.ok(html.indexOf('role="img"') < html.indexOf("<h1"));
+  assert.ok(html.indexOf("<h1") < html.indexOf('role="img"'));
+  assert.ok(html.indexOf("Minhas Observações") < html.indexOf('role="img"'));
+  assert.ok(html.indexOf('role="img"') < html.indexOf('class="catalog-item-history"'));
   assert.match(html, /O histórico continua com o título completo do desafio/);
+});
+
+test("collection details respect property names and visibility and retain zero and false", () => {
+  const html = renderWithIntl(createElement(CatalogItemPage, {
+    item: { id: "book", kind: "book", title: "Solaris", author: "Hidden author", year: 1961, ratingAvg: null,
+      attributes: [{ key: "copies", label: "Exemplares", type: "number", value: 0 }, { key: "read", label: "Lido", type: "boolean", value: false }], rounds: [] },
+    library: null,
+    properties: [
+      { key: "author", storage: "native", label: "Escritor", type: "text", hidden: true, position: 1, canHide: true },
+      { key: "year", storage: "native", label: "Publicado em", type: "number", hidden: false, position: 2, canHide: true },
+    ],
+    onBack: () => undefined, onOpenChallenge: () => undefined,
+  }));
+  assert.match(html, /Publicado em/);
+  assert.doesNotMatch(html, /Hidden author|Escritor/);
+  assert.match(html, /<dt>Exemplares<\/dt><dd>0<\/dd>/);
+  assert.match(html, /<dt>Lido<\/dt><dd>Não<\/dd>/);
+  assert.doesNotMatch(html, /role="img"/);
+  assert.match(html, /Histórico/);
 });
