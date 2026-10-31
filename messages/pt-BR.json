@@ -1222,7 +1222,7 @@
     "coverLabel": "Regras · {count}",
     "limit": "{count} / {max} regras",
     "legacyTitle": "Regras do desafio",
-    "viewTitle": "Regras a serem seguidas:",
+    "viewTitle": "Regras",
     "ruleN": "Regra {n}",
     "moveUp": "Mover regra para cima",
     "moveDown": "Mover regra para baixo",

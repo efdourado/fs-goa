@@ -1222,7 +1222,7 @@
     "coverLabel": "Rules · {count}",
     "limit": "{count} / {max} rules",
     "legacyTitle": "Challenge rules",
-    "viewTitle": "Rules to follow:",
+    "viewTitle": "Rules",
     "ruleN": "Rule {n}",
     "moveUp": "Move rule up",
     "moveDown": "Move rule down",

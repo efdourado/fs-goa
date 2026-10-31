@@ -141,26 +141,24 @@ export function RuleSectionsView({ rules, bare = false, onCover = false }: { rul
       {bare ? null : <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">{t("viewTitle")}</h2>}
       <div className={cx("grid grid-cols-1 gap-3", !bare && "mt-5")}>
         {rules.map((rule, index) => (
-          <article className={cx("min-w-0 rounded-2xl border p-5", onCover ? "border-white/15 bg-white/5" : "border-[var(--line)] bg-[var(--paper)]")} key={`${rule.title}-${index}`}>
-            <div className="flex items-start gap-3">
-              <span className={cx("grid h-8 w-8 flex-none place-items-center rounded-full text-xs font-black", onCover ? "bg-white/15 text-white" : "bg-[var(--ink)] text-[var(--paper)]")} aria-hidden="true">{index + 1}</span>
-              <div className="min-w-0 [overflow-wrap:anywhere]">
-                <h3 className="text-lg font-light tracking-[-0.02em]">{rule.title}</h3>
-                <p className={cx("mt-2 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/70" : "text-[var(--muted)]")}>{rule.description}</p>
-                {rule.topics?.length ? (
-                  <div className="mt-4 space-y-3 rounded-l-md border-l-2 border-[color-mix(in_srgb,var(--muted)_45%,var(--line))] pl-4">
-                    {rule.topics.map((topic, topicIndex) => (
-                      <div key={`${topic.title}-${topicIndex}`}>
-                        <h4 className={cx("text-sm font-light", onCover ? "text-white" : "text-[var(--ink)]")}>
-                          <span className={onCover ? "text-white/55" : "text-[var(--muted)]"}>{index + 1}.{topicIndex + 1}</span> {topic.title}
-                        </h4>
-                        <p className={cx("mt-1 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/70" : "text-[var(--muted)]")}>{topic.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+          <article className={cx("min-w-0 rounded-2xl border p-5 [overflow-wrap:anywhere]", onCover ? "border-white/[0.06] bg-white/[0.025]" : "border-[var(--line)] bg-[var(--paper)]")} key={`${rule.title}-${index}`}>
+            <div className="flex items-center gap-3">
+              <span className={cx("grid h-8 w-8 flex-none place-items-center rounded-full text-xs", onCover ? "bg-white/5 font-medium text-white/70" : "bg-[var(--ink)] font-black text-[var(--paper)]")} aria-hidden="true">{index + 1}</span>
+              <h3 className={cx("min-w-0 text-lg font-light tracking-[-0.02em]", onCover && "text-white/80")}>{rule.title}</h3>
             </div>
+            <p className={cx("mt-2 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/65" : "text-[var(--muted)]")}>{rule.description}</p>
+            {rule.topics?.length ? (
+              <div className={cx("mt-4 space-y-3 rounded-l-md border-l-2 pl-4", onCover ? "border-white/10" : "border-[color-mix(in_srgb,var(--muted)_45%,var(--line))]")}>
+                {rule.topics.map((topic, topicIndex) => (
+                  <div key={`${topic.title}-${topicIndex}`}>
+                    <h4 className={cx("text-sm font-light", onCover ? "text-white/80" : "text-[var(--ink)]")}>
+                      <span className={onCover ? "text-white/50" : "text-[var(--muted)]"}>{index + 1}.{topicIndex + 1}</span> {topic.title}
+                    </h4>
+                    <p className={cx("mt-1 whitespace-pre-wrap text-sm leading-6", onCover ? "text-white/65" : "text-[var(--muted)]")}>{topic.description}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -209,7 +207,10 @@ function ScrollableRules({ rules }: { rules: ChallengeRule[] }) {
   return <div className="relative isolate min-w-0">
     {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the bounded rules panel. */}
     <div ref={viewportRef} role="region" aria-label={t("legacyTitle")} tabIndex={0} className="min-w-0 max-h-[min(20rem,50dvh)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--spotlight)] px-6 pb-6 pt-3 sm:px-9 sm:pb-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-      <div ref={contentRef}><RuleSectionsView rules={rules} bare onCover /></div>
+      <div ref={contentRef}>
+        <h2 className="mb-5 text-2xl font-light tracking-[-0.035em] text-white/80">{t("viewTitle")}</h2>
+        <RuleSectionsView rules={rules} bare onCover />
+      </div>
     </div>
     <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8" style={{ opacity: shadows.above, background: "linear-gradient(to bottom, var(--spotlight), transparent)" }} />
     <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8" style={{ opacity: shadows.below, background: "linear-gradient(to top, var(--spotlight), transparent)" }} />
