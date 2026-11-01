@@ -26,7 +26,7 @@ function TemplateGallery({ templates, onOpen, moreHeadingLevel }: { templates: T
         {front.rest.map((template) => (
           <article
             key={template.id}
-            className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
+            className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--ink)]/25"
           >
             <div className="flex flex-1 flex-col p-3.5 sm:p-5">
               <div className="flex items-center justify-between gap-3">

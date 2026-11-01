@@ -99,7 +99,7 @@ export function storyExcerpt(
 
 /** A featured story's frame: a large paper card that lifts on hover, like the gallery's smaller cards. */
 const storyCardClass =
-  "relative flex min-w-0 flex-col rounded-[28px] border border-[var(--line)] bg-[var(--paper)] p-4 shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 hover:shadow-[var(--elevate-card)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25 sm:p-9";
+  "relative flex min-w-0 flex-col rounded-[28px] border border-[var(--line)] bg-[var(--paper)] p-4 shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 hover:shadow-[var(--elevate-card)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--ink)]/25 sm:p-9";
 
 function StorySkeleton() {
   return (
@@ -162,7 +162,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
   return (
     <article className={storyCardClass}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--main-strong)]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink)]">
           {/* The same filled disc Home uses for a pinned challenge — a featured one is pinned to the front page. */}
           <CirclePinIcon filled className="h-3.5 w-3.5" />
           {t("storyBadge")}
@@ -209,7 +209,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       ) : null}
 
       {standout ? (
-        <p className="mt-4 border-l-2 border-[var(--main)] pl-3 text-base font-light leading-snug sm:mt-6 sm:pl-4 sm:text-lg">{standout}</p>
+        <p className="mt-4 border-l-2 border-[var(--ink)] pl-3 text-base font-light leading-snug sm:mt-6 sm:pl-4 sm:text-lg">{standout}</p>
       ) : null}
 
       {drawn ? <StoryFigures story={drawn.story} input={drawn.input} /> : (
@@ -229,7 +229,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       )}
 
       <div className="mt-auto pt-5 sm:pt-8">
-        <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none">
+        <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] px-4 text-sm text-[var(--ink)] transition hover:bg-[var(--wash)] focus-visible:outline-none">
           {t("seeResult")} <ArrowRightIcon />
         </button>
       </div>
