@@ -209,7 +209,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       ) : null}
 
       {standout ? (
-        <p className="mt-4 border-l-2 border-[var(--ink)] pl-3 text-base font-light leading-snug sm:mt-6 sm:pl-4 sm:text-lg">{standout}</p>
+        <p className="mt-4 text-base font-light leading-snug sm:mt-6 sm:text-lg">{standout}</p>
       ) : null}
 
       {drawn ? <StoryFigures story={drawn.story} input={drawn.input} /> : (
