@@ -7,7 +7,6 @@ import type {
   SubmissionMode,
   TargetPolicy,
 } from "./entry-types";
-import type { MetricOperation } from "./types";
 
 /**
  * A recipe is the versioned blueprint of a challenge: which entry types it opens
@@ -33,35 +32,14 @@ interface RecipeEntryType {
   parentKey?: string;
 }
 
-/**
- * A default metric the recipe seeds so a fresh round produces a full showcase
- * with zero config. `fieldKey` is a field's semantic key on any of the recipe's
- * entry types (undefined for `count`/`completion_rate`).
- */
+/** The rating-field combination used by Today, catalogue scores and the automatic ranking. */
 interface RecipeMetric {
   key: string;
   label: string;
-  operation: MetricOperation;
-  fieldKey?: string;
-  /**
-   * Several field keys instead of one: the metric averages them together per entry (Tables' "Nota geral" —
-   * the mean of its three ratings) rather than reading a single measure. Mutually exclusive with `fieldKey`;
-   * skipped, like a single field that no longer resolves, if any key doesn't.
-   */
-  fieldKeys?: string[];
-  /** This metric is the challenge's rating from the start — Today, the catalogue and the rankings read it (rating.ts). */
-  isRating?: boolean;
-  /** Reads this entry type instead of the primary one — attendance counts the visits, not the records inside. */
-  entryTypeKey?: string;
-  groupBy?: "none" | "participant" | "item";
-  visibleDuring?: boolean;
-  visibleInResults?: boolean;
-  /**
-   * Only meaningful with more than one participant (disagreement, curator bias…).
-   * A solo/personal round skips seeding these entirely.
-   */
-  needsGroup?: boolean;
-  settings?: { minSample?: number; bayesPriorWeight?: number };
+  operation: "average";
+  fieldKeys: string[];
+  isRating: true;
+  groupBy: "item";
 }
 
 interface Recipe {
@@ -249,95 +227,47 @@ const progressoItem: RecipeEntryType = {
   ],
   primary: true,
 };
-const completionMetric: RecipeMetric = {
-  key: "taxa_conclusao",
-  label: "Taxa de conclusão",
-  operation: "completion_rate",
-  visibleDuring: true,
-  visibleInResults: true,
-};
-
-const cineMetrics: RecipeMetric[] = [
-  { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
-  {
-    key: "ranking",
-    label: "Ranking dos filmes",
-    operation: "bayesian_average",
-    fieldKey: "nota",
-    groupBy: "item",
-    // 2, not 3: a club of exactly two people (a common size) would never see a
-    // single film ranked otherwise, since no film ever gets a third rating.
-    settings: { minSample: 2, bayesPriorWeight: 4 },
-  },
-  { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
-  completionMetric,
-];
-
 export const RECIPES: Record<RecipeKey, Recipe> = {
   cinema: {
     key: "cinema",
-    version: 1,
+    version: 2,
     catalogKind: "film",
     // The period is always optional: an undated Cinema round is an open-ended
     // watchlist, an undated Library is a reading habit. The wizard only uses this
     // as the initial toggle position.
     scheduleMode: "none",
     entryTypes: [avaliacao(true)],
-    metrics: cineMetrics,
+    metrics: [],
   },
   library: {
     key: "library",
-    version: 1,
+    version: 2,
     catalogKind: "book",
     scheduleMode: "period",
     entryTypes: [progressoDia, conclusao],
-    metrics: [
-      { key: "paginas_total", label: "Páginas lidas", operation: "sum", fieldKey: "paginas", groupBy: "none" },
-      { key: "paginas_por_pessoa", label: "Páginas por pessoa", operation: "sum", fieldKey: "paginas", groupBy: "participant" },
-      {
-        key: "ranking",
-        label: "Ranking dos livros",
-        operation: "bayesian_average",
-        fieldKey: "nota",
-        groupBy: "item",
-        settings: { minSample: 3, bayesPriorWeight: 4 },
-      },
-      completionMetric,
-    ],
+    metrics: [],
   },
   // "Rate a list of books" — the Cinema shape for a bookshelf: each book gets a
   // rating and an optional comment, no period, no pages, no "when did it happen".
   bookshelf: {
     key: "bookshelf",
-    version: 1,
+    version: 2,
     catalogKind: "book",
     scheduleMode: "none",
     entryTypes: [avaliacao(true)],
-    metrics: [
-      { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
-      {
-        key: "ranking",
-        label: "Ranking dos livros",
-        operation: "bayesian_average",
-        fieldKey: "nota",
-        groupBy: "item",
-        settings: { minSample: 3, bayesPriorWeight: 4 },
-      },
-      { key: "polarizacao", label: "Polarização por livro", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
-      completionMetric,
-    ],
+    metrics: [],
   },
   // A personalized daily check-in with no catalog at all — studying, a workout,
   // a mood log. The wizard's Fields step and the admin's Metrics tab (any
   // numeric field can already feed a Sum/Average/Min/Max metric) are the whole
-  // template; only completion rate is seeded.
+  // template; the automatic story reads the recorded check-ins directly.
   habit: {
     key: "habit",
-    version: 1,
+    version: 2,
     catalogKind: null,
     scheduleMode: "none",
     entryTypes: [habitCheckin],
-    metrics: [completionMetric],
+    metrics: [],
   },
   // A challenge built on one of the workspace's own libraries (Matches,
   // Tables, or any other) instead of the fixed film/book catalog. `catalogKind`
@@ -345,7 +275,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
   // `body.libraryId` instead, resolved against this group's own libraries.
   custom: {
     key: "custom",
-    version: 1,
+    version: 2,
     catalogKind: null,
     catalogKindFromBody: true,
     userDefinedFields: true,
@@ -353,37 +283,30 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     // A response is about something else (a match, a place), so "when did it happen" is only asked
     // when the creator turns it on — every save is still timestamped internally.
     entryTypes: [customEntry],
-    metrics: [completionMetric],
+    metrics: [],
   },
   // Daily progress on any library (see `progressoItem`); books keep `library`, which knows their pages.
   progress: {
     key: "progress",
-    version: 1,
+    version: 2,
     catalogKind: null,
     catalogKindFromBody: true,
     userDefinedFields: true,
     scheduleMode: "period",
     entryTypes: [progressoItem, conclusao],
-    metrics: [
-      { key: "total", label: "Total", operation: "sum", fieldKey: "quantidade", groupBy: "none" },
-      { key: "total_por_pessoa", label: "Total por pessoa", operation: "sum", fieldKey: "quantidade", groupBy: "participant", needsGroup: true },
-      completionMetric,
-    ],
+    metrics: [],
   },
   // A ready-made challenge on a Tables library: rate each place on food,
   // atmosphere/service and value, plus one combined score averaging all three — which is the place's rating.
   tables: {
     key: "tables",
-    version: 3,
+    version: 4,
     catalogKind: null,
     catalogKindFromBody: true,
     defaultLibrarySource: "tables",
     scheduleMode: "none",
     entryTypes: [tablesEntry],
     metrics: [
-      { key: "media_comida", label: "Comida e bebida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },
-      { key: "media_ambiente_atendimento", label: "Ambiente e atendimento (média por lugar)", operation: "average", fieldKey: "ambiente_atendimento", groupBy: "item" },
-      { key: "media_custo_beneficio", label: "Custo-benefício (média por lugar)", operation: "average", fieldKey: "custo_beneficio", groupBy: "item" },
       {
         key: "nota_geral",
         label: "Nota geral (média por lugar)",
@@ -392,7 +315,6 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
         groupBy: "item",
         isRating: true,
       },
-      completionMetric,
     ],
   },
 };
@@ -456,11 +378,7 @@ export function withRecordingMode(recipe: Recipe, body: Record<string, unknown>)
     recipe: {
       ...recipe,
       entryTypes: [sessionEntry(name, noteLabel), recordEntry],
-      metrics: [
-        { key: "frequencia", label: "Frequência", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "none" },
-        { key: "frequencia_por_pessoa", label: "Frequência por pessoa", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "participant", needsGroup: true },
-        { key: "registros_por_item", label: "Registros por item", operation: "count", groupBy: "item" },
-      ],
+      metrics: [],
     },
   };
 }

@@ -18,7 +18,6 @@ import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/librarie
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
-import { seedFieldMetrics } from "../challenges/auto-metrics";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { MAX_CHALLENGE_RULES } from "./rule-limits";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
@@ -163,8 +162,6 @@ export async function createChallenge(
         recipe.key, recipe.version, startDate, endDate, timeZone, kind, status],
     );
 
-    let primaryTypeId = "";
-    let completionTypeId = "";
     const fieldByKey = new Map<string, { id: string; kind: string; entryTypeId: string }>();
     const typeIdByKey = new Map<string, string>();
     const hasExplicitPrimary = recipe.entryTypes.some((type) => type.primary);
@@ -189,7 +186,6 @@ export async function createChallenge(
           type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary,
           shared ? "shared" : "individual", shared ? sharedEditPolicy : null],
       );
-      if (type.purpose === "completion") completionTypeId = typeId;
       // The recipe's own ratings (Screens/Pages "nota", Tables' three) count toward the ranking unless the
       // creator said otherwise; any rating they added themselves doesn't, until they switch it on.
       const ownRatings = new Set(type.fields.filter((field) => field.type === "rating").map((field) => field.key));
@@ -203,9 +199,6 @@ export async function createChallenge(
         if (!fieldByKey.has(field.semanticKey)) {
           fieldByKey.set(field.semanticKey, { id: field.id, kind: field.kind, entryTypeId: typeId });
         }
-      }
-      if (isPrimary || !primaryTypeId) {
-        primaryTypeId = typeId;
       }
     }
     for (const response of parsedResponses) {
@@ -229,7 +222,6 @@ export async function createChallenge(
         }
       }
     }
-    const entryTypeId = primaryTypeId;
     // A type that lives inside another (a workout's exercise records) points at it — both exist by now.
     for (const type of recipe.entryTypes) {
       if (!type.parentKey) continue;
@@ -395,71 +387,25 @@ export async function createChallenge(
       );
     }
 
-    // Seed the recipe's analysis metrics so a fresh round produces a full
-    // showcase with zero config. A metric whose `fieldKey` no longer resolves
-    // (the wizard renamed the field away) is **skipped**, not re-pointed at some
-    // other numeric field — a metric labelled "Nota média" must never quietly
-    // average a different measure. The admin adds the right one later.
-    let metricPosition = 0;
-    for (const recipeMetric of recipe.metrics) {
-      // A solo round has no disagreement or curator dynamics, and a Bayesian
-      // shrink toward a one-person prior is meaningless — seed a plain average
-      // and drop the group-only metrics entirely.
-      if (options.personal && recipeMetric.needsGroup) continue;
-      const soloRanking = options.personal === true && recipeMetric.operation === "bayesian_average";
-      const operation = soloRanking ? "average" : recipeMetric.operation;
-      const settings = soloRanking ? { minSample: 1 } : recipeMetric.settings;
-      let fieldId: string | null = null;
-      // Several fields (Tables' "Nota geral"): every key must still resolve, same all-or-nothing rule as
-      // one — the recorded field ids ride along in `settings.fieldIds` for `ratingRows` to average per entry.
-      let combinedFieldIds: string[] | null = null;
-      // Completion rate counts the "done" signal — a dedicated completion type
-      // when the recipe has one, otherwise the primary type.
-      let metricTypeId = recipeMetric.entryTypeKey
-        ? typeIdByKey.get(recipeMetric.entryTypeKey) ?? entryTypeId
-        : operation === "completion_rate" && completionTypeId
-          ? completionTypeId
-          : entryTypeId;
-      if (recipeMetric.fieldKeys) {
-        const resolvedIds: string[] = [];
-        for (const key of recipeMetric.fieldKeys) {
-          const resolved = fieldByKey.get(key);
-          if (!resolved) break;
-          resolvedIds.push(resolved.id);
-          metricTypeId = resolved.entryTypeId;
-        }
-        if (resolvedIds.length !== recipeMetric.fieldKeys.length) continue;
-        fieldId = resolvedIds[0];
-        if (resolvedIds.length > 1) combinedFieldIds = resolvedIds;
-      } else if (recipeMetric.fieldKey) {
-        const resolved = fieldByKey.get(recipeMetric.fieldKey);
-        if (!resolved) continue;
-        fieldId = resolved.id;
-        metricTypeId = resolved.entryTypeId;
-      }
+    // The automatic story reads entries directly. Only an explicit rating-field combination
+    // needs a stored definition; all extra result pages are created through the metrics API.
+    for (const rating of recipe.metrics) {
+      const sources = rating.fieldKeys.map((key) => fieldByKey.get(key));
+      if (sources.some((source) => !source)) continue;
+      const fields = sources.filter((source): source is NonNullable<typeof source> => Boolean(source));
+      if (!fields.length || fields.some((field) => field.entryTypeId !== fields[0].entryTypeId)) continue;
       await client.query(
         `INSERT INTO challenge_metrics
           (id, challenge_id, entry_type_id, field_id, semantic_key, label, operation,
            group_by, decimal_places, visible_during_challenge, position, settings,
            created_by_user_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,now(),now())`,
-        [publicId(), id, metricTypeId, fieldId,
-          semanticKey(recipeMetric.key, `metrica_${metricPosition}`), recipeMetric.label,
-          operation, recipeMetric.groupBy ?? "none",
-          operation === "completion_rate" ? 1 : 2,
-          recipeMetric.visibleDuring !== false, metricPosition,
-          JSON.stringify({
-            visibleInResults: recipeMetric.visibleInResults !== false,
-            ...(combinedFieldIds ? { fieldIds: combinedFieldIds } : {}),
-            ...(recipeMetric.isRating ? { isRating: true } : {}),
-            ...settings,
-          }),
+         VALUES ($1,$2,$3,$4,$5,$6,'average','item',2,true,0,$7::jsonb,$8,now(),now())`,
+        [publicId(), id, fields[0].entryTypeId, fields[0].id, rating.key, rating.label,
+          JSON.stringify({ resultPage: false, visibleInResults: false, isRating: true,
+            ...(fields.length > 1 ? { fieldIds: fields.map((field) => field.id), combineOp: "average" } : {}) }),
           session.user.id],
       );
-      metricPosition += 1;
     }
-    // Whatever numbers the creator asked for beyond the recipe get their metrics too.
-    await seedFieldMetrics(client, id, session.user.id);
     await writeAudit(client, groupId, id, session.user.id, "challenge.created", "challenge", id, null, {
       title,
       template: body.template ?? null,

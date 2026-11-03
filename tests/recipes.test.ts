@@ -47,8 +47,7 @@ describe("current challenge recipes", () => {
     assert.equal(recipe.scheduleMode, "none");
     assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating"]);
     assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
-    assert.equal(recipe.metrics.some((metric) => metric.fieldKey === "paginas"), false);
-    assert.equal(recipe.metrics.some((metric) => metric.needsGroup), true);
+    assert.deepEqual(recipe.metrics, [], "the automatic story needs no stored summary metrics");
   });
 
   test("Habit has no catalog and no preset numeric field — a blank daily check-in", () => {
@@ -63,7 +62,7 @@ describe("current challenge recipes", () => {
     assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota_dia"]);
     // Nothing numeric is seeded — the whole point is that the person building it
     // adds their own field and their own metric on top of it.
-    assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
+    assert.deepEqual(recipe.metrics, []);
   });
 
   test("Custom draws its catalog kind from the request, not a fixed value", () => {
@@ -77,7 +76,7 @@ describe("current challenge recipes", () => {
     assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
     // Only completion is seeded — a "nota"-keyed metric would be wrong the
     // moment the wizard's Fields step replaces the default fields.
-    assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
+    assert.deepEqual(recipe.metrics, []);
   });
 
   test("Tables rates a place on three 0-5 dimensions with an optional comment and nothing else", () => {
@@ -93,12 +92,8 @@ describe("current challenge recipes", () => {
     assert.deepEqual(fields.map((field) => field.required), [true, true, true, false]);
     // No forced address, visit date, price, overall rating or "would return" field — an overall *metric* is fine.
     assert.equal(fields.some((field) => /endere|pre[cç]o|voltar/i.test(String(field.label))), false);
-    // The three dimensions' per-place averages, a combined "Nota geral" averaging all three, + completion.
-    assert.deepEqual(
-      recipe.metrics.map((metric) => metric.fieldKey),
-      ["comida", "ambiente_atendimento", "custo_beneficio", undefined, undefined],
-    );
-    const overall = recipe.metrics.find((metric) => metric.key === "nota_geral")!;
+    assert.equal(recipe.metrics.length, 1, "only the rating definition is persisted");
+    const overall = recipe.metrics[0];
     assert.deepEqual(overall.fieldKeys, ["comida", "ambiente_atendimento", "custo_beneficio"]);
     assert.equal(overall.operation, "average");
     assert.equal(overall.groupBy, "item");

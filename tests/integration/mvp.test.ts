@@ -40,6 +40,20 @@ async function call(
   return { response, body };
 }
 
+async function addAnalysisMetric(session: ClientSession, challengeId: string, input: Record<string, unknown> & { fieldKey?: string }) {
+  const { fieldKey, ...body } = input;
+  if (fieldKey) {
+    const detail = (await call("GET", `/api/challenges/${challengeId}`, { session })).body as import("../../app/goa/types").ChallengeDetail;
+    const field = detail.entryTypes.flatMap((type) => type.fields).find((field) => field.key === fieldKey);
+    assert.ok(field, `Missing metric source ${fieldKey}`);
+    body.fieldId = field.id;
+  }
+  const created = await call("POST", `/api/challenges/${challengeId}/metrics`, { session, body });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session })).body as import("../../app/goa/types").ChallengeDetail;
+  return detail.metrics.find((metric) => metric.id === (created.body as { id: string }).id)!;
+}
+
 async function register(name: string, username: string): Promise<ClientSession> {
   const result = await call("POST", "/api/auth/register", {
     body: { name, username, password: "uma senha segura 123" },
@@ -1980,6 +1994,7 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
   });
   const draftIndividual = ((await call("GET", `/api/challenges/${did}`, { session: owner })).body as { entryTypes: Array<{ id: string; answerScope: string }> })
     .entryTypes.find((type) => type.answerScope === "individual")!.id;
+  await addAnalysisMetric(owner, did, { label: "Nota média", operation: "average", fieldKey: "nota" });
   const needsConfirm = await call("DELETE", `/api/challenges/${did}/entry-types/${draftIndividual}`, { session: owner });
   assert.equal(needsConfirm.response.status, 409);
   assert.equal((needsConfirm.body as { error: string }).error, "entry_type_has_metrics");
@@ -2023,6 +2038,7 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
   assert.equal(soloEntry.response.status, 201, JSON.stringify(soloEntry.body));
   const boot = ((await call("GET", "/api/bootstrap", { session: soloOwner })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number }> }).challenges.find((c) => c.id === sid)!;
   assert.deepEqual([boot.completedCount, boot.totalCount], [1, 2], "um item concluído pelo placar compartilhado, de dois");
+  await addAnalysisMetric(soloOwner, sid, { label: "Completion", operation: "completion_rate" });
   const rate = ((await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as { metrics: Array<{ operation: string; value?: number | string | null }> }).metrics.find((m) => m.operation === "completion_rate");
   assert.equal(Number(rate?.value), 50, "a taxa conta uma resposta compartilhada por item, não uma por pessoa");
 });
@@ -2153,8 +2169,8 @@ test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma c�
   };
   assert.deepEqual(
     detail.metrics.map((metric) => metric.key),
-    ["media_comida", "media_ambiente_atendimento", "media_custo_beneficio", "nota_geral", "taxa_conclusao"],
-    "a receita semeia as três médias, a nota geral combinada e a conclusão",
+    ["nota_geral"],
+    "only the rating definition is needed; criterion charts read the entries directly",
   );
   assert.ok(detail.metrics.find((metric) => metric.key === "nota_geral")!.fieldId, "a métrica combinada ainda aponta um campo, para a checagem do banco");
   const cantina = detail.items.find((item) => item.title === "Cantina do Zé")!.id;
@@ -2177,7 +2193,6 @@ test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma c�
     [["Boteco da Ana", 2.1], ["Cantina do Zé", 4.87]],
   );
   // As três médias individuais continuam corretas e independentes da combinada.
-  assert.equal(withEntries.metrics.find((metric) => metric.key === "media_comida")!.value, 3, "(5 + 1) / 2");
 
   // Uma cópia do desafio (mesmo sem entradas ainda) precisa remapear os três campos da métrica combinada
   // para os campos NOVOS — não os do desafio de origem — ou a nota geral fica muda no destino.
@@ -2244,7 +2259,7 @@ test("a nota do desafio: a Nota geral do Tables já nasce como a nota; o acervo 
 
   // Reabre para mexer nas métricas: marcar a média da Comida como a nota tira a marca da Nota geral.
   await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
-  const comida = detail.metrics.find((metric) => metric.key === "media_comida")!;
+  const comida = await addAnalysisMetric(owner, cid, { key: "media_comida", label: "Comida", operation: "average", fieldKey: "comida", groupBy: "item" });
   const moved = await call("PATCH", `/api/challenges/${cid}/metrics/${comida.id}`, {
     session: owner, body: { label: comida.label, operation: "average", fieldId: comida.fieldId, groupBy: "item", isRating: true },
   });
@@ -2252,9 +2267,10 @@ test("a nota do desafio: a Nota geral do Tables já nasce como a nota; o acervo 
   const after = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
   assert.deepEqual(after.metrics.filter((metric) => metric.isRating).map((metric) => metric.key), ["media_comida"], "só uma métrica é a nota");
   assert.deepEqual(after.ratingFieldIds, [comida.fieldId]);
+  assert.ok(!after.metrics.some((metric) => metric.id === notaGeral.id), "superseded internal definitions are removed instead of becoming hidden leftovers");
 
   // Uma soma não está na escala de nota: recusada.
-  const refused = await call("PATCH", `/api/challenges/${cid}/metrics/${notaGeral.id}`, {
+  const refused = await call("PATCH", `/api/challenges/${cid}/metrics/${comida.id}`, {
     session: owner, body: { label: notaGeral.label, operation: "average", fieldIds: notaGeral.fieldIds, combineOp: "sum", groupBy: "item", isRating: true },
   });
   assert.equal(refused.response.status, 400, JSON.stringify(refused.body));
@@ -3067,6 +3083,7 @@ test("motor de análise: ranking ajustado, surpresa e vitrine automática", asyn
   const ratingEntryType = types.find((t) => t.purpose === "rating")!;
   const ratingType = ratingEntryType.id;
   const notaFieldId = ratingEntryType.fields.find((field) => field.key === "nota")!.id;
+  await addAnalysisMetric(owner, challengeId, { label: "Ranking dos filmes", operation: "bayesian_average", fieldKey: "nota", groupBy: "item", minSample: 2, bayesPriorWeight: 4 });
   const surpriseMetric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
     session: owner,
     body: { label: "Surpresa × decepção", operation: "surprise", fieldId: notaFieldId, groupBy: "item", minSample: 2 },
@@ -3629,7 +3646,8 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating"], "a estante nasce como uma lista normal; progresso é ativado depois em Gerenciar");
   assert.equal(detail.metrics.some((metric) => metric.operation === "indicator_bias"), false, "sem viés do indicador num desafio solo");
   assert.equal(detail.metrics.some((metric) => metric.operation === "spread"), false, "sem polarização num desafio solo");
-  const ranking = detail.metrics.find((metric) => metric.label.toLowerCase().includes("ranking"))!;
+  assert.deepEqual(detail.metrics, [], "no hidden ranking definitions are generated");
+  const ranking = await addAnalysisMetric(owner, cid, { label: "Ranking", operation: "average", fieldKey: "nota", groupBy: "item" });
   assert.equal(ranking.operation, "average", "ranking solo é média simples, sem encolhimento bayesiano");
 
   const ratingEntryType = detail.entryTypes.find((type) => type.purpose === "rating")!;
@@ -4727,6 +4745,7 @@ test("revelar juntos: a nota fica selada até alguém revelar, inclusive para o 
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
+  await addAnalysisMetric(owner, cid, { label: "Rating average", operation: "average", fieldKey: "nota" });
   type RevealDetail = {
     entryTypes: Array<{ id: string; purpose: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
     items: Array<{ id: string; title: string; revealedAt: string | null; answeredUserIds: string[] }>;
@@ -4833,41 +4852,37 @@ test("gosto em comum: concordância cruza os desafios do grupo pelo título do c
   assert.equal((await call("GET", `/api/groups/${groupId}/taste`, { session: outsider })).response.status, 404);
 });
 
-test("métricas automáticas: todo número ou nota que alguém cria ganha métricas, e apagar uma é para sempre", async () => {
+test("automatic Results read entries without generating hidden definitions, including after field edits", async () => {
   const owner = await register("Dona Auto", "dona_auto_metric");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Auto Métricas" } })).body as { id: string }).id;
-  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "habit", title: "Correr", participantIds: [owner.user.id],
-      fields: [{ key: "km", label: "Km", type: "number", required: true, config: { min: 0, step: 0.5 } }],
-    },
-  });
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Automatic results" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, { session: owner, body: {
+    recipe: "habit", title: "Correr", participantIds: [owner.user.id],
+    fields: [{ key: "km", label: "Km", type: "number", required: true, config: { min: 0, step: 0.5 } }],
+  } });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
-  type M = { id: string; label: string; operation: string; groupBy: string };
-  const metrics = async () => ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: M[] }).metrics;
-  const auto = (list: M[]) => list.filter((metric) => metric.label.startsWith("Km (")).map((metric) => `${metric.operation}/${metric.groupBy}`).sort();
-  assert.deepEqual(auto(await metrics()), ["max/none", "sum/none", "sum/participant"], "total, leaderboard and record from the start");
-
-  // A field added later gets its own; deleting one of the automatic ones sticks across the next save.
-  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; key: string; label: string; type: string; required: boolean; config?: unknown }> };
-  const saved = await call("POST", `/api/challenges/${cid}/fields`, {
-    session: owner, body: { replace: true, fields: [...detail.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })), { key: "humor", label: "Humor", type: "rating", required: false, config: { min: 0, max: 5, step: 1 } }] },
-  });
-  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
-  const humor = (await metrics()).filter((metric) => metric.label.startsWith("Humor ("));
-  assert.deepEqual(humor.map((metric) => `${metric.operation}/${metric.groupBy}`).sort(), ["average/none", "average/participant"], "a habit's rating: average and per person (no items to rank)");
-  const total = (await metrics()).find((metric) => metric.label === "Km (total)")!;
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  assert.deepEqual((await detail()).metrics, []);
+  const original = await detail();
+  const fields = original.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config }));
+  const added = await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { replace: true, fields: [...fields, { key: "humor", label: "Humor", type: "rating", required: false, config: { min: 0, max: 5, step: 1 } }] } });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
+  assert.deepEqual((await detail()).metrics, [], "adding numeric/rating fields creates no hidden summaries");
+  const total = await addAnalysisMetric(owner, cid, { label: "Km total", operation: "sum", fieldKey: "km" });
+  assert.equal(total.resultPage, true);
   assert.equal((await call("DELETE", `/api/challenges/${cid}/metrics/${total.id}`, { session: owner })).response.status, 200);
-  const again = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; label: string; type: string; required: boolean; config?: unknown }> };
-  await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { replace: true, fields: again.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })) } });
-  assert.ok(!(await metrics()).some((metric) => metric.label === "Km (total)"), "the deleted automatic metric does not grow back");
-
-  // A recipe's own rating is already covered — no duplicates.
-  const cinema = await call("POST", `/api/groups/${groupId}/challenges`, { session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Filme" }] } });
-  const cinemaMetrics = ((await call("GET", `/api/challenges/${(cinema.body as { id: string }).id}`, { session: owner })).body as { metrics: M[] }).metrics;
-  assert.ok(!cinemaMetrics.some((metric) => / \((média|ranking|por pessoa|por gênero|por ano)\)$/.test(metric.label)), "cinema's nota already has its recipe metrics");
+  const current = await detail();
+  assert.equal((await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { replace: true, fields: current.fields } })).response.status, 201);
+  assert.deepEqual((await detail()).metrics, [], "deleted extras do not regenerate on a field save");
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  for (const [day, km] of [["2026-09-01", 4], ["2026-09-02", 6]] as const) {
+    assert.equal((await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { occurredOn: day, values: { km } } })).response.status, 201);
+  }
+  const entries = ((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body as { entries: import("../../app/goa/types").Entry[] }).entries;
+  const { buildStory, storyFromChallenge } = await import("../../app/goa/story/model");
+  const story = buildStory(storyFromChallenge(await detail(), entries, "2026-09-02"));
+  assert.equal(story.kind, "dated");
+  if (story.kind === "dated") { assert.equal(story.totals.total, 10); assert.equal(story.totals.checkins, 2); }
 });
 
 test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {
@@ -8024,7 +8039,9 @@ test("check-in com vários itens: um treino guarda um registro por exercício, e
   const bench = records.filter((record) => record.itemId === item("Supino reto")).sort((a, b) => (a.occurredOn ?? "").localeCompare(b.occurredOn ?? ""));
   assert.deepEqual(bench.map((record) => [record.occurredOn, record.values[carga]]), [["2026-09-19", 55], ["2026-09-22", 55]]);
 
-  // as métricas de partida: frequência (visitas) e registros por item
+  await addAnalysisMetric(owner, cid, { label: "Frequência", operation: "count", entryTypeId: visitType.id });
+  await addAnalysisMetric(owner, cid, { label: "Registros por item", operation: "count", entryTypeId: recordType.id, groupBy: "item" });
+  // Optional analysis pages explicitly selected by the owner.
   const seeded = await detail();
   assert.equal(seeded.metrics.find((metric) => metric.label === "Frequência")?.value, 2, "a frequência conta treinos, não exercícios");
   const perItem = seeded.metrics.find((metric) => metric.label === "Registros por item")!.series!;
@@ -9101,6 +9118,7 @@ test("progress tracking persists explicit workload factors, validates goals, and
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const get = async (id = cid) => (await call("GET", `/api/challenges/${id}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  await addAnalysisMetric(owner, cid, { label: "Best load", operation: "max", fieldKey: "weight", groupBy: "item" });
   const initial = await get();
   const ids = initial.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);
   const trackingSettings = { performance: { mode: "product", fieldIds: ids, sessionAggregation: "sum" }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
@@ -9166,7 +9184,7 @@ test("legacy cleanup retires invisible calculations while preserving entries, au
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
   const type = detail.entryTypes.find((type) => type.purpose === "rating")!;
   const field = type.fields.find((field) => field.type === "rating")!;
-  const legacy = detail.metrics.find((metric) => !metric.isRating)!;
+  const legacy = await addAnalysisMetric(owner, cid, { label: "Legacy unused definition", operation: "average", fieldId: field.id, resultPage: false });
   assert.equal(legacy.resultPage, false, "a generated definition is not a result page");
   const internal = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Internal rating", operation: "average", fieldId: field.id, isRating: true, resultPage: false } });
   assert.equal(internal.response.status, 201, JSON.stringify(internal.body));
@@ -9188,6 +9206,20 @@ test("legacy cleanup retires invisible calculations while preserving entries, au
     assert.equal((await client.query("SELECT count(*)::int AS n FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL", [cid])).rows[0].n, 1);
     assert.equal((await client.query("SELECT visible FROM result_blocks WHERE metric_id=$1", [legacy.id])).rows[0].visible, false);
     const { challengeRatingFieldIds } = await import("../../lib/goa/challenges/rating");
+    assert.deepEqual(await challengeRatingFieldIds(client, cid), [field.id]);
+    const referenced = await client.query<{ id: string }>(
+      `INSERT INTO challenge_metrics (id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,decimal_places,visible_during_challenge,position,settings,created_by_user_id,archived_at)
+       SELECT gen_random_uuid()::text,challenge_id,entry_type_id,field_id,'historical_report','Historical report',operation,group_by,decimal_places,visible_during_challenge,99,'{}'::jsonb,created_by_user_id,now()
+       FROM challenge_metrics WHERE id=$1 RETURNING id`, [(extra.body as { id: string }).id]);
+    await client.query("INSERT INTO result_blocks (id,challenge_id,kind,metric_id,position,visible,created_by_user_id,value_snapshot) VALUES (gen_random_uuid()::text,$1,'metric',$2,99,true,$3,$4::jsonb)",
+      [cid, referenced.rows[0].id, owner.user.id, JSON.stringify({ id: referenced.rows[0].id, label: "Historical report", operation: "average", value: 4 })]);
+    const purge = await readFile(new URL("../../drizzle/0074_purge_unused_result_definitions.sql", import.meta.url), "utf8");
+    for (const statement of purge.split("--> statement-breakpoint")) await client.query(statement);
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM challenge_metrics WHERE id=$1", [legacy.id])).rows[0].n, 0);
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM result_blocks WHERE metric_id=$1", [legacy.id])).rows[0].n, 0);
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM challenge_metrics WHERE challenge_id=$1", [cid])).rows[0].n, 3, "the live rating, explicit page and actual publication dependency remain");
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM result_blocks WHERE metric_id=$1 AND visible", [referenced.rows[0].id])).rows[0].n, 1, "a still-used frozen report is preserved");
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM entries WHERE challenge_id=$1", [cid])).rows[0].n, 1);
     assert.deepEqual(await challengeRatingFieldIds(client, cid), [field.id]);
   } finally {
     await client.query("ROLLBACK");

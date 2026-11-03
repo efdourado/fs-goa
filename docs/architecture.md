@@ -95,9 +95,10 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
 - **Métricas** (`results.ts`, `analysis.ts`): contagem, soma, média, mediana,
   mín/máx, média bayesiana, desvio, consenso, surpresa (nota − expectativa), viés de
   quem indicou, agrupadas por item, pessoa, etapa, ano, autor ou gênero.
-  Combinações incoerentes são recusadas. **Auto-métricas** (`auto-metrics.ts`):
-  todo campo de número ou nota ganha as métricas óbvias uma vez; apagadas, não
-  voltam.
+  Combinações incoerentes são recusadas. As páginas automáticas de Resultados
+  leem os registros diretamente; não geram definições extras de métricas. Apenas
+  páginas adicionais configuradas explicitamente (`settings.resultPage`) e a
+  definição interna da nota (`settings.isRating`) são persistidas.
 - **"A nota"** de um desafio (`rating.ts`): uma métrica marcada `isRating` diz quais
   campos formam a nota de cada registro; sem ela, a média dos campos de nota que **contam para o
   ranking** (`settings.inRanking`, migração `0062`). As notas da receita contam; uma nota que alguém

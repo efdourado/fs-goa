@@ -1136,6 +1136,16 @@ async function assertRatingMetric(
 
 /** A challenge has at most one rating — naming a new one takes the flag off whichever had it. */
 async function clearOtherRatingMetrics(client: PoolClient, challengeId: string, keepId: string) {
+  // A superseded internal definition has no independent purpose. Explicit result pages and
+  // visible publication dependencies keep their calculation and only lose the rating flag.
+  const obsolete = await client.query<{ id: string }>(
+    `SELECT m.id FROM challenge_metrics m
+      WHERE m.challenge_id=$1 AND m.id<>$2 AND m.settings->>'isRating'='true'
+        AND coalesce(m.settings->>'resultPage','false')<>'true'
+        AND NOT EXISTS (SELECT 1 FROM result_blocks b WHERE b.metric_id=m.id AND b.visible)`,
+    [challengeId, keepId],
+  );
+  await deleteMetricsHard(client, obsolete.rows.map((row) => row.id));
   await client.query(
     `UPDATE challenge_metrics SET settings = settings - 'isRating', updated_at = now()
       WHERE challenge_id = $1 AND id <> $2 AND settings ? 'isRating'`,
