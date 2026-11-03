@@ -90,10 +90,9 @@ function Chapter({ lead, children, bottom, className, ...rest }: { lead?: ReactN
 }
 
 /** A quiet summary; the session details live in the exercise dialog. */
-function Progression({ title, row, person, tone, onOpen }: {
+function Progression({ title, row, tone, onOpen }: {
   title: string;
-  row: { first: number; best: number; sessions: number; label?: string };
-  person: string | null;
+  row: { first: number; best: number; sessions: number };
   tone: string;
   onOpen: () => void;
 }) {
@@ -101,7 +100,7 @@ function Progression({ title, row, person, tone, onOpen }: {
   const gain = row.first > 0 ? Math.round(((row.best - row.first) / row.first) * 100) : null;
   return <li>
     <button type="button" onClick={onOpen} className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_3.5rem] items-center gap-3 rounded-lg py-2.5 text-left text-sm transition hover:bg-[var(--wash)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20">
-      <span className="min-w-0"><span className="block truncate">{title}</span>{person || row.label ? <span className="block truncate text-xs text-[var(--muted)]">{[person, row.label].filter(Boolean).join(" · ")}</span> : null}</span>
+      <span className="min-w-0 truncate">{title}</span>
       <span className="text-xs text-[var(--muted)]">{t("records.sessions", { count: row.sessions })}</span>
       <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>{gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%`}</strong>
     </button>
@@ -205,7 +204,7 @@ function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit:
     <>
       <ul className="divide-y divide-[var(--line)]">
         {rows.map((row) => (
-          <Progression key={`${row.person.id}-${row.item.id}-${row.metricKey ?? ""}`} title={row.item.title} row={row} person={showPerson ? firstName(row.person.name) : null} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
+          <Progression key={`${row.person.id}-${row.item.id}-${row.metricKey ?? ""}`} title={row.item.title} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
         ))}
       </ul>
       {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
