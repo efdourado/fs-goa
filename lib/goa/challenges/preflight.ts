@@ -210,7 +210,9 @@ export async function computePreflight(
 
   // --- warnings --------------------------------------------------------
 
-  if (metrics === 0) warn("no_metrics", "Nenhuma métrica configurada, a retrospectiva ficará vazia.");
+  const hasAutomaticStory = liveFields.some((field) => field.kind === "rating")
+    || types.some((type) => type.purpose === "checkin" || type.purpose === "progress" || type.submission_mode === "daily" || type.parent_type_id);
+  if (metrics === 0 && !hasAutomaticStory) warn("no_metrics", "Nenhuma métrica configurada, a retrospectiva ficará vazia.");
   if (text_fields === 0) warn("no_comment_source", "Nenhum campo de texto, não haverá comentários para a retrospectiva.");
 
   const requiredOnPrimary = primaryType

@@ -359,6 +359,8 @@ export interface MetricSeriesEntry {
 }
 
 export interface Metric {
+  /** Explicitly added result page; generated calculation definitions stay internal. */
+  resultPage?: boolean;
   id: Id;
   label: string;
   operation: MetricOperation;

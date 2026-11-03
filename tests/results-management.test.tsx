@@ -11,7 +11,7 @@ import { StoryView } from "../app/goa/story/view";
 import type { ChallengeDetail, Metric } from "../app/goa/types";
 import { renderWithIntl } from "./helpers/intl";
 
-const metric: Metric = { id: "combined", label: "Overall rating", operation: "average", fieldIds: ["food", "value"], fieldId: "food", combineOp: "average", entryTypeId: "rating", groupBy: "item", isRating: true, minSample: 2, visibleDuring: true, visibleInResults: true, series: [{ key: "a", label: "Restaurant", value: 4, sampleSize: 2 }] };
+const metric: Metric = { resultPage: true, id: "combined", label: "Overall rating", operation: "average", fieldIds: ["food", "value"], fieldId: "food", combineOp: "average", entryTypeId: "rating", groupBy: "item", isRating: true, minSample: 2, visibleDuring: true, visibleInResults: true, series: [{ key: "a", label: "Restaurant", value: 4, sampleSize: 2 }] };
 const challenge = {
   id: "c", title: "Ratings", scope: "group", status: "active", recipeKey: "custom", submissionMode: "item",
   items: [{ id: "a", title: "Restaurant" }], participants: [{ userId: "ana", name: "Ana" }], checkpoints: [],
@@ -97,4 +97,14 @@ test("check-in handling has its own section, apart from performance calculations
   assert.match(html, /Como contar os check-ins/);
   assert.match(html, /aria-haspopup="listbox"/);
   assert.doesNotMatch(html, /<select/);
+});
+
+
+test("stored calculation definitions never become result pages without explicit intent", () => {
+  const legacy = { ...metric, id: "legacy", label: "Invisible legacy total", resultPage: false };
+  const html = renderWithIntl(createElement(Pages, { value: input, metrics: [legacy] }));
+  assert.doesNotMatch(html, /Invisible legacy total|data-result-page="metric-legacy"/);
+  assert.match(html, /data-result-page="rankings"/, "the existing automatic ranking remains intact");
+  const manage = renderWithIntl(createElement(AdminMetrics, { challenge: { ...challenge, metrics: [{ ...legacy, isRating: false }] }, entries: [], onSaveSettings: noop, onSaveMetric: noop, onDeleteMetric: noop }));
+  assert.doesNotMatch(manage, /Invisible legacy total/);
 });

@@ -4,7 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf } from "../catalog-cover";
-import { arrangeResultPages } from "../../../lib/result-presentation";
+import { arrangeResultPages, isResultMetric } from "../../../lib/result-presentation";
 import { MetricBlock } from "../metrics-view";
 import { metricHasData } from "../utils";
 import { CatalogTile } from "../catalog-views";
@@ -499,7 +499,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   const noun = (count: number) => t(`noun.${input.noun}`, { count });
   const pages: AlmanacPage[] = [];
   const metricsPage: AlmanacPage[] = metrics
-    .filter((metric) => metric.visibleInResults !== false && (input.resultsClosed || metric.visibleDuring !== false) && metricHasData(metric as unknown as Record<string, unknown>))
+    .filter((metric) => isResultMetric(metric) && metric.visibleInResults !== false && (input.resultsClosed || metric.visibleDuring !== false) && metricHasData(metric as unknown as Record<string, unknown>))
     .map((metric) => ({ id: `metric-${metric.id}`, title: metric.label, headline: metric.label, ownHeadline: true,
       body: <div className="mx-auto max-w-3xl"><MetricBlock metric={metric} /></div> }));
   const present = (rows: AlmanacPage[]) => manage ? rows : arrangeResultPages(rows, input.resultPresentation);

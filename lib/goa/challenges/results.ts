@@ -377,6 +377,7 @@ async function calculateMetricRow(
   return {
     id: metric.id,
     key: metric.semantic_key,
+    resultPage: metric.settings?.resultPage === true,
     label: metric.label,
     operation: metric.operation,
     fieldId: metric.field_id,
@@ -902,7 +903,7 @@ export async function publicMetricsForChallenge(client: PoolClient, challengeId:
        AND (t.visibility_policy <> 'after_close' OR c.status = 'closed')
        AND (p.id IS NULL OR (p.visibility_policy <> 'author_only' AND (p.visibility_policy <> 'after_close' OR c.status = 'closed')))`, [challengeId]);
   const ids = new Set(allowed.rows.map((row) => row.id));
-  return (await metricsForChallenge(client, challengeId)).filter((metric) => ids.has(String(metric.id)) && metric.visibleInResults !== false);
+  return (await metricsForChallenge(client, challengeId)).filter((metric) => ids.has(String(metric.id)) && metric.resultPage === true && metric.visibleInResults !== false);
 }
 
 const METRIC_OPERATIONS = new Set([
@@ -1100,8 +1101,9 @@ async function parseMetricScope(client: PoolClient, challengeId: string, parsed:
   return { itemId, countDays };
 }
 
-function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false, scope?: MetricScopeInput): string {
+function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false, scope?: MetricScopeInput, resultPage = true): string {
   return JSON.stringify({
+    resultPage,
     ...(scope?.itemId ? { itemId: scope.itemId } : {}),
     ...(scope?.countDays ? { countDays: true } : {}),
     visibleInResults: parsed.visibleInResults,
@@ -1182,7 +1184,7 @@ export async function addMetric(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
       [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? parsed.label, `metrica_${positionRow?.position ?? 0}`),
         parsed.label, parsed.operation, parsed.groupBy, parsed.visibleDuring, positionRow?.position ?? 0,
-        metricSettingsJson(parsed, resolved, combineOp, isRating, scope), session.user.id],
+        metricSettingsJson(parsed, resolved, combineOp, isRating, scope, body.resultPage !== false), session.user.id],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, id);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
@@ -1227,7 +1229,7 @@ export async function updateMetric(
               visible_during_challenge=$8, settings=$9::jsonb, updated_at=now()
         WHERE id=$1 AND challenge_id=$2`,
       [metricId, challengeId, entryTypeId, fieldId, parsed.label, parsed.operation, parsed.groupBy,
-        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating, scope)],
+        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating, scope, body.resultPage !== false)],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, metricId);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,

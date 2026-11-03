@@ -63,7 +63,7 @@ export function metricMinimum(metric: Pick<Metric, "operation" | "minSample">): 
 /** Full update shape: changing visibility must preserve the calculation and its scope. */
 export function metricUpdatePayload(metric: Metric): Record<string, unknown> {
   return {
-    label: metric.label, operation: metric.operation, entryTypeId: metric.entryTypeId,
+    resultPage: metric.resultPage !== false, label: metric.label, operation: metric.operation, entryTypeId: metric.entryTypeId,
     fieldId: metric.fieldId, fieldIds: metric.fieldIds, combineOp: metric.combineOp ?? "average",
     groupBy: metric.groupBy ?? "none", minSample: metric.minSample ?? 1,
     bayesPriorWeight: metric.bayesPriorWeight ?? 4, cumulative: metric.cumulative ?? false,

@@ -25,3 +25,8 @@ export function arrangeResultPages<T extends { id: string }>(pages: T[], setting
 
 export const RATED_RESULT_PAGES = ["rankings", "duo", "brought", "solo", "people", "details", "words"] as const;
 export const DATED_RESULT_PAGES = ["streaks", "volume", "records", "words"] as const;
+
+/** Stored calculations are not presentation intent; only explicitly configured extras become pages. */
+export function isResultMetric(metric: { resultPage?: boolean }): boolean {
+  return metric.resultPage === true;
+}

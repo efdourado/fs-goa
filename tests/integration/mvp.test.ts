@@ -9157,3 +9157,40 @@ test("result page settings reach public Results and live metrics respect visibil
   assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${type.id}`, { session: owner, body: { visibilityPolicy: "author_only" } })).response.status, 200);
   assert.deepEqual(((await call("GET", `/api/results/${token}`)).body as Public).challenge.metrics, [], "private sources never enter the new public metric pages");
 });
+
+test("legacy cleanup retires invisible calculations while preserving entries, automatic rating sources and new explicit pages", async () => {
+  const owner = await register("Cleanup Owner", "legacy_results_cleanup");
+  const created = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "cinema", title: "Legacy cleanup", items: [{ title: "Aftersun" }] } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  const type = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const field = type.fields.find((field) => field.type === "rating")!;
+  const legacy = detail.metrics.find((metric) => !metric.isRating)!;
+  assert.equal(legacy.resultPage, false, "a generated definition is not a result page");
+  const internal = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Internal rating", operation: "average", fieldId: field.id, isRating: true, resultPage: false } });
+  assert.equal(internal.response.status, 201, JSON.stringify(internal.body));
+  const extra = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "New explicit page", operation: "average", fieldId: field.id } });
+  assert.equal(extra.response.status, 201, JSON.stringify(extra.body));
+  assert.equal((await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: type.id, itemId: detail.items[0].id, values: { [field.id!]: 4 } } })).response.status, 201);
+  const client = await adminPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("INSERT INTO result_blocks (id,challenge_id,kind,metric_id,position,visible,created_by_user_id) VALUES (gen_random_uuid()::text,$1,'metric',$2,0,true,$3)", [cid, legacy.id, owner.user.id]);
+    const { readFile } = await import("node:fs/promises");
+    const cleanup = await readFile(new URL("../../drizzle/0073_remove_unused_result_metrics.sql", import.meta.url), "utf8");
+    for (const statement of cleanup.split("--> statement-breakpoint")) await client.query(statement);
+    const rows = await client.query<{ id: string; retired: boolean }>("SELECT id, archived_at IS NOT NULL AS retired FROM challenge_metrics WHERE challenge_id=$1", [cid]);
+    const retired = new Map(rows.rows.map((row) => [row.id, row.retired]));
+    assert.equal(retired.get(legacy.id), true);
+    assert.equal(retired.get((internal.body as { id: string }).id), false);
+    assert.equal(retired.get((extra.body as { id: string }).id), false);
+    assert.equal((await client.query("SELECT count(*)::int AS n FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL", [cid])).rows[0].n, 1);
+    assert.equal((await client.query("SELECT visible FROM result_blocks WHERE metric_id=$1", [legacy.id])).rows[0].visible, false);
+    const { challengeRatingFieldIds } = await import("../../lib/goa/challenges/rating");
+    assert.deepEqual(await challengeRatingFieldIds(client, cid), [field.id]);
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});

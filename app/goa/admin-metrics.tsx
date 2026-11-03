@@ -30,7 +30,8 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
   const f = useGoaFormat();
   const [settings, setSettings] = useState(challenge.trackingSettings ?? {});
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
-  const metrics = (challenge.metrics ?? []).map((metric) => ({ ...metric, visibleInResults: visibility[metric.id] ?? metric.visibleInResults }));
+  const metrics = (challenge.metrics ?? []).filter((metric) => metric.resultPage).map((metric) => ({ ...metric, resultPage: visibility[metric.id] ?? metric.resultPage, visibleInResults: visibility[metric.id] ?? metric.visibleInResults }));
+  const ratingMetric = challenge.metrics?.find((metric) => metric.isRating);
   const [editing, setEditing] = useState<Metric | "new" | null>(null);
   const [performanceOpen, setPerformanceOpen] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
   const rows = arrangeResultPages(definitions, settings.results ? { ...settings.results, hiddenPages: [] } : undefined);
   const hidden = settings.results?.hiddenPages ?? [];
   const closed = challenge.status === "closed";
-  const dirty = JSON.stringify(settings) !== JSON.stringify(challenge.trackingSettings ?? {}) || Object.entries(visibility).some(([id, visible]) => visible !== (challenge.metrics?.find((metric) => metric.id === id)?.visibleInResults !== false));
+  const dirty = JSON.stringify(settings) !== JSON.stringify(challenge.trackingSettings ?? {}) || Object.entries(visibility).some(([id, visible]) => visible !== (challenge.metrics?.some((metric) => metric.id === id && metric.resultPage && metric.visibleInResults !== false) ?? false));
   const opened = preview === "thread" ? null : byId.get(preview ?? "");
   const previewMetric = challenge.metrics?.find((metric) => `metric-${metric.id}` === preview);
 
@@ -74,7 +75,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
       await onSaveSettings({ trackingSettings: normalized });
       setSettings(normalized);
       for (const metric of metrics) {
-        if (Object.hasOwn(visibility, metric.id) && visibility[metric.id] !== (challenge.metrics?.find((row) => row.id === metric.id)?.visibleInResults !== false)) {
+        if (Object.hasOwn(visibility, metric.id) && visibility[metric.id] !== (challenge.metrics?.some((row) => row.id === metric.id && row.resultPage && row.visibleInResults !== false) ?? false)) {
           await onSaveMetric(metric.id, metricUpdatePayload(metric));
         }
       }
@@ -99,7 +100,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
           <ol className="divide-y divide-[var(--line)]">
             {rows.map((row, index) => {
               const ready = byId.has(row.id);
-              const eligible = !row.metric || row.metric.visibleInResults !== false;
+              const eligible = !row.metric || (row.metric.resultPage === true && row.metric.visibleInResults !== false);
               const included = !hidden.includes(row.id) && eligible;
               return <li key={row.id} className="flex items-center gap-2 py-3">
                 <Toggle bare disabled={closed} checked={included} onChange={(visible) => {
@@ -113,6 +114,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
                 <span className="flex flex-none">
                   <button type="button" className={rowIcon} aria-label={t("moveUp", { title: row.title })} disabled={closed || !index} onClick={() => move(index, -1)}><ChevronIcon dir="up" /></button>
                   <button type="button" className={rowIcon} aria-label={t("moveDown", { title: row.title })} disabled={closed || index === rows.length - 1} onClick={() => move(index, 1)}><ChevronIcon dir="down" /></button>
+                  {row.id === "rankings" && ratingMetric ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(ratingMetric)}><SlidersIcon className="h-4 w-4" /></button> : null}
                   {row.id === "records" ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setPerformanceOpen(true)}><SlidersIcon className="h-4 w-4" /></button> : null}
                   {row.metric ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(row.metric!)}><SlidersIcon className="h-4 w-4" /></button> : null}
                 </span>
@@ -181,7 +183,7 @@ export function MetricEditorDialog({ challenge, metric, onSave, onDelete, onCanc
   const operations = metricOperations.filter((op) => (!metricNeedsField(op) || fields.length > 0) && (op !== "surprise" || challenge.entryTypes.some((type) => type.purpose === "expectation")) && (sourceType?.answerScope !== "shared" || !["spread", "consensus", "surprise"].includes(op)));
   async function save() {
     setBusy(true); setError(null);
-    try { await onSave({ label: label.trim(), operation, entryTypeId: source,
+    try { await onSave({ label: label.trim(), operation, resultPage: metric?.resultPage !== false, entryTypeId: source,
       ...(needsField ? selected.length > 1 ? { fieldIds: selected, combineOp: combine } : { fieldId: selected[0] } : {}),
       groupBy: activeGroup, minSample: minimum, bayesPriorWeight: prior, visibleDuring: during, visibleInResults: results,
       isRating: canRate && isRating, countDays: operation === "count" && countDays,
