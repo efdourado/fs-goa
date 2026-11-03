@@ -758,8 +758,8 @@
       "participants": "People",
       "fields": "Fields",
       "items": "Items",
-      "metrics": "Metrics",
-      "results": "Showcase",
+      "metrics": "Results",
+      "results": "Results",
       "checkpoints": "Stages",
       "settings": "Settings"
     },
@@ -2178,7 +2178,12 @@
       "title": "{name} showed up {value}% of the days",
       "note": "Share of the {days} days with a check-in.",
       "titleWeek": "{name} showed up in {value}% of the weeks",
-      "noteWeek": "Share of weeks with at least one check-in."
+      "noteWeek": "Share of weeks with at least one check-in.",
+      "goal": "Goal: {target} sessions every {days} days.",
+      "current": "Current period: {count} of {target}.",
+      "completed": "Percentage across {count} finished periods.",
+      "titleGoal": "{name}: {value}% of the goal",
+      "goalDays": "Goal: {target} active days every {days} days."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2212,7 +2217,9 @@
       "sessionsLabel": "Sessions",
       "history": "Latest sessions",
       "chartAria": "Progress of {title}",
-      "headlineFlat": "{count, plural, one {# exercise tracked.} other {# exercises tracked.}}"
+      "headlineFlat": "{count, plural, one {# exercise tracked.} other {# exercises tracked.}}",
+      "sumPerSession": "Sum per session: {fields}",
+      "bestPerSession": "Best record per session: {fields}"
     },
     "notes": {
       "eyebrow": "In their words"
@@ -2335,7 +2342,8 @@
       "note": "By release year, {first} to {last}.",
       "tooltip": "{things} from {year}, averaging {average}."
     },
-    "plusMore": "+ {count} more"
+    "plusMore": "+ {count} more",
+    "noVisiblePages": "No results to show yet."
   },
   "organise": {
     "button": "Organise",
@@ -2379,5 +2387,104 @@
     "showDatesHint": "Off, only the progress shows; each entry's day is kept without showing.",
     "goalFrom": "Use each item's “{name}”",
     "goalHint": "Use the same number for every item, or a number property from the library when each item has its own goal."
+  },
+  "progressTracking": {
+    "title": "Progress tracking",
+    "performance": "Performance calculation",
+    "product": "Workload: multiply selected properties",
+    "separate": "Track each property separately",
+    "properties": "Properties to multiply",
+    "performanceHelp": "Choose exactly what you enter: weight × reps for one set, weight × reps × sets for identical sets, or track an already calculated total directly. Select only factors that are not already included in another field. For sets logged separately, add the records; for a single best performance, use the best record. Progress compares the first session with the best session. Missing factors are excluded, and zero baselines have no percentage.",
+    "preview": "{title}: first {first}, best {best}",
+    "consistency": "Set a consistency goal",
+    "target": "Target per period",
+    "periodDays": "Period length in days",
+    "count": "What counts",
+    "sessions": "Sessions",
+    "days": "Active days",
+    "consistencyHelp": "Periods start on the challenge start date, or the first check-in. Finished periods each count up to 100%; extra sessions cannot cover a missed period. The open period is shown separately. A final partial period counts against the full target when the challenge ends. Changes recalculate the whole history.",
+    "noGoal": "Without a goal, consistency shows days or weeks with a check-in.",
+    "aggregation": "Within each session",
+    "bestRecord": "Use the best record",
+    "sumRecords": "Add all records",
+    "trackedProperties": "Properties to track",
+    "performanceTitle": "Performance calculations",
+    "checkinsTitle": "Check-in handling"
+  },
+  "metricsManage": {
+    "description": "Choose what appears in Results, review each calculation, and preview it with the current records.",
+    "resultsTitle": "Results pages",
+    "resultsHint": "Switch pages on or off and arrange their order. A page appears when it has enough data. The thread stays above the pages.",
+    "thread": "The thread",
+    "threadHint": "The visual overview of ratings or check-ins.",
+    "showPage": "Show {title} in Results",
+    "automatic": "Automatic analysis",
+    "hidden": "Hidden",
+    "pending": "Waiting for data",
+    "moveUp": "Move {title} up",
+    "moveDown": "Move {title} down",
+    "edit": "Edit {title}",
+    "preview": "Preview",
+    "pendingHelp": "This analysis will appear when there are enough compatible records.",
+    "metricExplanation": "{operation} · {group}. The preview uses the saved calculation.",
+    "source": "Entry source",
+    "rating": "Use as the challenge rating",
+    "ratingHint": "This score also drives the item ratings and the automatic ranking. Only an average of rating fields qualifies.",
+    "options": "Calculation options",
+    "prior": "Prior weight",
+    "countDays": "Count active days instead of records",
+    "item": "Limit to an item",
+    "allItems": "All items",
+    "cumulative": "Accumulate earlier stages",
+    "includeInResults": "Include in Results",
+    "pages": {
+      "thread": {
+        "title": "The thread",
+        "description": "A visual overview of the recorded ratings or check-ins."
+      },
+      "rankings": {
+        "title": "Rankings",
+        "description": "Items ordered by the challenge rating. The selected rating properties determine the score."
+      },
+      "duo": {
+        "title": "Together",
+        "description": "Shared favourites, differences and affinity between two participants, based on their ratings."
+      },
+      "brought": {
+        "title": "Discoveries",
+        "description": "What each participant brought to the shared collection and where their ratings meet."
+      },
+      "solo": {
+        "title": "My ratings",
+        "description": "The distribution of your ratings, favourites and lowest-rated items."
+      },
+      "people": {
+        "title": "Participants",
+        "description": "Each participant’s ratings, averages and differences from the group."
+      },
+      "details": {
+        "title": "Patterns",
+        "description": "Ratings grouped by available catalogue properties, such as genre, year, author and length."
+      },
+      "words": {
+        "title": "Comments and notes",
+        "description": "Written comments attached to ratings or check-ins. Public pages follow their existing comment visibility rules."
+      },
+      "streaks": {
+        "title": "Check-ins and consistency",
+        "description": "Streaks count consecutive days or weeks with a check-in. Consistency uses the check-in goal below when enabled; extra sessions cannot cover a missed period."
+      },
+      "volume": {
+        "title": "Totals",
+        "description": "Totals and strongest days for a check-in with a single numeric counter."
+      },
+      "records": {
+        "title": "Personal records",
+        "description": "The first session compared with the best, using the selected properties and session aggregation below. Missing values are excluded; a zero baseline has no percentage."
+      }
+    },
+    "missingValues": "Missing numeric values are ignored. Combined sums and averages use the selected fields that are present in each record.",
+    "visibilityHint": "Turning off visibility during the challenge keeps this metric for the closed results.",
+    "personalRecordsSettings": "Personal record calculations"
   }
 }

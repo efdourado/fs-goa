@@ -758,8 +758,8 @@
       "participants": "Personas",
       "fields": "Campos",
       "items": "Ítems",
-      "metrics": "Métricas",
-      "results": "Vitrina",
+      "metrics": "Resultados",
+      "results": "Resultados",
       "checkpoints": "Etapas",
       "settings": "Configuración"
     },
@@ -2178,7 +2178,12 @@
       "title": "{name} apareció el {value}% de los días",
       "note": "Parte de los {days} días con registro.",
       "titleWeek": "{name} apareció en el {value}% de las semanas",
-      "noteWeek": "Parte de las semanas con al menos un registro."
+      "noteWeek": "Parte de las semanas con al menos un registro.",
+      "goal": "Meta: {target} sesiones cada {days} días.",
+      "current": "Período actual: {count} de {target}.",
+      "completed": "Porcentaje de {count} períodos terminados.",
+      "titleGoal": "{name}: {value}% de la meta",
+      "goalDays": "Meta: {target} días activos cada {days} días."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2212,7 +2217,9 @@
       "sessionsLabel": "Entrenos",
       "history": "Últimos entrenos",
       "chartAria": "Progreso de {title}",
-      "headlineFlat": "{count, plural, one {# ejercicio seguido.} other {# ejercicios seguidos.}}"
+      "headlineFlat": "{count, plural, one {# ejercicio seguido.} other {# ejercicios seguidos.}}",
+      "sumPerSession": "Suma por sesión: {fields}",
+      "bestPerSession": "Mejor registro por sesión: {fields}"
     },
     "notes": {
       "eyebrow": "En sus palabras"
@@ -2335,7 +2342,8 @@
       "note": "Por año de estreno, de {first} a {last}.",
       "tooltip": "{things} de {year}, con media {average}."
     },
-    "plusMore": "+ {count} más"
+    "plusMore": "+ {count} más",
+    "noVisiblePages": "Todavía no hay resultados que mostrar."
   },
   "organise": {
     "button": "Organizar",
@@ -2379,5 +2387,104 @@
     "showDatesHint": "Apagado, solo se ve el progreso; el día de cada registro se guarda sin mostrarse.",
     "goalFrom": "Usar “{name}” de cada ítem",
     "goalHint": "Usa el mismo número para todos los ítems o una propiedad numérica de la biblioteca cuando cada ítem tenga su propia meta."
+  },
+  "progressTracking": {
+    "title": "Seguimiento del progreso",
+    "performance": "Cálculo del rendimiento",
+    "product": "Volumen: multiplicar propiedades seleccionadas",
+    "separate": "Seguir cada propiedad por separado",
+    "properties": "Propiedades para multiplicar",
+    "performanceHelp": "Elige exactamente lo que registras: peso × repeticiones para una serie, peso × repeticiones × series para series iguales, o sigue un total ya calculado directamente. Selecciona solo factores que no estén incluidos en otro campo. Para series registradas por separado, suma los registros; para un rendimiento único, usa el mejor registro. El progreso compara la primera sesión con la mejor. Se excluyen factores ausentes y una base cero no genera porcentaje.",
+    "preview": "{title}: inicio {first}, mejor {best}",
+    "consistency": "Definir una meta de constancia",
+    "target": "Meta por período",
+    "periodDays": "Duración del período en días",
+    "count": "Qué contar",
+    "sessions": "Sesiones",
+    "days": "Días activos",
+    "consistencyHelp": "Los períodos empiezan en la fecha inicial del reto, o en el primer registro. Cada período terminado cuenta hasta el 100%; sesiones extra no compensan un período perdido. El período en curso aparece separado. Un período final parcial usa la meta completa al cerrar. Los cambios recalculan todo el historial.",
+    "noGoal": "Sin meta, la constancia muestra días o semanas con un registro.",
+    "aggregation": "Dentro de cada sesión",
+    "bestRecord": "Usar el mejor registro",
+    "sumRecords": "Sumar todos los registros",
+    "trackedProperties": "Propiedades a seguir",
+    "performanceTitle": "Cálculos de rendimiento",
+    "checkinsTitle": "Cómo contar los registros"
+  },
+  "metricsManage": {
+    "description": "Elige qué aparece en Resultados, revisa cada cálculo y ve una vista previa con los registros actuales.",
+    "resultsTitle": "Páginas de resultados",
+    "resultsHint": "Activa u oculta páginas y organiza su orden. Cada página aparece cuando tiene datos suficientes. El hilo queda encima de las páginas.",
+    "thread": "El hilo",
+    "threadHint": "La vista general de las valoraciones o los registros.",
+    "showPage": "Mostrar {title} en Resultados",
+    "automatic": "Análisis automático",
+    "hidden": "Oculto",
+    "pending": "Esperando datos",
+    "moveUp": "Mover {title} arriba",
+    "moveDown": "Mover {title} abajo",
+    "edit": "Editar {title}",
+    "preview": "Vista previa",
+    "pendingHelp": "Este análisis aparece cuando hay suficientes registros compatibles.",
+    "metricExplanation": "{operation} · {group}. La vista previa usa el cálculo guardado.",
+    "source": "Origen de los registros",
+    "rating": "Usar como nota del reto",
+    "ratingHint": "Esta puntuación también define las notas de los elementos y la clasificación automática. Solo se puede usar una media de campos de valoración.",
+    "options": "Opciones de cálculo",
+    "prior": "Peso de referencia",
+    "countDays": "Contar días activos en vez de registros",
+    "item": "Limitar a un elemento",
+    "allItems": "Todos los elementos",
+    "cumulative": "Acumular etapas anteriores",
+    "includeInResults": "Incluir en Resultados",
+    "pages": {
+      "thread": {
+        "title": "El hilo",
+        "description": "Una vista general de las valoraciones o registros guardados."
+      },
+      "rankings": {
+        "title": "Clasificaciones",
+        "description": "Elementos ordenados por la nota del reto. Las propiedades de valoración elegidas definen la puntuación."
+      },
+      "duo": {
+        "title": "En pareja",
+        "description": "Favoritos compartidos, diferencias y afinidad entre dos participantes según sus valoraciones."
+      },
+      "brought": {
+        "title": "Descubrimientos",
+        "description": "Lo que cada participante aportó a la colección compartida y dónde coinciden sus valoraciones."
+      },
+      "solo": {
+        "title": "Mis valoraciones",
+        "description": "La distribución de tus notas, favoritos y elementos peor valorados."
+      },
+      "people": {
+        "title": "Participantes",
+        "description": "Las notas, medias y diferencias de cada participante respecto al grupo."
+      },
+      "details": {
+        "title": "Patrones",
+        "description": "Valoraciones agrupadas por propiedades disponibles del catálogo, como género, año, autoría y duración."
+      },
+      "words": {
+        "title": "Comentarios y notas",
+        "description": "Comentarios escritos en las valoraciones o registros. Las páginas públicas siguen sus reglas de visibilidad existentes."
+      },
+      "streaks": {
+        "title": "Registros y constancia",
+        "description": "Las rachas cuentan días o semanas consecutivos con un registro. La constancia usa la meta de registros de abajo cuando está activada; sesiones extra no compensan un período perdido."
+      },
+      "volume": {
+        "title": "Totales",
+        "description": "Totales y mejores días de registros con un único contador numérico."
+      },
+      "records": {
+        "title": "Récords personales",
+        "description": "La primera sesión comparada con la mejor, usando las propiedades y la agregación por sesión elegidas abajo. Se excluyen valores ausentes; una base cero no genera porcentaje."
+      }
+    },
+    "missingValues": "Se ignoran los valores numéricos ausentes. Las sumas y medias combinadas usan los campos seleccionados presentes en cada registro.",
+    "visibilityHint": "Al ocultarla durante el reto, la métrica queda disponible solo en los resultados tras el cierre.",
+    "personalRecordsSettings": "Cálculo de los récords personales"
   }
 }

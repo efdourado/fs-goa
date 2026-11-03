@@ -23,6 +23,6 @@ export function usePreviewStory(challenge: ChallengeDetail): { input: StoryInput
 
 /** The Results tab: the thread and its almanac (the challenge's metrics included); `fallback` only when there's nothing to draw yet. */
 export function ChallengeResults({ challenge, input, story, fallback }: { challenge: ChallengeDetail; input: StoryInput; story: Story; fallback: ReactNode }) {
-  if (story.kind === "empty") return <>{fallback}</>;
+  if (story.kind === "empty" && !challenge.metrics?.length) return <>{fallback}</>;
   return <StoryView input={input} story={story} metrics={challenge.metrics ?? []} />;
 }

@@ -11,11 +11,11 @@ export function metricNeedsField(operation: Metric["operation"]) {
 
 // The primary form is only a convenience view. Reading ratings, for example,
 // belong to the completion form, not the primary pages-read form.
-export function metricFields(challenge: Pick<ChallengeDetail, "fields" | "entryTypes">): Array<ChallengeField & { source: string }> {
-  const fields = new Map<string, ChallengeField & { source: string }>();
+export function metricFields(challenge: Pick<ChallengeDetail, "fields" | "entryTypes">): Array<ChallengeField & { source: string; entryTypeId?: string }> {
+  const fields = new Map<string, ChallengeField & { source: string; entryTypeId?: string }>();
   for (const type of challenge.entryTypes ?? []) {
     for (const field of type.fields) {
-      if (field.id && (field.type === "number" || field.type === "rating")) fields.set(field.id, { ...field, source: type.name });
+      if (field.id && (field.type === "number" || field.type === "rating")) fields.set(field.id, { ...field, entryTypeId: type.id, source: type.name });
     }
   }
   for (const field of challenge.fields) {
@@ -58,4 +58,16 @@ export function defaultRankingFieldIds(fields: Array<Pick<ChallengeField, "id" |
 
 export function metricMinimum(metric: Pick<Metric, "operation" | "minSample">): number {
   return Math.max(1, metric.minSample ?? 1);
+}
+
+/** Full update shape: changing visibility must preserve the calculation and its scope. */
+export function metricUpdatePayload(metric: Metric): Record<string, unknown> {
+  return {
+    label: metric.label, operation: metric.operation, entryTypeId: metric.entryTypeId,
+    fieldId: metric.fieldId, fieldIds: metric.fieldIds, combineOp: metric.combineOp ?? "average",
+    groupBy: metric.groupBy ?? "none", minSample: metric.minSample ?? 1,
+    bayesPriorWeight: metric.bayesPriorWeight ?? 4, cumulative: metric.cumulative ?? false,
+    visibleDuring: metric.visibleDuring !== false, visibleInResults: metric.visibleInResults !== false,
+    isRating: metric.isRating ?? false, countDays: metric.countDays ?? false, itemId: metric.itemId ?? null,
+  };
 }

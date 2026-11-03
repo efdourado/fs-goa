@@ -27,6 +27,7 @@ export const challenges = pgTable(
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    trackingSettings: jsonb("tracking_settings").$type<import("../../lib/progress-tracking").ProgressTracking>().notNull().default(sql`'{}'::jsonb`),
     title: text("title").notNull(),
     description: text("description"),
     rules: text("rules"),

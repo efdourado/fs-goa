@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
 
+import { AdminMetrics } from "../admin-metrics";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { ConfirmDialog, FormDialog } from "../dialog";
@@ -820,6 +821,8 @@ export function AdminScreen({
   onAssignCheckpointItems,
   onPublishResult,
   onUnpublishResult,
+  onSaveMetric,
+  onDeleteMetric,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -831,6 +834,8 @@ export function AdminScreen({
   backLabel?: string;
   /** Resolves with `linkRotated` when new dates replaced a published results link. */
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<{ linkRotated?: boolean } | undefined | void>;
+  onSaveMetric: (id: Id | null, payload: Record<string, unknown>) => Promise<void>;
+  onDeleteMetric: (id: Id) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: CopyMode }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
@@ -867,10 +872,10 @@ export function AdminScreen({
     "overview",
     "fields",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
-    // Metrics and the showcase are built by Goa itself now (auto-metrics + the thread on Results) — no tabs to tend.
+    "results",
     "settings",
   ];
-  const requestedTab = tab === "participants" ? "overview" : tab;
+  const requestedTab = tab === "participants" ? "overview" : tab === "metrics" ? "results" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
   // While it is a draft, the tabs that must be in order before it can start show their progress.
   const setupOrder = SETUP_STEPS.filter((step) => tabs.includes(step));
@@ -920,6 +925,7 @@ export function AdminScreen({
         ) : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetTracking={onSetPageCount} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
+        {activeTab === "results" ? <AdminMetrics challenge={challenge} entries={entries} onSaveSettings={onSaveBasics} onSaveMetric={onSaveMetric} onDeleteMetric={onDeleteMetric} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>
     </main>

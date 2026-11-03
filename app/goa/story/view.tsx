@@ -6,7 +6,7 @@ import { useState } from "react";
 import { firstName, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
 import { PagedView } from "../paged-view";
-import { AvatarMark, cx } from "../ui";
+import { AvatarMark, FaceEmptyState, cx } from "../ui";
 import { useAlmanacPages } from "./almanac";
 import type { Story, StoryInput } from "./model";
 import { DatedThread } from "./thread-dated";
@@ -110,10 +110,12 @@ export function ThreadPanel({ input, story, fit = false, interactive = true, bar
  */
 export function StoryView({ input, story, metrics = [] }: { input: StoryInput; story: Story; metrics?: Metric[] }) {
   const pages = useAlmanacPages(story, input, metrics);
-  if (story.kind === "empty") return null;
+  const t = useTranslations("story");
+  const showThread = story.kind !== "empty" && !input.resultPresentation?.hiddenPages.includes("thread");
+  if (!showThread && !pages.length) return <FaceEmptyState title={t("noVisiblePages")} />;
   return (
     <section>
-      <ThreadPanel input={input} story={story} />
+      {showThread ? <ThreadPanel input={input} story={story} /> : null}
       {/* Everything after the drawing is a page of the paginator — one theme at a time, named tabs on top. */}
       <div className="mt-8 px-1">
         <PagedView

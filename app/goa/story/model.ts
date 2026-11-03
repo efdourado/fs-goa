@@ -1,3 +1,4 @@
+import { consistencyProgress, performancePlans, type ProgressTracking } from "../../../lib/progress-tracking";
 import type { ChallengeDetail, ChallengeField, Entry, Id } from "../types";
 import { entryRatingReader, itemIdForEntry, valuesAsRecord } from "../utils";
 
@@ -34,9 +35,11 @@ export interface StoryExpectation { personId: Id; itemId: Id; value: number }
 /** One dated check-in: a habit's day, a day's pages, a workout. `value` only when the day has a number. */
 export interface StoryDay { personId: Id; day: string; value?: number | null; note?: string | null }
 /** One record inside a workout: this item, this day, this number (the load). */
-export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number }
+export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number; sessionId?: string; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; order?: string }
 
 export interface StoryInput {
+  resultPresentation?: import("../../../lib/result-presentation").ResultPresentation;
+  resultsClosed?: boolean;
   title: string;
   noun: "film" | "book" | "place" | "item";
   people: StoryPerson[];
@@ -59,6 +62,8 @@ export interface StoryInput {
    * days there would call three sessions a week a failure.
    */
   rhythm?: "day" | "week";
+  consistencyGoal?: ProgressTracking["consistency"];
+  ended?: boolean;
   /** The counted number's label and unit on a dated challenge ("Páginas", "km"). */
   counter?: { label: string; unit?: string | null } | null;
   recordLabel?: string | null;
@@ -160,6 +165,7 @@ export interface Lane {
   runs: Array<{ from: string; to: string }>;
   /** How much of the time they showed up: % of the days, or of the weeks. */
   consistency: number | null;
+  goalProgress?: ReturnType<typeof consistencyProgress>;
   /** Weekly rhythm only: check-ins per week, on average. */
   perWeek: number | null;
   best: { day: string; value: number } | null;
@@ -177,7 +183,7 @@ export interface DatedStory {
   /** The weekdays that stand out (tied at the top, clearly above the rest); empty when the week is even. */
   bestWeekdays: number[];
   /** Workouts: per exercise, where it started, the best it reached, and every session's number in order. */
-  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[] }>;
+  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[]; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum" }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
   /** Two people: the days both of them showed up. */
   together: number | null;
@@ -495,19 +501,23 @@ function buildDated(input: StoryInput): DatedStory | null {
     const weeksElapsed = Math.max(1, weekIndex(to) - weekIndex(from) + 1);
     const weeksLogged = new Set(logged.map((row) => weekIndex(row.day))).size;
     const valued = logged.filter((row): row is { day: string; value: number } => row.value !== null);
+    const goalProgress = input.consistencyGoal ? consistencyProgress(
+      days.filter((row) => row.personId === person.id).map((row) => row.day), from, to, input.consistencyGoal, Boolean(input.ended),
+    ) : undefined;
     return {
       person,
+      goalProgress,
       days: logged,
       total: hasValues ? valued.reduce((sum, row) => sum + row.value, 0) : null,
       longest: longest && longest.length >= 2 ? longest : null,
       current,
       runs,
-      consistency: !logged.length ? null : Math.round(((weekly ? weeksLogged / weeksElapsed : logged.length / elapsed)) * 100),
+      consistency: goalProgress ? goalProgress.value : !logged.length ? null : Math.round(((weekly ? weeksLogged / weeksElapsed : logged.length / elapsed)) * 100),
       perWeek: weekly && logged.length ? round1(logged.length / weeksElapsed) : null,
       best: valued.length ? valued.reduce((best, row) => (row.value > best.value ? row : best)) : null,
       comeback,
     };
-  }).filter((lane) => lane.days.length);
+  }).filter((lane) => lane.days.length || Boolean(input.consistencyGoal));
 
   const weekdays = [0, 0, 0, 0, 0, 0, 0];
   for (const lane of lanes) for (const row of lane.days) weekdays[new Date(`${row.day}T12:00:00Z`).getUTCDay()] += 1;
@@ -518,22 +528,29 @@ function buildDated(input: StoryInput): DatedStory | null {
   const records: DatedStory["records"] = [];
   const recordKeys = new Map<string, StoryRecord[]>();
   for (const record of input.records.filter((row) => known.has(row.personId))) {
-    const key = `${record.personId}:${record.itemId}`;
+    const key = `${record.personId}:${record.itemId}:${record.metricKey ?? ""}`;
     recordKeys.set(key, [...(recordKeys.get(key) ?? []), record]);
   }
   // Every exercise that was logged, not only the ones that went up: one that held steady, or was done once, is still theirs.
   for (const list of recordKeys.values()) {
-    const ordered = [...list].sort((a, b) => a.day.localeCompare(b.day));
-    const best = ordered.reduce((top, row) => (row.value > top.value ? row : top));
+    const ordered = [...list].sort((a, b) => a.day.localeCompare(b.day) || (a.order ?? "").localeCompare(b.order ?? ""));
     const item = input.items.find((candidate) => candidate.id === ordered[0].itemId);
     if (!item) continue;
-    // One number per day (the heaviest set that day), oldest first — the line a card draws.
-    const byDay = new Map<string, number>();
-    for (const row of ordered) byDay.set(row.day, Math.max(byDay.get(row.day) ?? -Infinity, row.value));
-    records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: byDay.size, series: [...byDay.values()], days: [...byDay.keys()] });
+    const sessions = new Map<string, { day: string; value: number }>();
+    for (const row of ordered) {
+      const key = row.sessionId ?? row.day;
+      const previous = sessions.get(key);
+      sessions.set(key, { day: row.day, value: row.sessionAggregation === "sum" ? (previous?.value ?? 0) + row.value : Math.max(previous?.value ?? -Infinity, row.value) });
+    }
+    const series = [...sessions.values()];
+    const best = series.reduce((top, row) => row.value > top.value ? row : top);
+    records.push({ item, first: series[0].value, best: best.value, bestDay: best.day,
+      person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: series.length,
+      series: series.map((row) => row.value), days: series.map((row) => row.day),
+      metricKey: ordered[0].metricKey, label: ordered[0].label, unit: ordered[0].unit, sessionAggregation: ordered[0].sessionAggregation });
   }
   // Biggest gain first; among equals, the one trained more often.
-  records.sort((a, b) => (b.best - b.first) / Math.max(1e-9, b.first) - (a.best - a.first) / Math.max(1e-9, a.first) || b.sessions - a.sessions);
+  records.sort((a, b) => (b.first > 0 ? (b.best - b.first) / b.first : 0) - (a.first > 0 ? (a.best - a.first) / a.first : 0) || b.sessions - a.sessions);
 
   return {
     kind: "dated",
@@ -597,12 +614,14 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     !ratingTypes.has(type.id) && type.purpose !== "expectation" && type.id !== recordType?.id && type.answerScope !== "shared"
     && (type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day" || type.purpose === "checkin" || type.purpose === "progress" || type.submissionMode === "daily"));
   const counters = new Map(datedTypes.map((type) => [type.id, counterOf(type.fields)]));
-  const recordField = recordType ? counterOf(recordType.fields) ?? recordType.fields.find((field) => field.type === "number") ?? null : null;
+  const plans = performancePlans(recordType?.fields ?? [], challenge.trackingSettings?.performance);
+  const recordField = plans[0]?.fields[0] ?? null;
 
   const ratings: StoryRating[] = [];
   const expectations: StoryExpectation[] = [];
   const days: StoryDay[] = [];
   const records: StoryRecord[] = [];
+  const visitOrder = new Map(entries.map((entry) => [entry.id, entry.submittedAt]));
   const visitDay = new Map(entries.map((entry) => [entry.id, entry.occurredOn ?? entry.submittedAt?.slice(0, 10) ?? null]));
   for (const entry of entries) {
     if (!entry.userId) continue;
@@ -621,10 +640,21 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     } else if (expectationType && entry.entryTypeId === expectationType.id && expectationField && itemId) {
       const value = Number(values[expectationField]);
       if (Number.isFinite(value)) expectations.push({ personId: entry.userId, itemId, value });
-    } else if (recordType && entry.entryTypeId === recordType.id && itemId && recordField?.id) {
-      const value = Number(values[recordField.id]);
+    } else if (recordType && entry.entryTypeId === recordType.id && itemId) {
       const day = entry.parentEntryId ? visitDay.get(entry.parentEntryId) : entry.occurredOn;
-      if (Number.isFinite(value) && day) records.push({ personId: entry.userId, itemId, day, value });
+      if (!day) continue;
+      for (const plan of plans) {
+        const raw = plan.fields.map((field) => values[field.id!]);
+        if (raw.some((value) => value === null || value === undefined || value === "" || !["number", "string"].includes(typeof value))) continue;
+        const numbers = raw.map(Number);
+        if (numbers.some((value) => !Number.isFinite(value) || (plan.product && value < 0))) continue;
+        const value = plan.product ? numbers.reduce((product, n) => product * n, 1) : numbers[0];
+        if (!Number.isFinite(value)) continue;
+        records.push({ order: entry.parentEntryId ? visitOrder.get(entry.parentEntryId) : entry.submittedAt, personId: entry.userId, itemId, day, value, sessionId: entry.parentEntryId ?? entry.id,
+          sessionAggregation: challenge.trackingSettings?.performance?.sessionAggregation,
+          metricKey: plan.fields.map((field) => field.id).join(":"), label: plan.fields.map((field) => field.label).join(" × "),
+          unit: plan.product ? "" : plan.fields[0].config?.unit ?? plan.fields[0].label.match(/\(([^)]+)\)\s*$/)?.[1] ?? "" });
+      }
     } else if (datedTypes.some((type) => type.id === entry.entryTypeId)) {
       const day = entry.occurredOn ?? entry.submittedAt?.slice(0, 10);
       if (!day) continue;
@@ -636,6 +666,8 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
   const counterField = [...counters.values()].find(Boolean) ?? null;
   const kinds = new Set(challenge.items.map((item) => item.catalogItem?.kind));
   return {
+    resultPresentation: challenge.trackingSettings?.results,
+    resultsClosed: challenge.status === "closed",
     title: challenge.title,
     noun: kinds.size === 1 && kinds.has("film") ? "film" : kinds.size === 1 && kinds.has("book") ? "book" : challenge.recipeKey === "tables" ? "place" : "item",
     people: challenge.participants.filter((participant) => participant.userId).map((participant) => ({ id: participant.userId!, name: participant.name })),
@@ -652,8 +684,10 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     records,
     // A check-in holding a record per item is a workout: done a few times a week, not every day.
     rhythm: recordType ? "week" : "day",
+    consistencyGoal: challenge.trackingSettings?.consistency,
+    ended: challenge.status === "closed" || Boolean(challenge.endsOn && challenge.endsOn < today),
     counter: counterField ? { label: counterField.label, unit: counterField.config?.unit ?? null } : null,
-    recordLabel: recordField?.label?.replace(/\s*\([^)]*\)\s*$/, "") ?? null,
+    recordLabel: plans.map((plan) => plan.fields.map((field) => field.label).join(" × ")).join(" · "),
     recordUnit: recordField?.config?.unit ?? recordField?.label?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null,
     startsOn: challenge.startsOn ?? null,
     endsOn: challenge.endsOn ?? null,

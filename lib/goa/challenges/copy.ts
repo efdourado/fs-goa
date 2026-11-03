@@ -267,6 +267,12 @@ export async function copyChallengeStructure(
     }
   }
 
+  const trackingSource = await client.query<{ tracking_settings: import("../../progress-tracking").ProgressTracking }>(
+    "SELECT tracking_settings FROM challenges WHERE id=$1", [sourceChallengeId]);
+  const tracking = trackingSource.rows[0]?.tracking_settings ?? {};
+  if (tracking.performance) tracking.performance.fieldIds = tracking.performance.fieldIds.flatMap((id) => fieldMap.has(id) ? [fieldMap.get(id)!] : []);
+  await client.query("UPDATE challenges SET tracking_settings=$2::jsonb WHERE id=$1", [targetId, JSON.stringify(tracking)]);
+
   // The manual checkpoint layout (weeks, sessions, milestones) is the structural
   // promise a template makes — "six weeks, two films each". Carry it, but drop
   // the absolute dates: the copy is undated, so the admin sets a fresh period (or
@@ -378,7 +384,10 @@ export async function copyChallengeStructure(
     `SELECT id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
             decimal_places,visible_during_challenge,position,settings
        FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL AND operation <> 'indicator_bias' ORDER BY position`, [sourceChallengeId]);
+  const metricMap = new Map<string, string>();
   for (const source of metrics.rows) {
+    const copiedMetricId = publicId();
+    metricMap.set(source.id, copiedMetricId);
     // `settings.fieldIds` (a multi-field metric, e.g. Tables' "Nota geral") names fields by id — those ids
     // belong to the source challenge, so they need the same remap `field_id` itself just got.
     const sourceSettings = (source.settings ?? {}) as { fieldIds?: unknown };
@@ -394,10 +403,16 @@ export async function copyChallengeStructure(
         (id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
          decimal_places,visible_during_challenge,position,settings,created_by_user_id,created_at,updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,now(),now())`,
-      [publicId(), targetId, typeMap.get(source.entry_type_id), source.field_id ? fieldMap.get(source.field_id) : null,
+      [copiedMetricId, targetId, typeMap.get(source.entry_type_id), source.field_id ? fieldMap.get(source.field_id) : null,
         source.semantic_key, source.label, source.operation, source.group_by, source.decimal_places,
         source.visible_during_challenge, source.position, JSON.stringify(settings), createdByUserId],
     );
+  }
+
+  if (tracking.results) {
+    const remapPage = (id: string) => id.startsWith("metric-") ? (metricMap.has(id.slice(7)) ? [`metric-${metricMap.get(id.slice(7))}`] : []) : [id];
+    tracking.results = { hiddenPages: tracking.results.hiddenPages.flatMap(remapPage), pageOrder: tracking.results.pageOrder.flatMap(remapPage) };
+    await client.query("UPDATE challenges SET tracking_settings=$2::jsonb WHERE id=$1", [targetId, JSON.stringify(tracking)]);
   }
 
   // A copy into a group starts with no participants (the people there may not be the same; they're picked again). A

@@ -758,8 +758,8 @@
       "participants": "Pessoas",
       "fields": "Campos",
       "items": "Itens",
-      "metrics": "Métricas",
-      "results": "Vitrine",
+      "metrics": "Resultados",
+      "results": "Resultados",
       "checkpoints": "Etapas",
       "settings": "Configurações"
     },
@@ -2178,7 +2178,12 @@
       "title": "{name} apareceu em {value}% dos dias",
       "note": "Parte dos {days} dias com registro.",
       "titleWeek": "{name} apareceu em {value}% das semanas",
-      "noteWeek": "Parte das semanas com pelo menos um registro."
+      "noteWeek": "Parte das semanas com pelo menos um registro.",
+      "goal": "Meta: {target} sessões a cada {days} dias.",
+      "current": "Período atual: {count} de {target}.",
+      "completed": "Percentual de {count} períodos concluídos.",
+      "titleGoal": "{name}: {value}% da meta",
+      "goalDays": "Meta: {target} dias ativos a cada {days} dias."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2212,7 +2217,9 @@
       "sessionsLabel": "Treinos",
       "history": "Últimos treinos",
       "chartAria": "Progresso de {title}",
-      "headlineFlat": "{count, plural, one {# exercício acompanhado.} other {# exercícios acompanhados.}}"
+      "headlineFlat": "{count, plural, one {# exercício acompanhado.} other {# exercícios acompanhados.}}",
+      "sumPerSession": "Soma por sessão: {fields}",
+      "bestPerSession": "Melhor registro por sessão: {fields}"
     },
     "notes": {
       "eyebrow": "Nas palavras deles"
@@ -2335,7 +2342,8 @@
       "note": "Por ano de lançamento, de {first} a {last}.",
       "tooltip": "{things} de {year}, com média {average}."
     },
-    "plusMore": "+ {count} mais"
+    "plusMore": "+ {count} mais",
+    "noVisiblePages": "Ainda não há resultados para mostrar."
   },
   "organise": {
     "button": "Organizar",
@@ -2379,5 +2387,104 @@
     "showDatesHint": "Desligado, só o progresso aparece; o dia de cada registro fica guardado sem aparecer.",
     "goalFrom": "Usar “{name}” de cada item",
     "goalHint": "Use o mesmo número para todos os itens ou uma propriedade numérica da biblioteca quando cada item tiver sua própria meta."
+  },
+  "progressTracking": {
+    "title": "Acompanhamento do progresso",
+    "performance": "Cálculo de desempenho",
+    "product": "Volume: multiplicar propriedades selecionadas",
+    "separate": "Acompanhar cada propriedade separadamente",
+    "properties": "Propriedades para multiplicar",
+    "performanceHelp": "Escolha exatamente o que registra: carga × repetições para uma série, carga × repetições × séries para séries iguais, ou acompanhe um total já calculado diretamente. Selecione apenas fatores ainda não incluídos em outro campo. Para séries registradas separadamente, some os registros; para um desempenho único, use o melhor registro. O progresso compara a primeira sessão com a melhor. Fatores ausentes ficam de fora e uma base zero não gera percentual.",
+    "preview": "{title}: início {first}, melhor {best}",
+    "consistency": "Definir uma meta de consistência",
+    "target": "Meta por período",
+    "periodDays": "Duração do período em dias",
+    "count": "O que contar",
+    "sessions": "Sessões",
+    "days": "Dias ativos",
+    "consistencyHelp": "Os períodos começam na data inicial do desafio, ou no primeiro check-in. Cada período concluído vale até 100%; sessões extras não compensam um período perdido. O período em andamento aparece separado. Um período final parcial usa a meta inteira ao encerrar. Alterações recalculam todo o histórico.",
+    "noGoal": "Sem meta, a consistência mostra dias ou semanas com check-in.",
+    "aggregation": "Dentro de cada sessão",
+    "bestRecord": "Usar o melhor registro",
+    "sumRecords": "Somar todos os registros",
+    "trackedProperties": "Propriedades para acompanhar",
+    "performanceTitle": "Cálculos de desempenho",
+    "checkinsTitle": "Como contar os check-ins"
+  },
+  "metricsManage": {
+    "description": "Escolha o que aparece nos Resultados, confira cada cálculo e veja uma prévia com os registros atuais.",
+    "resultsTitle": "Páginas dos resultados",
+    "resultsHint": "Ative ou oculte páginas e organize a ordem. Cada página aparece quando tem dados suficientes. O fio fica acima das páginas.",
+    "thread": "O fio",
+    "threadHint": "A visão geral das avaliações ou dos check-ins.",
+    "showPage": "Mostrar {title} nos Resultados",
+    "automatic": "Análise automática",
+    "hidden": "Oculto",
+    "pending": "Aguardando dados",
+    "moveUp": "Mover {title} para cima",
+    "moveDown": "Mover {title} para baixo",
+    "edit": "Editar {title}",
+    "preview": "Prévia",
+    "pendingHelp": "Esta análise aparece quando houver registros compatíveis suficientes.",
+    "metricExplanation": "{operation} · {group}. A prévia usa o cálculo salvo.",
+    "source": "Origem dos registros",
+    "rating": "Usar como nota do desafio",
+    "ratingHint": "Esta pontuação também define as notas dos itens e o ranking automático. Apenas uma média de campos de nota pode ser usada.",
+    "options": "Opções de cálculo",
+    "prior": "Peso da referência",
+    "countDays": "Contar dias ativos em vez de registros",
+    "item": "Limitar a um item",
+    "allItems": "Todos os itens",
+    "cumulative": "Acumular etapas anteriores",
+    "includeInResults": "Incluir nos Resultados",
+    "pages": {
+      "thread": {
+        "title": "O fio",
+        "description": "Uma visão geral das avaliações ou dos check-ins registrados."
+      },
+      "rankings": {
+        "title": "Rankings",
+        "description": "Itens ordenados pela nota do desafio. As propriedades de avaliação selecionadas definem a pontuação."
+      },
+      "duo": {
+        "title": "Em dupla",
+        "description": "Favoritos em comum, diferenças e afinidade entre duas pessoas, com base nas avaliações."
+      },
+      "brought": {
+        "title": "Descobertas",
+        "description": "O que cada pessoa trouxe ao acervo compartilhado e onde as avaliações se encontram."
+      },
+      "solo": {
+        "title": "Minhas avaliações",
+        "description": "A distribuição das suas notas, os favoritos e os itens com menor nota."
+      },
+      "people": {
+        "title": "Participantes",
+        "description": "As notas, médias e diferenças de cada pessoa em relação ao grupo."
+      },
+      "details": {
+        "title": "Padrões",
+        "description": "Avaliações agrupadas pelas propriedades disponíveis do acervo, como gênero, ano, autoria e duração."
+      },
+      "words": {
+        "title": "Comentários e notas",
+        "description": "Comentários escritos nas avaliações ou nos check-ins. Páginas públicas seguem as regras existentes de visibilidade dos comentários."
+      },
+      "streaks": {
+        "title": "Check-ins e consistência",
+        "description": "Sequências contam dias ou semanas consecutivos com check-in. A consistência usa a meta de check-ins abaixo, quando ativada; sessões extras não compensam um período perdido."
+      },
+      "volume": {
+        "title": "Totais",
+        "description": "Totais e melhores dias de check-ins com um único contador numérico."
+      },
+      "records": {
+        "title": "Recordes pessoais",
+        "description": "A primeira sessão comparada à melhor, usando as propriedades e o agrupamento por sessão escolhidos abaixo. Valores ausentes ficam de fora; uma base zero não gera percentual."
+      }
+    },
+    "missingValues": "Valores numéricos ausentes são ignorados. Somas e médias combinadas usam os campos selecionados presentes em cada registro.",
+    "visibilityHint": "Ao ocultar durante o desafio, a métrica fica disponível apenas nos resultados após o encerramento.",
+    "personalRecordsSettings": "Cálculo dos recordes pessoais"
   }
 }

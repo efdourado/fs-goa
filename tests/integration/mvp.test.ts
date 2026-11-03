@@ -9088,3 +9088,72 @@ test("retired recommendation flow: old assignments stay out of item payloads and
   assert.equal((await call("GET", `/api/groups/${gid}/catalog/recommenders`, { session: owner })).response.status, 404);
   assert.equal((await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Outside person" } })).response.status, 404);
 });
+
+test("progress tracking persists explicit workload factors, validates goals, and remaps properties on copy", async () => {
+  const owner = await register("Progress Owner", "progress_rules_owner");
+  const outsider = await register("Progress Outsider", "progress_rules_other");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Progress rules" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Exercises" } })).body as { id: string };
+  const created = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: {
+    recipe: "custom", recordingMode: "session", title: "Workload", libraryId: library.id, participantIds: [owner.user.id],
+    items: [{ title: "Squat" }], fields: ["weight", "reps", "sets"].map((key) => ({ key, label: key, type: "number", required: true, config: { min: 0, step: 1 } })),
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const get = async (id = cid) => (await call("GET", `/api/challenges/${id}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  const initial = await get();
+  const ids = initial.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);
+  const trackingSettings = { performance: { mode: "product", fieldIds: ids, sessionAggregation: "sum" }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
+  const saved = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings } });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual((await get()).trackingSettings, trackingSettings);
+  const invalid = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance: { mode: "product", fieldIds: [ids[0], "foreign-field"] } } } });
+  assert.equal(invalid.response.status, 400);
+  const impossible = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { consistency: { target: 8, periodDays: 7, count: "days" } } } });
+  assert.equal(impossible.response.status, 400);
+  assert.notEqual((await call("PATCH", `/api/challenges/${cid}`, { session: outsider, body: { trackingSettings } })).response.status, 200);
+  await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { title: "Renamed workload" } });
+  assert.deepEqual((await get()).trackingSettings, trackingSettings, "unrelated updates preserve calculation rules");
+  const targetGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copied progress rules" } })).body as { id: string }).id;
+  const copied = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { title: "Copied rules", targetGroupId: targetGroup, mode: "structure_and_items" } });
+  assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
+  const copy = await get((copied.body as { id: string }).id);
+  assert.deepEqual(copy.trackingSettings?.consistency, trackingSettings.consistency);
+  assert.equal(copy.trackingSettings?.performance?.sessionAggregation, "sum");
+  assert.deepEqual(copy.trackingSettings?.results?.hiddenPages, ["words", `metric-${copy.metrics.find((metric) => metric.label === initial.metrics[0].label)!.id}`]);
+  assert.equal(copy.trackingSettings?.results?.pageOrder[1], "records");
+  const copyFields = copy.entryTypes.find((type) => type.parentTypeId)!.fields;
+  assert.deepEqual(copy.trackingSettings?.performance?.fieldIds, copyFields.map((field) => field.id));
+  assert.ok(copy.trackingSettings?.performance?.fieldIds.every((id) => !ids.includes(id)));
+});
+
+test("result page settings reach public Results and live metrics respect visibility and source privacy", async () => {
+  const owner = await register("Results Owner", "results_page_owner");
+  const created = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "cinema", title: "Results configuration", items: [{ title: "Aftersun" }] } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  const type = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const field = type.fields.find((field) => field.type === "rating")!;
+  const added = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Configured score", operation: "average", fieldId: field.id, groupBy: "participant" } });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
+  const metricId = (added.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: type.id, itemId: detail.items[0].id, values: { [field.id!]: 4 } } })).response.status, 201);
+  const results = { hiddenPages: ["thread", "solo"], pageOrder: [`metric-${metricId}`, "rankings"] };
+  assert.equal((await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { results } } })).response.status, 200);
+  const published = await call("POST", `/api/challenges/${cid}/results/publish`, { session: owner, body: {} });
+  assert.equal(published.response.status, 200, JSON.stringify(published.body));
+  const token = (published.body as { url: string }).url.split("/results/")[1];
+  type Public = { challenge: { story: import("../../app/goa/story/model").StoryInput; metrics: Array<{ id: string; series?: Array<{ label: string; key: string }> }> } };
+  const shared = (await call("GET", `/api/results/${token}`)).body as Public;
+  assert.deepEqual(shared.challenge.story.resultPresentation, results);
+  assert.ok(shared.challenge.metrics.some((metric) => metric.id === metricId));
+  const score = shared.challenge.metrics.find((metric) => metric.id === metricId)!;
+  assert.ok(score.series?.every((row) => row.key !== owner.user.id && row.label !== owner.user.name), "public metric series are masked");
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/metrics/${metricId}`, { session: owner, body: { label: "Configured score", operation: "average", fieldId: field.id, groupBy: "participant", visibleDuring: false } })).response.status, 200);
+  assert.ok(!((await call("GET", `/api/results/${token}`)).body as Public).challenge.metrics.some((metric) => metric.id === metricId), "metrics hidden during an active list stay out of the public response");
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/metrics/${metricId}`, { session: owner, body: { label: "Configured score", operation: "average", fieldId: field.id, groupBy: "participant", visibleInResults: false } })).response.status, 200);
+  assert.ok(!((await call("GET", `/api/results/${token}`)).body as Public).challenge.metrics.some((metric) => metric.id === metricId));
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${type.id}`, { session: owner, body: { visibilityPolicy: "author_only" } })).response.status, 200);
+  assert.deepEqual(((await call("GET", `/api/results/${token}`)).body as Public).challenge.metrics, [], "private sources never enter the new public metric pages");
+});

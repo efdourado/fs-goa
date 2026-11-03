@@ -200,7 +200,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
                   <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="2.8" />
                   <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="2.8" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
                 </svg>
-                <span className="text-xs font-medium tabular-nums sm:text-sm">{lane.consistency ?? 0}%</span>
+                <span className="text-xs font-medium tabular-nums sm:text-sm">{lane.consistency === null ? "—" : `${lane.consistency}%`}</span>
               </span>
               <span className="max-w-[5rem] truncate text-xs text-[var(--muted)]">{firstName(lane.person.name)}</span>
             </li>

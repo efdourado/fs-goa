@@ -61,7 +61,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           <SettingsMenu />
         </div>
         {challenge.story && (challenge.story.ratings.length || challenge.story.days.length) ? (
-          <PublicStory input={challenge.story} title={challenge.title} dates={f.dateRange(challenge.startsOn, challenge.endsOn)} description={challenge.description} />
+          <PublicStory metrics={challenge.metrics as unknown as Metric[]} input={challenge.story} title={challenge.title} dates={f.dateRange(challenge.startsOn, challenge.endsOn)} description={challenge.description} />
         ) : (
           <ShowcaseView
             variant="dark"

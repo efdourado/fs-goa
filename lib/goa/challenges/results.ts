@@ -889,6 +889,22 @@ export async function resultForChallenge(
   };
 }
 
+/** Public outputs only use metrics whose entire entry source is public at this challenge state. */
+export async function publicMetricsForChallenge(client: PoolClient, challengeId: string) {
+  const allowed = await client.query<{ id: string }>(
+    `SELECT m.id FROM challenge_metrics m
+      JOIN entry_types t ON t.id = m.entry_type_id
+      JOIN challenges c ON c.id = m.challenge_id
+      LEFT JOIN entry_types p ON p.id = t.parent_type_id
+     WHERE m.challenge_id=$1 AND m.archived_at IS NULL
+       AND (m.visible_during_challenge OR c.status = 'closed')
+       AND t.visibility_policy <> 'author_only'
+       AND (t.visibility_policy <> 'after_close' OR c.status = 'closed')
+       AND (p.id IS NULL OR (p.visibility_policy <> 'author_only' AND (p.visibility_policy <> 'after_close' OR c.status = 'closed')))`, [challengeId]);
+  const ids = new Set(allowed.rows.map((row) => row.id));
+  return (await metricsForChallenge(client, challengeId)).filter((metric) => ids.has(String(metric.id)) && metric.visibleInResults !== false);
+}
+
 const METRIC_OPERATIONS = new Set([
   "sum", "average", "count", "min", "max", "median", "completion_rate",
   "bayesian_average", "spread", "consensus", "surprise",
@@ -1642,7 +1658,7 @@ export async function publicResults(token: string) {
       client,
       // The parent group's state also gates the public link: a binned group
       // takes its challenges' showcases offline with it (docs/architecture.md › Lixeira e recuperação).
-      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
+      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections, c.tracking_settings,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
               c.show_schedule, c.time_zone
@@ -1658,9 +1674,12 @@ export async function publicResults(token: string) {
       const masked = await maskShowcaseIdentities(client, row.id, result, row.results_anon === true);
       // The thread for the public page — names masked, no private answers, no words (see public-story.ts).
       const story = await publicStoryInput(client, row);
+      const liveMetrics = await publicMetricsForChallenge(client, row.id);
+      const publicMetricResult = await maskShowcaseIdentities(client, row.id, { ...result, metrics: liveMetrics, blocks: [] }, row.results_anon === true);
       return {
         challenge: {
           story,
+          metrics: publicMetricResult.result.metrics,
           id: row.id,
           title: row.title,
           description: row.description,

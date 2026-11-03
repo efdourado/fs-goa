@@ -90,7 +90,7 @@ test("new challenges allow ten rules and existing challenges can still load twen
   assert.equal(parseRuleSections(rules).length, 20);
 });
 
-test("cover rules start folded in a bounded scroll region and retain the ticket waist when empty", () => {
+test("cover rules start folded in a bounded scroll region and disappear when empty", () => {
   const html = renderWithIntl(createElement(ChallengeCoverRules, { rules: [{ title: "Respect deadlines", description: "Submit before midnight." }] }));
   assert.match(html, /challenge-ticket-bottom/);
   assert.match(html, /challenge-ticket-waist-lower/);
@@ -109,8 +109,7 @@ test("cover rules start folded in a bounded scroll region and retain the ticket 
   assert.ok(html.indexOf(">Regras</h2>") < html.indexOf("Respect deadlines"));
   assert.match(html, /Respect deadlines/);
   const empty = renderWithIntl(createElement(ChallengeCoverRules, { rules: [] }));
-  assert.match(empty, /challenge-ticket-waist/);
-  assert.doesNotMatch(empty, /<summary|<details|role="region"/);
+  assert.equal(empty, "", "no rules means no ticket decoration or empty rules panel");
 });
 
 

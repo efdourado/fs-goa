@@ -501,6 +501,7 @@ export interface ChallengeSummary {
   recipeKey?: RecipeKey | null;
   resultsAnon?: boolean;
   /** Cosmetic: false hides the read-only checkpoint grid on the challenge / result / template pages. */
+  trackingSettings?: import("../../lib/progress-tracking").ProgressTracking;
   showSchedule?: boolean;
   /** When true, the Vitrine's comments section is every current comment, live — no picking one by one. */
   resultsAllComments?: boolean;

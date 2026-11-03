@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { parseProgressTracking, type ProgressTracking } from "../../progress-tracking";
 
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
@@ -21,7 +22,7 @@ import { attributeValuesForItems } from "../catalog-attributes";
 import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
 import { challengeRatingFieldIds } from "./rating";
-import { metricsForChallenge, resultForChallenge } from "./results";
+import { metricsForChallenge, publicMetricsForChallenge, resultForChallenge } from "./results";
 import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 import { deleteCheckpointsHard } from "../hard-delete";
@@ -164,6 +165,7 @@ export interface DetailChallengeRow {
   recipe_key: string | null;
   group_kind: string | null;
   results_anon: boolean;
+  tracking_settings?: ProgressTracking;
   show_schedule?: boolean;
   results_all_comments?: boolean;
   published_as_template_at?: string | Date | null;
@@ -236,7 +238,7 @@ export async function buildChallengeDetail(
   }));
   const primaryEntryTypeId = primaryType?.id ?? null;
   const completionEntryTypeId = completionType?.id ?? null;
-  const liveMetrics = await metricsForChallenge(client, challengeId);
+  const liveMetrics = viewer.userId === null ? await publicMetricsForChallenge(client, challengeId) : await metricsForChallenge(client, challengeId);
   // Rankings + affinity are computed live from the entries; `result_blocks` only
   // decides which of them show. The template preview passes its own `result`.
   const result = "result" in opts
@@ -287,6 +289,7 @@ export async function buildChallengeDetail(
     recipeKey: ch.recipe_key ?? null,
     scope: ch.group_kind === "personal" ? "personal" : "group",
     resultsAnon: ch.results_anon,
+    trackingSettings: ch.tracking_settings ?? {},
     showSchedule: ch.show_schedule ?? true,
     resultsAllComments: ch.results_all_comments === true,
     publishedAsTemplate: ch.published_as_template_at != null,
@@ -378,6 +381,17 @@ export async function updateChallenge(
     const scheduleChanged =
       startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
     const allTypes = await entryTypesForChallenge(client, challengeId);
+    let trackingSettings = access.challenge.tracking_settings ?? {};
+    if (body.trackingSettings !== undefined) {
+      try { trackingSettings = parseProgressTracking(body.trackingSettings); }
+      catch (error) { throw new ApiError(400, "invalid_tracking", (error as Error).message); }
+      const ids = trackingSettings.performance?.fieldIds ?? [];
+      const recordType = allTypes.find((type) => type.parent_type_id);
+      const fields = await fieldsForChallenge(client, challengeId);
+      if (ids.some((id) => !fields.some((field) => field.id === id && field.type === "number" && field.entryTypeId === recordType?.id))) {
+        throw new ApiError(400, "invalid_tracking_fields", "Choose numeric properties from the exercise record.");
+      }
+    }
     // Checkpoints are generated only for recipes that bind entries to them, not
     // for every "daily" primary type (a reading club's progress is `while_active`).
     const checkpointDriven = allTypes.some((type) => schedulePolicyOf(type, true) === "checkpoint");
@@ -418,8 +432,8 @@ export async function updateChallenge(
 
     await client.query(
       `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb,
-              start_date=$6, end_date=$7, updated_at=now() WHERE id=$1`,
-      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
+              start_date=$6, end_date=$7, tracking_settings=$8::jsonb, updated_at=now() WHERE id=$1`,
+      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate, JSON.stringify(trackingSettings)],
     );
     if (
       checkpointDriven
@@ -449,10 +463,11 @@ export async function updateChallenge(
       "challenge.updated", "challenge", challengeId,
       { title: access.challenge.title, description: access.challenge.description,
         ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
+        trackingSettings: access.challenge.tracking_settings ?? {},
         startsOn: access.challenge.start_date, endsOn: access.challenge.end_date },
-      { title, description, ruleSections, startsOn: startDate, endsOn: endDate });
+      { title, description, ruleSections, trackingSettings, startsOn: startDate, endsOn: endDate });
     return {
-      id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate,
+      id: challengeId, title, description, rules, ruleSections, trackingSettings, startsOn: startDate, endsOn: endDate,
       linkRotated,
     };
   });

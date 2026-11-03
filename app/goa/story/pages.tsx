@@ -107,12 +107,12 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
   const t = useTranslations("story");
   const figures = useStoryFigures(story, input);
   const almanac: AlmanacPage[] = useAlmanacPages(story, input, metrics, true);
-  if (story.kind === "empty") return [];
+  if (story.kind === "empty" && !almanac.length) return [];
   const frame = (eyebrow: string | undefined, headline: string | undefined, body: ReactNode) => function renderStory(index: number) {
     return <StoryFrame input={input} figures={figures} index={index} eyebrow={eyebrow} headline={headline}>{body}</StoryFrame>;
   };
   return [
-    { id: "thread", title: t("title"), node: frame(t("title"), storyHeadline(story, input, t), <ThreadPanel input={input} story={story} fit interactive={false} bare />) },
+    ...(story.kind !== "empty" && !input.resultPresentation?.hiddenPages.includes("thread") ? [{ id: "thread", title: t("title"), node: frame(t("title"), storyHeadline(story, input, t), <ThreadPanel input={input} story={story} fit interactive={false} bare />) }] : []),
     ...almanac.map((page) => ({ id: page.id, title: page.title, node: frame(page.title, page.headline, page.body) })),
   ];
 }
@@ -124,7 +124,7 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
 export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" }: { input: StoryInput; story: Story; metrics?: Metric[]; tone?: "hero" | "plain" }) {
   const t = useTranslations("story.download");
   const [open, setOpen] = useState(false);
-  if (story.kind === "empty") return null;
+  if (story.kind === "empty" && !metrics.length) return null;
   return (
     <>
       <button

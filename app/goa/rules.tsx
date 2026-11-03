@@ -217,19 +217,20 @@ function ScrollableRules({ rules }: { rules: ChallengeRule[] }) {
   </div>;
 }
 
-/** The upper curve is always visible; expanding reveals its matching lower half. */
+/** Challenges with rules reveal them beneath the ticket curve. */
 export function ChallengeCoverRules({ rules }: { rules: ChallengeRule[] }) {
   const t = useTranslations("rules");
+  if (!rules.length) return null;
   return <div className="challenge-ticket-bottom min-w-0 w-full">
-    {rules.length ? <details className="challenge-cover-rules block min-w-0 w-full open:overflow-hidden open:rounded-b-[28px]">
+    <details className="challenge-cover-rules block min-w-0 w-full open:overflow-hidden open:rounded-b-[28px]">
       <summary aria-label={t("coverLabel", { count: rules.length })} className="block cursor-pointer list-none text-white/75 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white [&::-webkit-details-marker]:hidden">
-        <span className="challenge-ticket-waist flex h-12 w-full items-center justify-center bg-[var(--spotlight)]" aria-hidden="true">
+        <span className="challenge-ticket-waist flex h-12 w-full items-center justify-start bg-[var(--spotlight)] px-6 sm:px-9" aria-hidden="true">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
         </span>
       </summary>
       <div className="challenge-ticket-waist challenge-ticket-waist-lower bg-[var(--spotlight)]" aria-hidden="true" />
       <ScrollableRules rules={rules} />
       <div className="h-5 bg-[var(--spotlight)]" aria-hidden="true" />
-    </details> : <div className="challenge-ticket-waist h-12 bg-[var(--spotlight)]" aria-hidden="true" />}
+    </details>
   </div>;
 }

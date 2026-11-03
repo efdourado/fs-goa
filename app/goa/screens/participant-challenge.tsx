@@ -1746,7 +1746,7 @@ export function ParticipantChallengeScreen({
       <div className={cx("mb-5 flex items-center sm:hidden", tabs.length > 1 && "hidden")}>
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
       </div>
-      <section className="relative isolate min-w-0 overflow-hidden rounded-[28px] text-[var(--spotlight-ink)]" style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+      <section className="relative isolate min-w-0 overflow-hidden rounded-[28px] text-[var(--spotlight-ink)]" style={ruleSections.length ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : undefined}>
         <div className="relative overflow-hidden bg-[var(--spotlight)] p-6 sm:p-9">
           <div className="relative z-10">
             <div className="flex items-center justify-between gap-3">
@@ -1775,7 +1775,7 @@ export function ParticipantChallengeScreen({
                 // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
                 <div className="mt-8 flex flex-wrap gap-2">
                   {previewActions}
-                  {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} /> : null}
+                  {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} metrics={challenge.metrics ?? []} /> : null}
                 </div>
               )}
           </div>
@@ -1964,7 +1964,7 @@ export function ParticipantChallengeScreen({
 
         {activeTab === "results" ? (
           preview
-            ? previewStory ? <StoryView input={previewStory.input} story={previewStory.story} /> : <ResultView challenge={challenge} hideCompletionRate live={false} />
+            ? previewStory ? <StoryView input={previewStory.input} story={previewStory.story} metrics={challenge.metrics ?? []} /> : <ResultView challenge={challenge} hideCompletionRate live={false} />
             : <ChallengeResults challenge={challenge} input={storyInput} story={story} fallback={<ResultView challenge={challenge} hideCompletionRate live />} />
         ) : null}
       </div>

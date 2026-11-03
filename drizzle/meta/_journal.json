@@ -505,6 +505,13 @@
       "when": 1793230000000,
       "tag": "0071_remove_item_descriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793729442740,
+      "tag": "0072_progress_tracking",
+      "breakpoints": true
     }
   ]
 }

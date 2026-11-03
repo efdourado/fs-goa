@@ -4,6 +4,9 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf } from "../catalog-cover";
+import { arrangeResultPages } from "../../../lib/result-presentation";
+import { MetricBlock } from "../metrics-view";
+import { metricHasData } from "../utils";
 import { CatalogTile } from "../catalog-views";
 import { firstName, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
@@ -86,47 +89,23 @@ function Chapter({ lead, children, bottom, className, ...rest }: { lead?: ReactN
   );
 }
 
-/**
- * One exercise as a single row: its name, a tiny line of every session's number (the best dot filled),
- * the range it covered and the gain — compact, no arrows, the line already goes up.
- */
-function Progression({ title, row, unit, person, fmt, tone, onOpen }: {
+/** A quiet summary; the session details live in the exercise dialog. */
+function Progression({ title, row, person, tone, onOpen }: {
   title: string;
-  row: { first: number; best: number; sessions: number; series: number[] };
-  unit: string;
+  row: { first: number; best: number; sessions: number; label?: string };
   person: string | null;
-  fmt: (value: number) => string;
   tone: string;
-  /** Opens the exercise's own page: the whole line, session by session. */
   onOpen: () => void;
 }) {
   const t = useTranslations("story");
-  const width = 88;
-  const height = 22;
-  const low = Math.min(...row.series);
-  const high = Math.max(...row.series);
-  const span = Math.max(1e-9, high - low);
-  const x = (index: number) => (row.series.length === 1 ? width / 2 : 3 + (index * (width - 6)) / (row.series.length - 1));
-  const y = (value: number) => height - 3 - ((value - low) / span) * (height - 6);
-  const points = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
-  const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
-  return (
-    <li>
-      <button type="button" onClick={onOpen} className="group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_88px_6.5rem_3rem] items-center gap-3 rounded-lg py-2.5 text-left text-sm transition hover:bg-[var(--wash)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20">
-      <span className="min-w-0">
-        <span className="block truncate">{title}</span>
-        <span className="block text-xs text-[var(--muted)]">{[person, t("records.sessions", { count: row.sessions })].filter(Boolean).join(" · ")}</span>
-      </span>
-      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
-        <polyline points={points} fill="none" stroke={tone} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={x(row.series.indexOf(high))} cy={y(high)} r={2.6} fill={tone} />
-      </svg>
-      <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{row.best > row.first ? t("records.range", { first: fmt(row.first), best: fmt(row.best), unit }) : `${fmt(row.best)}${unit ? ` ${unit}` : ""}`}</span>
-      {/* No gain yet: nothing to show. */}
-      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>{gain > 0 ? `+${gain}%` : ""}</strong>
-      </button>
-    </li>
-  );
+  const gain = row.first > 0 ? Math.round(((row.best - row.first) / row.first) * 100) : null;
+  return <li>
+    <button type="button" onClick={onOpen} className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_3.5rem] items-center gap-3 rounded-lg py-2.5 text-left text-sm transition hover:bg-[var(--wash)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20">
+      <span className="min-w-0"><span className="block truncate">{title}</span>{person || row.label ? <span className="block truncate text-xs text-[var(--muted)]">{[person, row.label].filter(Boolean).join(" · ")}</span> : null}</span>
+      <span className="text-xs text-[var(--muted)]">{t("records.sessions", { count: row.sessions })}</span>
+      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>{gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%`}</strong>
+    </button>
+  </li>;
 }
 
 type RecordRow = DatedStory["records"][number];
@@ -144,7 +123,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const withUnit = (value: number) => `${fmt(value)}${unit ? ` ${unit}` : ""}`;
   // Months are always abbreviated; the year only where it tells something (the period up top, or a history that crosses years).
   const day = (key: string, withYear = false) => nf.dateTime(new Date(`${key}T12:00:00Z`), { day: "numeric", month: "short", ...(withYear ? { year: "numeric" as const } : {}), timeZone: "UTC" });
-  const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
+  const gain = row.first > 0 ? Math.round(((row.best - row.first) / row.first) * 100) : null;
   const width = 560;
   const height = 190;
   const pad = { top: 26, right: 18, bottom: 26, left: 18 };
@@ -161,12 +140,13 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
     { label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay), strong: true },
     { label: t("records.first"), value: withUnit(row.first), note: day(row.days[0]) },
-    { label: t("records.gain"), value: gain > 0 ? `+${gain}%` : "" },
+    { label: t("records.gain"), value: gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%` },
     { label: t("records.sessionsLabel"), value: String(row.sessions) },
   ];
   return (
     <Dialog title={row.item.title} onClose={onClose} wide>
       <div>
+        {row.label ? <p className="mb-2 text-sm">{t(row.sessionAggregation === "sum" ? "records.sumPerSession" : "records.bestPerSession", { fields: row.label })}</p> : null}
         <p className="text-xs text-[var(--muted)]">{[person, `${day(row.days[0], true)} – ${day(row.days[last], true)}`].filter(Boolean).join(" · ")}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
@@ -187,7 +167,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
             <polyline points={`${x(0)},${height - pad.bottom} ${line} ${x(last)},${height - pad.bottom}`} fill={tone} opacity={0.08} stroke="none" />
             <polyline points={line} fill="none" stroke={tone} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
             {row.series.map((value, index) => (
-              <circle key={row.days[index]} cx={x(index)} cy={y(value)} r={index === bestIndex ? 5 : 2.8} fill={index === bestIndex ? tone : "var(--paper)"} stroke={tone} strokeWidth={1.6} />
+              <circle key={`${row.days[index]}:${index}`} cx={x(index)} cy={y(value)} r={index === bestIndex ? 5 : 2.8} fill={index === bestIndex ? tone : "var(--paper)"} stroke={tone} strokeWidth={1.6} />
             ))}
             <text x={Math.min(width - 60, Math.max(60, x(bestIndex)))} y={Math.max(13, y(high) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(high)}</text>
             <text x={pad.left} y={height - 7} fontSize={11} fill="var(--muted)">{day(row.days[0])}</text>
@@ -201,7 +181,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
           {row.series.map((value, index) => ({ value, index })).reverse().slice(0, RECENT_SESSIONS).map(({ value, index }) => {
             const change = index > 0 ? Number((value - row.series[index - 1]).toFixed(4)) : null;
             return (
-              <li key={row.days[index]} className="flex items-center gap-3 py-2.5 text-sm">
+              <li key={`${row.days[index]}:${index}`} className="flex items-center gap-3 py-2.5 text-sm">
                 <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], crossesYears)}</span>
                 <strong className="flex-1 font-medium tabular-nums">{withUnit(value)}</strong>
                 {index === bestIndex ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
@@ -219,16 +199,16 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
 }
 
 /** The records page's list: each exercise a row to tap, opening its own page. */
-function RecordsList({ rows, unit, showPerson, ids, fmt }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
+function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
   const [open, setOpen] = useState<RecordRow | null>(null);
   return (
     <>
       <ul className="divide-y divide-[var(--line)]">
         {rows.map((row) => (
-          <Progression key={`${row.person.id}-${row.item.id}`} title={row.item.title} row={row} unit={unit} person={showPerson ? firstName(row.person.name) : null} fmt={fmt} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
+          <Progression key={`${row.person.id}-${row.item.id}-${row.metricKey ?? ""}`} title={row.item.title} row={row} person={showPerson ? firstName(row.person.name) : null} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
         ))}
       </ul>
-      {open ? <RecordDialog row={open} unit={unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
+      {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
     </>
   );
 }
@@ -505,7 +485,7 @@ function Grid({ children }: { children: ReactNode }) {
  * page: no buttons to press, so long lists stay at their preview and say "+ N" for the rest (a page is a
  * preview and must keep its shape; the PDF has everything).
  */
-export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric[], full = false): AlmanacPage[] {
+export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric[], full = false, manage = false): AlmanacPage[] {
   const t = useTranslations("story");
   const nf = useFormatter();
   const [rankingExpanded, setRankingExpanded] = useState(false);
@@ -518,7 +498,11 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   const ids = input.people.map((person) => person.id);
   const noun = (count: number) => t(`noun.${input.noun}`, { count });
   const pages: AlmanacPage[] = [];
-  const metricsPage: AlmanacPage[] = [];
+  const metricsPage: AlmanacPage[] = metrics
+    .filter((metric) => metric.visibleInResults !== false && (input.resultsClosed || metric.visibleDuring !== false) && metricHasData(metric as unknown as Record<string, unknown>))
+    .map((metric) => ({ id: `metric-${metric.id}`, title: metric.label, headline: metric.label, ownHeadline: true,
+      body: <div className="mx-auto max-w-3xl"><MetricBlock metric={metric} /></div> }));
+  const present = (rows: AlmanacPage[]) => manage ? rows : arrangeResultPages(rows, input.resultPresentation);
 
   if (story.kind === "rated") {
     const s: RatedStory = story;
@@ -1017,7 +1001,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         ),
       });
     }
-    return [...pages, ...metricsPage];
+    return present([...pages, ...metricsPage]);
   }
 
   if (story.kind === "dated") {
@@ -1043,7 +1027,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             <Block title={t("soloDays.numbers")}>
               <dl className="grid grid-cols-3 gap-4">
                 {[
-                  { value: lane.longest?.length ?? 1, label: t(`soloDays.longest${wk}`) },
+                  { value: lane.longest?.length ?? (lane.days.length ? 1 : 0), label: t(`soloDays.longest${wk}`) },
                   { value: lane.current, label: t(`soloDays.current${wk}`) },
                   { value: lane.days.length, label: t("soloDays.days") },
                 ].map((row) => (
@@ -1058,9 +1042,13 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                     <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="2.6" />
                     <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="2.6" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
                   </svg>
-                  <span className="text-xl font-light tabular-nums">{lane.consistency ?? 0}%</span>
+                  <span className="text-xl font-light tabular-nums">{lane.consistency === null ? "—" : `${lane.consistency}%`}</span>
                 </span>
-                <p className="text-sm">{wk ? t("soloDays.consistencyWeek", { value: nf.number(lane.perWeek ?? 0) }) : t("soloDays.consistency", { days: lane.days.length, total: s.totals.days })}</p>
+                <div className="text-sm">{lane.goalProgress ? <>
+                  <p>{t(input.consistencyGoal?.count === "days" ? "consistency.goalDays" : "consistency.goal", { target: lane.goalProgress.target, days: lane.goalProgress.periodDays })}</p>
+                  {lane.goalProgress.current !== null ? <p>{t("consistency.current", { count: lane.goalProgress.current, target: lane.goalProgress.target })}</p> : null}
+                  <p className="mt-1 text-xs text-[var(--muted)]">{t("consistency.completed", { count: lane.goalProgress.completed })}</p>
+                </> : <p>{wk ? t("soloDays.consistencyWeek", { value: nf.number(lane.perWeek ?? 0) }) : t("soloDays.consistency", { days: lane.days.length, total: s.totals.days })}</p>}</div>
               </div>
             </Block>
             {comebacks.length ? (
@@ -1085,13 +1073,13 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <li key={lane.person.id} className="flex items-center gap-3 text-sm">
                   <Avatar id={lane.person.id} name={lane.person.name} ids={ids} />
                   <span className="w-16 truncate">{firstName(lane.person.name)}</span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full" style={{ width: `${Math.max(4, ((lane.longest?.length ?? 1) / Math.max(1, byStreak[0].longest?.length ?? 1)) * 100)}%`, background: personTone(ids, lane.person.id) }} /></span>
-                  <span className="w-32 flex-none whitespace-nowrap text-right text-xs text-[var(--muted)]">{t("streaks.best", { count: lane.longest?.length ?? 1 })}{lane.current > 1 ? ` · ${t("streaks.now", { count: lane.current })}` : ""}</span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full" style={{ width: `${Math.max(4, ((lane.longest?.length ?? (lane.days.length ? 1 : 0)) / Math.max(1, byStreak[0].longest?.length ?? 1)) * 100)}%`, background: personTone(ids, lane.person.id) }} /></span>
+                  <span className="w-32 flex-none whitespace-nowrap text-right text-xs text-[var(--muted)]">{t("streaks.best", { count: lane.longest?.length ?? (lane.days.length ? 1 : 0) })}{lane.current > 1 ? ` · ${t("streaks.now", { count: lane.current })}` : ""}</span>
                 </li>
               ))}
             </ul>
           </Block>
-          <Block title={t(`consistency.title${wk}`, { name: firstName(byConsistency[0].person.name), value: byConsistency[0].consistency ?? 0 })}>
+          <Block title={byConsistency[0].consistency === null ? t("consistency.eyebrow") : t(input.consistencyGoal ? "consistency.titleGoal" : `consistency.title${wk}`, { name: firstName(byConsistency[0].person.name), value: byConsistency[0].consistency ?? 0 })}>
             <div className="flex flex-wrap gap-4">
               {byConsistency.map((lane) => (
                 <div key={lane.person.id} className="flex flex-col items-center gap-1">
@@ -1100,13 +1088,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                       <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="3" />
                       <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="3" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
                     </svg>
-                    <span className="text-xs font-medium tabular-nums">{lane.consistency ?? 0}%</span>
+                    <span className="text-xs font-medium tabular-nums">{lane.consistency === null ? "—" : `${lane.consistency}%`}</span>
                   </span>
                   <span className="text-xs">{firstName(lane.person.name)}</span>
+                  {lane.goalProgress?.current != null ? <span className="text-xs text-[var(--muted)]">{t("consistency.current", { count: lane.goalProgress.current, target: lane.goalProgress.target })}</span> : null}
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-[var(--muted)]">{t(`consistency.note${wk}`, { days: s.totals.days })}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">{input.consistencyGoal ? t(input.consistencyGoal.count === "days" ? "consistency.goalDays" : "consistency.goal", { target: input.consistencyGoal.target, days: input.consistencyGoal.periodDays }) : t(`consistency.note${wk}`, { days: s.totals.days })}</p>
           </Block>
           {s.together !== null ? (
             <Block title={t("together.title")}>
@@ -1196,9 +1185,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "records",
         title: t("records.eyebrow"),
-        headline: s.records[0].best > s.records[0].first
+        headline: s.records[0].first > 0 && s.records[0].best > s.records[0].first
           ? t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) })
-          : t("records.headlineFlat", { count: s.records.length }),
+          : t("records.headlineFlat", { count: new Set(s.records.map((row) => row.item.id)).size }),
         body: (
           <Grid>
             <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
@@ -1231,7 +1220,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         ),
       });
     }
-    return [...pages, ...metricsPage];
+    return present([...pages, ...metricsPage]);
   }
-  return metricsPage;
+  return present(metricsPage);
 }

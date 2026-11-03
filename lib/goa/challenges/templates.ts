@@ -103,7 +103,7 @@ export async function getTemplatePreview(challengeId: string) {
   return withClient(async (client) => {
     const row = await oneOrNull<DetailChallengeRow & { template_featured_at: Date | null }>(
       client,
-      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
+      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections, c.tracking_settings,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
               c.show_schedule, c.published_as_template_at, c.time_zone,
