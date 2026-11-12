@@ -20,14 +20,18 @@ const stubRouter = {
 } as unknown as Parameters<typeof AppRouterContext.Provider>[0]["value"];
 
 /** Renders a component tree with the pt-BR catalog, matching the app's default. */
-export function renderWithIntl(element: ReactElement): string {
-  return renderToStaticMarkup(
+export function withIntl(element: ReactElement): ReactElement {
+  return (
     <AppRouterContext.Provider value={stubRouter}>
       <NextIntlClientProvider locale={LOCALE} messages={ptBR} timeZone={TIME_ZONE}>
         {element}
       </NextIntlClientProvider>
-    </AppRouterContext.Provider>,
+    </AppRouterContext.Provider>
   );
+}
+
+export function renderWithIntl(element: ReactElement): string {
+  return renderToStaticMarkup(withIntl(element));
 }
 
 /** The shared formatters/status labels, wired to the pt-BR catalog for assertions. */

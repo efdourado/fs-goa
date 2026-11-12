@@ -43,7 +43,7 @@ test("um check-in que guarda registros por item é reconhecido pelos tipos; um d
 test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', sem 'por item', só o seu histórico", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
-    challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
+    challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
   assert.match(html, /＋ Registrar o treino de hoje/, "o caminho do dia, num botão só");
   assert.doesNotMatch(html, /Repetir o último/);
@@ -63,7 +63,7 @@ test("o treino de hoje já registrado aparece num cartão que abre o treino, e d
     entry({ id: "w3-bench", entryTypeId: "record", parentEntryId: "w3", itemId: "bench", occurredOn: today, values: { carga: 60, reps: 8 } }),
   ];
   const html = renderWithIntl(createElement(SessionLog, {
-    challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
+    challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
   assert.match(html, />Treino<\/strong>/, "um treino só no dia: sem número");
   assert.match(html, />1 item</);
@@ -76,7 +76,7 @@ test("o treino de hoje já registrado aparece num cartão que abre o treino, e d
 test("quem não pode registrar vê o resumo, sem o botão", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
-    challenge, spec, entries, userId: "me", canEdit: false, unavailableMessage: "Fechado.", onSave: async () => undefined,
+    challenge, spec, entries, userId: "me", canEdit: false, unavailableMessage: "Fechado.", onSave: async () => ({ id: "saved", children: [] }),
   }));
   assert.doesNotMatch(html, /Registrar o treino/);
   assert.match(html, /Fechado\./);
@@ -85,7 +85,7 @@ test("quem não pode registrar vê o resumo, sem o botão", () => {
 test("sem itens no desafio, o log avisa em vez de mostrar um formulário vazio", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
-    challenge: { ...challenge, items: [] } as ChallengeDetail, spec, entries: [], userId: "me", canEdit: true, onSave: async () => undefined,
+    challenge: { ...challenge, items: [] } as ChallengeDetail, spec, entries: [], userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }),
   }));
   assert.match(html, /Nenhum item ainda/);
   assert.doesNotMatch(html, /Registrar Treino/);

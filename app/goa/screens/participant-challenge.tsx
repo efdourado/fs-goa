@@ -18,7 +18,7 @@ import { DownloadPagesButton } from "../story/pages";
 import { ChallengeDock } from "../bottom-dock";
 import dynamic from "next/dynamic";
 import { SharedGlyph } from "../shared-responses";
-import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
+import { SessionLog, type SessionPayload, type SessionSaveResult, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { ChallengeCoverRules, visibleRuleSections } from "../rules";
 import { instantToDateKey } from "../schedule";
@@ -379,7 +379,12 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   }
 
   useImperativeHandle(ref, () => ({
-    submitIfEditing: async () => (editing ? { ok: await performSubmit() } : { ok: true }),
+    submitIfEditing: async () => {
+      // An untouched section is not an answer. In particular, saving a guess
+      // before watching must not require (or create) the actual rating.
+      const answered = Object.values(values).some((value) => value !== null && value !== undefined && value !== "");
+      return editing && canEdit && (entry || answered) ? { ok: await performSubmit() } : { ok: true };
+    },
   }));
 
   if (!fields.length) {
@@ -846,19 +851,15 @@ function ItemEntryPanel({
       && (candidate.entryTypeId ?? "") === type.id
       && (!perDay || candidate.occurredOn === (occurredOn || today)));
   };
-  // Required-field sections (Expectativa, Avaliação, Progresso do dia) each
-  // answer-once-then-lock — when there's more than one stacked, they share
-  // one Save button at the bottom instead of each carrying its own. An
-  // all-optional section (Terminei) is a standalone action you can take any
-  // time, not a fact you fill in once, so it always keeps its own button.
+  // Stack answer sections behind one Save, including an optional rating paired
+  // with a guess. Standalone completion actions still keep their own button.
   const combinableTypeIds = stacked
-    ? types.filter((type) => type.fields.some((field) => field.required)).map((type) => type.id)
+    ? types.filter((type) => type.fields.some((field) => field.required) || (types.some((candidate) => candidate.purpose === "expectation") && type.purpose === "rating")).map((type) => type.id)
     : [];
   const useSharedButton = combinableTypeIds.length > 1;
   const formRefs = useRef(new Map<Id, DynamicEntryFormHandle | null>());
   // Seeded from each combinable type's OWN initial `editing` rule
-  // (`alwaysEditable || !entry` — always `!entry` here, since a combinable
-  // type by definition has a required field and so is never `alwaysEditable`)
+  // (`!entry` for every combined section)
   // so the button is correctly visible/hidden on the very first render, not
   // only after a section's effect reports in.
   const [openTypeIds, setOpenTypeIds] = useState<Set<Id>>(() => new Set(
@@ -875,7 +876,11 @@ function ItemEntryPanel({
   async function saveAll() {
     setSavingAll(true);
     try {
-      await Promise.all(combinableTypeIds.map((typeId) => formRefs.current.get(typeId)?.submitIfEditing()));
+      // Expectation must commit before the rating locks it on the server.
+      for (const typeId of combinableTypeIds) {
+        const result = await formRefs.current.get(typeId)?.submitIfEditing();
+        if (result && !result.ok) break;
+      }
     } finally {
       setSavingAll(false);
     }
@@ -918,7 +923,7 @@ function ItemEntryPanel({
         const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only" || (type.visibilityPolicy === "until_reveal" && isSealed(challenge, item))
           ? <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
           : undefined;
-        const combinable = stacked && hasRequiredField && useSharedButton;
+        const combinable = useSharedButton && combinableTypeIds.includes(type.id);
         return (
           <div key={type.id || "registro"} id={type.id ? `entry-type-${type.id}` : undefined}>
             <DynamicEntryForm
@@ -926,7 +931,7 @@ function ItemEntryPanel({
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
               heading={heading}
               sectioned={stacked && hasRequiredField}
-              alwaysEditable={!hasRequiredField}
+              alwaysEditable={!hasRequiredField && !combinable}
               hideOwnSaveButton={combinable}
               onEditingChange={combinable ? (open) => markOpen(type.id, open) : undefined}
               note={note}
@@ -1415,7 +1420,7 @@ export function ParticipantChallengeScreen({
   onAdmin?: () => void;
   onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
   /** A check-in that holds a record per item (a workout): saves it whole — a new one, or the given one rewritten. */
-  onSaveSession?: (payload: SessionPayload, entry?: Entry) => Promise<void>;
+  onSaveSession?: (payload: SessionPayload, entry?: Entry) => Promise<SessionSaveResult>;
   /** For someone who may add items (an admin, or the owner of a personal challenge): adds one and returns its id. */
   onAddSessionItem?: (title: string) => Promise<Id>;
   /** Managers only: renames a record type ("Treino" → "Sessão") straight from Today. */

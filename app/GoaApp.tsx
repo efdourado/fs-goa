@@ -26,7 +26,7 @@ import { CatalogItemScreen } from "./goa/screens/catalog-item";
 import { GroupScreen } from "./goa/screens/group";
 import { InviteAcceptedScreen, InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
-import { type SessionPayload, sessionSpecOf } from "./goa/session-log";
+import { type SessionPayload, type SessionSaveResult, sessionSpecOf } from "./goa/session-log";
 import { CatalogWorkspaceScreen } from "./goa/screens/catalog-workspace";
 import { CsrfProvider } from "./goa/csrf";
 import { PersonalTrashScreen } from "./goa/screens/personal-trash";
@@ -615,19 +615,20 @@ export default function GoaApp() {
   }
 
   /** One check-in with its records (a workout): a new one, or — with `entry` — the whole check-in rewritten as the form shows it. */
-  async function saveSession(payload: SessionPayload, entry?: Entry) {
-    if (!bootstrap || !selectedChallenge) return;
-    if (entry) {
-      await apiRequest(API_PATHS.entry(entry.id), { method: "PATCH", body: payload, csrfToken: bootstrap.csrfToken });
-    } else {
-      const spec = sessionSpecOf(selectedChallenge);
-      if (!spec) return;
-      await apiRequest(API_PATHS.entries(selectedChallenge.id), {
-        method: "POST", body: { entryTypeId: spec.visit.id, ...payload }, csrfToken: bootstrap.csrfToken,
-      });
-    }
-    await reloadSelected();
+  async function saveSession(payload: SessionPayload, entry?: Entry): Promise<SessionSaveResult> {
+    if (!bootstrap || !selectedChallenge) throw new Error("no challenge");
+    const spec = sessionSpecOf(selectedChallenge);
+    if (!spec) throw new Error("no session type");
+    const saved = await apiRequest<SessionSaveResult>(entry ? API_PATHS.entry(entry.id) : API_PATHS.entries(selectedChallenge.id), {
+      method: entry ? "PATCH" : "POST",
+      body: entry ? payload : { entryTypeId: spec.visit.id, ...payload },
+      csrfToken: bootstrap.csrfToken,
+    });
+    // A refresh failure must not make a committed workout look like a failed
+    // create. Give the form its saved ids regardless of the subsequent reads.
+    await reloadSelected().catch(() => undefined);
     void refreshBootstrap().catch(() => undefined);
+    return saved;
   }
 
   /** Adds one item to the open challenge (a workout's new exercise) and hands back its id, with the challenge already refreshed. */

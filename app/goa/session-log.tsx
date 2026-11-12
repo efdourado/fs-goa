@@ -34,11 +34,22 @@ export interface SessionPayload {
   children: Array<{ id?: Id; itemId: Id; values: Record<Id, unknown> }>;
 }
 
-interface Row {
+export interface SessionSaveResult {
+  id: Id;
+  children: Array<{ id: Id; itemId: Id; values: Record<Id, unknown> }>;
+}
+
+interface SessionRow {
   key: string;
   id?: Id;
   itemId: Id | "";
   values: Record<Id, unknown>;
+}
+
+/** Match the response to the rows actually sent, even if rows changed during the request. */
+function reconcileSessionRows(current: SessionRow[], sent: SessionRow[], saved: SessionSaveResult): SessionRow[] {
+  const ids = new Map(sent.map((row, index) => [row.key, saved.children[index]?.id]));
+  return current.map((row) => ids.has(row.key) ? { ...row, id: ids.get(row.key) } : row);
 }
 
 let rowCounter = 0;
@@ -196,7 +207,7 @@ export function SessionLog({
   userId: Id | undefined;
   canEdit: boolean;
   unavailableMessage?: string | null;
-  onSave: (payload: SessionPayload, entry?: Entry) => Promise<void>;
+  onSave: (payload: SessionPayload, entry?: Entry) => Promise<SessionSaveResult>;
   onDelete?: (entryId: Id) => Promise<void>;
   /** Present for someone who may add items to the challenge — makes "New item" available in the tray. */
   onAddItem?: (title: string) => Promise<Id>;
@@ -241,7 +252,7 @@ export function SessionLog({
   const requiredFor = (fields: ChallengeField[], saved: Record<Id, unknown> | undefined) => (saved
     ? fields.filter((field) => !field.required || !field.id || (saved[field.id] !== undefined && saved[field.id] !== null && saved[field.id] !== ""))
     : fields);
-  const rowGap = (row: Row) => findMissingRequiredField(requiredFor(recordFields, row.id ? savedValues.get(row.id) : undefined), row.values);
+  const rowGap = (row: SessionRow) => findMissingRequiredField(requiredFor(recordFields, row.id ? savedValues.get(row.id) : undefined), row.values);
   const visitGapOf = (visit: Entry | null | undefined, values: Record<Id, unknown>) => findMissingRequiredField(requiredFor(visitFields, visit ? valuesAsRecord(visit.values) : undefined), values);
 
   // Newest first within a day: a day with two check-ins opens the latest.
@@ -273,7 +284,7 @@ export function SessionLog({
   const [editing, setEditing] = useState<Entry | null>(() => visitsByDay.get(today)?.[0] ?? null);
   const [occurredOn, setOccurredOn] = useState(today);
   const [visitValues, setVisitValues] = useState<Record<Id, unknown>>(() => (editing ? valuesAsRecord(editing.values) : {}));
-  const [rows, setRows] = useState<Row[]>(() => (editing ? sortedRecords(editing.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []));
+  const [rows, setRows] = useState<SessionRow[]>(() => (editing ? sortedRecords(editing.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []));
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   // "New item" being named in the tray. It never touches the rows until the item exists.
@@ -281,8 +292,6 @@ export function SessionLog({
   const [trayOpen, setTrayOpen] = useState(false);
   // "+ Add" opened the list of items (it's folded away while there's a check-in to repeat).
   const [adding, setAdding] = useState(false);
-  // After a save, the check-in to reopen once the reload brings it back: the edited one, or the newest of that day.
-  const [reopen, setReopen] = useState<{ day: string; visitId?: Id; known: Set<Id> } | null>(null);
   const newItemInput = useRef<HTMLInputElement>(null);
   const cardsRef = useRef<HTMLOListElement>(null);
   const isCreating = creating !== null;
@@ -299,18 +308,6 @@ export function SessionLog({
     setError(null);
   }
 
-  useEffect(() => {
-    if (!reopen) return;
-    const visits = visitsByDay.get(reopen.day) ?? [];
-    const found = reopen.visitId
-      ? visits.find((visit) => visit.id === reopen.visitId)
-      : visits.find((visit) => !reopen.known.has(visit.id));
-    if (!found) return;
-    setReopen(null);
-    adopt(found);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reopen, visitsByDay]);
-
   // ── Logging in the sheet, saved as you go ───────────────────────────────
   // Every change is kept on this device at once (a draft), and a moment later the rows that are complete are
   // saved for real — so a dropped connection at the gym never loses a set, and there's no Save to remember.
@@ -318,12 +315,10 @@ export function SessionLog({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "incomplete" | "error">("idle");
   const saving = useRef(false);
   const retry = useRef(false);
-  // A new check-in was saved and is on its way back with its id; another save now would make a second one.
-  const awaiting = useRef(false);
   // A change made by loading or adopting a check-in, not by the person — nothing to save.
   const skipNextChange = useRef(true);
-  const latest = useRef({ rows, visitValues, editing, occurredOn, day, visitsByDay });
-  useEffect(() => { latest.current = { rows, visitValues, editing, occurredOn, day, visitsByDay }; });
+  const latest = useRef({ rows, visitValues, editing, occurredOn, day });
+  useEffect(() => { latest.current = { rows, visitValues, editing, occurredOn, day }; });
 
   const draftKey = (onDay: string) => `goa.workout.${challenge.id}.${onDay}`;
   function readDraft(onDay: string): WorkoutDraft | null {
@@ -341,37 +336,10 @@ export function SessionLog({
     try { window.localStorage.removeItem(draftKey(onDay)); } catch { /* nothing to clear */ }
   }
 
-  /** The saved check-in came back: keep what's on screen, just learn the ids its rows were given. */
-  function adopt(visit: Entry) {
-    skipNextChange.current = true;
-    setEditing(visit);
-    const records = sortedRecords(visit.id);
-    const used = new Set(latest.current.rows.map((row) => row.id).filter(Boolean));
-    const next = latest.current.rows.map((row) => {
-      if (row.id) return row;
-      const match = records.find((record) => record.itemId === row.itemId && !used.has(record.id));
-      if (!match) return row;
-      used.add(match.id);
-      return { ...row, id: match.id };
-    });
-    setRows(next);
-    // The retry below can run before React re-renders: it must already see this check-in and its row ids, or it
-    // would save everything again as a second check-in.
-    latest.current = { ...latest.current, editing: visit, rows: next };
-    if (next.some((row) => rowGap(row))) {
-      writeDraft(latest.current.day, { visitId: visit.id, rows: next.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues: latest.current.visitValues });
-    }
-    awaiting.current = false;
-    if (retry.current) {
-      retry.current = false;
-      window.setTimeout(() => { void autosave(); }, 0);
-    }
-  }
-
   async function autosave() {
     if (!canEdit) return;
-    if (saving.current || awaiting.current) { retry.current = true; return; }
-    const { rows: current, visitValues: values, editing: visit, occurredOn: on, day: onDay, visitsByDay: byDay } = latest.current;
+    if (saving.current) { retry.current = true; return; }
+    const { rows: current, visitValues: values, editing: visit, occurredOn: on, day: onDay } = latest.current;
     if (!current.length) { setSaveState("idle"); return; }
     const complete = current.filter((row) => row.itemId && !rowGap(row));
     if (!complete.length || visitGapOf(visit, values)) { setSaveState("incomplete"); return; }
@@ -379,23 +347,31 @@ export function SessionLog({
     setSaveState("saving");
     try {
       const target = on || onDay;
-      const known = new Set((byDay.get(target) ?? []).map((candidate) => candidate.id));
-      await onSave({
+      const saved = await onSave({
         occurredOn: target,
         values,
         children: complete.map((row) => ({ ...(row.id ? { id: row.id } : {}), itemId: row.itemId as Id, values: row.values })),
       }, visit ?? undefined);
-      if (!visit) awaiting.current = true;
-      setReopen({ day: target, visitId: visit?.id, known });
+      // Learn identities before releasing the save lock. A timer or Done tap
+      // queued during this request must PATCH this workout, never POST another.
+      const changed = latest.current.rows !== current || latest.current.visitValues !== values;
+      const nextRows = reconcileSessionRows(latest.current.rows, complete, saved);
+      if (changed) retry.current = true;
+      const savedVisit: Entry = { ...visit, id: saved.id, entryTypeId: spec.visit.id, userId, occurredOn: target, values };
+      latest.current = { ...latest.current, editing: savedVisit, rows: nextRows };
+      skipNextChange.current = true;
+      setEditing(savedVisit);
+      setRows(nextRows);
       const allSaved = complete.length === current.length;
       setSaveState(allSaved ? "saved" : "incomplete");
-      if (allSaved) clearDraft(onDay);
+      if (allSaved && !changed) clearDraft(onDay);
+      else writeDraft(onDay, { visitId: saved.id, rows: nextRows, visitValues: latest.current.visitValues });
     } catch (cause) {
       setSaveState("error");
       setError(f.error(cause));
     } finally {
       saving.current = false;
-      if (retry.current && !awaiting.current) {
+      if (retry.current) {
         retry.current = false;
         void autosave();
       }
@@ -478,7 +454,7 @@ export function SessionLog({
     }
   }
 
-  function patchRow(key: string, patch: Partial<Row>) {
+  function patchRow(key: string, patch: Partial<SessionRow>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   }
 
