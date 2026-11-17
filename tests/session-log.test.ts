@@ -45,7 +45,8 @@ test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', se
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.match(html, /＋ Registrar o treino de hoje/, "o caminho do dia, num botão só");
+  assert.match(html, /＋ Registrar as respostas de hoje/, "o caminho do dia, num botão só");
+  assert.doesNotMatch(html, /Treino|Desempenho/, "nomes internos não viram títulos do registro");
   assert.doesNotMatch(html, /Repetir o último/);
   assert.match(html, /<strong[^>]*>2<\/strong> dias com registro desde/, "só os seus dois treinos contam");
   assert.match(html, /semanas? seguidas?/, "um treino conta semanas seguidas, não dias");
@@ -65,12 +66,12 @@ test("o treino de hoje já registrado aparece num cartão que abre o treino, e d
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.match(html, />Treino<\/strong>/, "um treino só no dia: sem número");
+  assert.match(html, />Respostas<\/strong>/, "um registro só no dia: sem número");
   assert.match(html, />1 item</);
   assert.match(html, /Supino<\/span><span[^>]*>60 · 8<\/span>/, "cada exercício numa linha, com os números");
-  assert.match(html, /<button[^>]*aria-label="Abrir Treino"/, "o cartão inteiro abre o treino, sem botão Editar");
+  assert.match(html, /<button[^>]*aria-label="Abrir respostas"/, "o cartão inteiro abre o registro, sem botão Editar");
   assert.doesNotMatch(html, />Editar</);
-  assert.match(html, /＋ Novo treino/, "outro treino no mesmo dia");
+  assert.match(html, /＋ Novo registro/, "outro registro no mesmo dia");
 });
 
 test("quem não pode registrar vê o resumo, sem o botão", () => {

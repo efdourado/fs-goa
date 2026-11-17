@@ -11,7 +11,7 @@ import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel"
 import { type CatalogScope, useCatalogShelf } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select } from "./ui";
+import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select, SlidersIcon } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -199,13 +199,15 @@ function useEditorProperties({ libraries, refreshKey = 0 }: Pick<EditorShared, "
  * Every property of the given rows, one card each: the name and the library properties (each with its
  * label), and the rest folded under "+N more" at the bottom of the card.
  */
-function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
+function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unboxed = false }: {
   rows: CineRow[];
   onChange: (row: CineRow) => void;
   onRemove?: (key: string) => void;
   shared: EditorShared;
   /** Show every property straight away (editing one item), instead of behind "details". */
   openByDefault?: boolean;
+  /** A single-item editing modal already provides its own container. */
+  unboxed?: boolean;
 }) {
   const t = useTranslations("cineItems");
   const { propertiesFor } = useEditorProperties(shared);
@@ -245,7 +247,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
           </label>
         ) : null;
         return (
-          <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
+          <li className={unboxed ? undefined : "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3"} key={row.key}>
             <div className={cx("grid items-end gap-2", topRight ? (onRemove ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]") : onRemove ? "grid-cols-[1fr_auto]" : "")}>
               <label className="block min-w-0">
                 <span className={labelClass}>{nameOf("title", t("nameLabel"))}</span>
@@ -482,7 +484,7 @@ export function CineItemsEditor({
   onProblem,
   addDialogOpen,
   onAddDialogOpenChange,
-  showEmptyAddButton = true,
+  showAddButton = true,
   ...shared
 }: EditorShared & {
   value: CineRow[];
@@ -492,7 +494,8 @@ export function CineItemsEditor({
   /** Lets a surrounding heading own the add button while this editor still owns the dialog. */
   addDialogOpen?: boolean;
   onAddDialogOpenChange?: (open: boolean) => void;
-  showEmptyAddButton?: boolean;
+  /** False when the surrounding page heading already provides the + control. */
+  showAddButton?: boolean;
 }) {
   const t = useTranslations("cineItems");
   const { problemOf, loaded } = useEditorProperties(shared);
@@ -514,11 +517,21 @@ export function CineItemsEditor({
 
   return (
     <div>
-      {value.length ? <Button className="mb-4 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button> : null}
-      {value.length ? (
+      {value.length || showAddButton ? (
         <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
-          <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
-          {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
+          {value.length ? <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p> : <span />}
+          <div className="ml-auto flex items-center gap-2">
+            {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
+            {showAddButton ? <StateButton
+              type="button"
+              onClick={() => { setDraft([]); setDraftProblem(null); setAdding(true); }}
+              aria-label={t("addItems")}
+              title={t("addItems")}
+              className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+            </StateButton> : null}
+          </div>
         </div>
       ) : null}
       {value.length ? (
@@ -531,7 +544,7 @@ export function CineItemsEditor({
                 {summary(row) ? <span className="block truncate text-xs text-[var(--muted)]">{summary(row)}</span> : null}
                 {flagged(row) ? <span className="block text-xs text-[var(--danger)]">{t("needsAttention")}</span> : null}
               </span>
-              <StateButton type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setEditingKey(row.key)}>{t("edit")}</StateButton>
+              <StateButton type="button" className={rowIconClass} aria-label={t("edit")} title={t("edit")} onClick={() => setEditingKey(row.key)}><SlidersIcon className="h-[18px] w-[18px]" /></StateButton>
               <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
             </li>
           ))}
@@ -539,15 +552,6 @@ export function CineItemsEditor({
       ) : (
         <div className="grid justify-items-center pb-3">
           <FaceEmptyState title={t("emptyList")} compact />
-          {showEmptyAddButton ? <StateButton
-            type="button"
-            onClick={() => { setDraft([]); setAdding(true); }}
-            aria-label={t("addItems")}
-            title={t("addItems")}
-            className="-mt-3 grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-          >
-            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-          </StateButton> : null}
         </div>
       )}
 
@@ -557,10 +561,10 @@ export function CineItemsEditor({
           dirty={draft.length > 0}
           busy={false}
           error={draftProblem === "author" ? t("authorRequired") : null}
-          onCancel={() => setAdding(false)}
+          onCancel={() => { setDraft([]); setDraftProblem(null); setAdding(false); }}
           submitDisabled={!draft.length || draftProblem !== null}
           submitLabel={t("addCount", { count: draft.length })}
-          onSubmit={() => { onChange([...value, ...draft]); setAdding(false); }}
+          onSubmit={() => { onChange([...value, ...draft]); setDraft([]); setDraftProblem(null); setAdding(false); }}
         >
           <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={value} onProblem={setDraftProblem} />
         </FormDialog>
@@ -580,7 +584,7 @@ export function CineItemsEditor({
 
       {editing ? (
         <Dialog title={editing.title || t("untitled")} onClose={() => setEditingKey(null)}>
-          <RowCards rows={[editing]} shared={shared} openByDefault onChange={(row) => onChange(value.map((candidate) => (candidate.key === row.key ? row : candidate)))} />
+          <RowCards rows={[editing]} shared={shared} openByDefault unboxed onChange={(row) => onChange(value.map((candidate) => (candidate.key === row.key ? row : candidate)))} />
           <ModalActions className="mt-4"><Button onClick={() => setEditingKey(null)}>{t("doneEditing")}</Button></ModalActions>
         </Dialog>
       ) : null}

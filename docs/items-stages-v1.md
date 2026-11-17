@@ -14,13 +14,15 @@
 - Save stage reordering and existing distribute/shuffle actions immediately. Keep these unavailable on closed challenges and automatically generated calendar stages.
 - Move the item-organising shortcut from General to the combined tab. Missing-item setup notices now point to the combined tab.
 - Use neutral inherited text for the “required” label in Entry fields.
-- Show ordinary primary fields under the generic “Sua resposta” / “Your response” label. Keep check-in details distinguishable when they contain fields; hide empty parent groups. These are display changes, without renaming stored types or fields.
+- Show all configured response fields together directly beneath the Entry fields title. Remove the extra “Sua resposta” / “Your response” heading and response-group tabs, including “Detalhes do check-in.” Keep shared fields identifiable with a field-level badge. Stored types, field IDs and existing answers are preserved.
 - Remove the separate add-shared-response button. The existing + field button opens one field modal with a shared/individual switch. New shared fields derive their internal response name from their question label; there is no second response-name prompt.
-- Keep response-name inputs out of the response settings opened from Entry fields; retain confirmed response removal where available. Existing response data and identifiers are preserved.
-- When adding an individual field while viewing shared fields, save it to the individual response. A failed field save preserves the modal draft.
-- Shared creation is available on supported once-per-item lists. Daily/multi-item check-ins show the switch disabled with an explanation. The API also rejects adding a once-per-item shared response to a multi-item daily session, preserving its existing fields.
+- Remove the response-group settings/edit control and its dialog from Entry fields. Individual field editing and its existing confirmed removal remain available.
+- Route each field edit and reorder to its original response type, even though all fields are visible together. New individual fields target the primary response. A failed field save preserves the modal draft.
+- Shared creation is offered only on supported once-per-item lists. Daily/multi-item check-ins omit the option and its unavailable-state explanation entirely. The API still rejects unsupported shared creation, preserving its existing fields.
 - Show the selected collection's actual count in the collapsed “Da coleção (89)” button when that collection contains items. Counts load from the existing scoped catalogue shelf endpoint and refer to that library, not every collection combined.
 - Update English, Portuguese and Spanish text.
+- Call the creation tab and field label “Resposta” / “Response” / “Respuesta” rather than “question or measure.”
+- A single-item creation edit modal shows its inputs directly, with no nested bordered item card. Input borders and the normal modal shell remain.
 
 ## Scope and compatibility
 
@@ -28,14 +30,15 @@ No migrations, field renaming, record conversion or changes to Results calculati
 
 ## Verification
 
-- Thirteen interaction tests cover modal stage saves and failures, preserved date instants, item assignment, adding directly into a stage, collection counts, item editing/details, generic response labels, sharing, failed field saves, and progress availability for missing/hidden/visible numeric library properties.
-- All 40 unit/component test files pass.
+- Interaction tests cover modal stage saves and failures, preserved date instants, item assignment, collection counts, item editing/details, one combined response list, editing fields without changing their owners, shared-field routing, failed saves, generic daily-answer modal titles, and progress availability.
+- All 357 unit/component tests and both production-render checks pass. TypeScript and the production Docker build pass; lint has no errors and retains the existing image-element warning.
 - Full isolated API suite: 168 tests pass. The added regression verifies item addition, stage assignment, property editing and saved-answer preservation, plus unsupported daily sharing rejection.
 - TypeScript, lint for changed files and the production Docker build pass.
 - Browser review on an existing local challenge verified the combined tab, expanded stage items, stage modal, generic response label, new-field sharing switch, and a real collection count. No challenge or record was saved during this review.
 
 ## Follow-up polish
 
+- Use “Respostas de hoje” / “Today’s answers,” dated answer titles and generic saved-entry labels in multi-item logging. Do not use stored workout/session names as UI headings, buttons or accessible names. Keep multiple logs on the same date supported.
 - Remove decorative left borders from all response-form sections, including expectation and rating.
 - Hide the supplementary Progress control when no eligible visible numeric library property exists, including while the properties load. Available progress remains off until explicitly enabled.
 - Reject unsupported activation on the server, including legacy boolean requests and hidden native book-page properties. Existing stored fields/answers are preserved.

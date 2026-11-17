@@ -5,7 +5,8 @@ import {JSDOM} from "jsdom";
 import {CheckpointPlanner} from "../app/goa/checkpoint-planner";
 import {Toaster} from "../app/goa/ui";
 import {AdminScreen} from "../app/goa/screens/admin";
-import type {ChallengeDetail, ChallengeItemInput, CheckpointInput} from "../app/goa/types";
+import {SessionLog, sessionSpecOf} from "../app/goa/session-log";
+import type {ChallengeDetail, ChallengeField, ChallengeItemInput, CheckpointInput} from "../app/goa/types";
 import {withIntl} from "./helpers/intl";
 const library = {id: "lib", kind: "custom_test", label: "Things", source: "custom"};
 const field = {id: "answer", key: "answer", label: "Amount", type: "number", required: true};
@@ -122,11 +123,11 @@ test('closed challenges retain readable item details and expose no editing contr
  } finally {await ui.cleanup();}
 });
 
-test('fields use Your response and a neutral required label without a response-name prompt', async () => {
+test('fields have a neutral required label without redundant headings or a response-name prompt', async () => {
  const ui = await setup();
  try {
   await ui.render(<AdminScreen {...adminProps()} />);
-  assert.match(document.body.textContent!, /Sua resposta/);
+  assert.equal(document.querySelector('h2'),null);
   assert.doesNotMatch(document.body.textContent!, /Unnecessary name|＋ Resposta compartilhada/);
   const required = [...document.querySelectorAll('span')].find((span) => span.textContent === '· obrigatório')!;
   assert.equal(required.className, '');
@@ -150,27 +151,82 @@ test('the add-field modal creates a shared field without a second response name'
  } finally {await ui.cleanup();}
 });
 
-test('adding an individual field while viewing shared fields targets the individual response', async () => {
+test('individual and shared fields stay visible together and new individual fields target the primary response', async () => {
  const ui = await setup(); const saved: unknown[][] = [];
- const value = {...challenge,entryTypes:[...challenge.entryTypes,{id:'shared',name:'Shared verdict',answerScope:'shared',submissionMode:'item',fields:[{...field,id:'shared-field'}]}]} as ChallengeDetail;
+ const value = {...challenge,entryTypes:[...challenge.entryTypes,{id:'shared',name:'Unnecessary shared title',answerScope:'shared',submissionMode:'item',fields:[{...field,id:'shared-field',label:'Shared verdict'}]}]} as ChallengeDetail;
  try {
   await ui.render(<AdminScreen {...adminProps({challenge:value,onSaveFields:async (...args) => {saved.push(args);}})} />);
-  const sharedTab = [...document.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].find((button) => button.textContent!.includes('Shared verdict'))!;
-  await act(async () => sharedTab.click()); await act(async () => ui.button('Adicionar campo').click());
+  assert.match(document.body.textContent!,/Amount/);
+  assert.match(document.body.textContent!,/Shared verdict/);
+  assert.doesNotMatch(document.body.textContent!,/Unnecessary shared title/);
+  assert.equal(document.querySelector('button[aria-pressed]'),null);
+  await act(async () => ui.button('Ajustes de Shared verdict').click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="100"]')!,'Group verdict');
+  await act(async () => ui.button('Salvar').click());
+  assert.equal(saved[0][0],'shared');
+  assert.equal((saved[0][1] as ChallengeField[])[0].id,'shared-field');
+  await act(async () => ui.button('Adicionar campo').click());
   await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="100"]')!,'Individual note');
   await act(async () => ui.button('Adicionar campo').click());
-  assert.equal(saved[0][0],'response'); assert.equal((saved[0][1] as unknown[]).length,2);
+  assert.equal(saved[1][0],'response'); assert.equal((saved[1][1] as unknown[]).length,2);
  } finally {await ui.cleanup();}
 });
 
-test('workout field creation keeps sharing unavailable and failed saves preserve the draft', async () => {
+test('one response list keeps all four fields visible and edits preserve their original owners', async () => {
+ const ui = await setup(); const saved: [string, ChallengeField[]][] = [];
+ const workoutFields = [field,{...field,id:'reps',key:'reps',label:'Reps'},{...field,id:'sets',key:'sets',label:'Sets'}];
+ const value = {...challenge,fields:workoutFields,entryTypes:[
+  {id:'day',name:'Treino',purpose:'checkin',submissionMode:'daily',fields:[{id:'note',key:'note',label:'Como foi?',type:'text',required:false}]},
+  {...challenge.entryTypes[0],name:'Desempenho',parentTypeId:'day',fields:workoutFields},
+ ]} as ChallengeDetail;
+ try {
+  await ui.render(<AdminScreen {...adminProps({challenge:value,onSaveFields:async (id,fields) => {saved.push([id,fields]);}})} />);
+  assert.deepEqual([...document.querySelectorAll('section ul li strong')].map((el) => el.textContent),['Amount','Reps','Sets','Como foi?']);
+  assert.equal(document.querySelector('h2'),null);
+  assert.doesNotMatch(document.body.textContent!,/Treino|Desempenho|Detalhes do check-in/);
+  assert.equal(document.querySelector('button[aria-label="Ajustes do registro"]'),null);
+  await act(async () => ui.button('Ajustes de Como foi?').click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="100"]')!,'Reflexão');
+  await act(async () => ui.button('Salvar').click());
+  assert.equal(saved[0][0],'day');
+  assert.deepEqual(saved[0][1].map((field) => field.id),['note']);
+  await act(async () => ui.button('Ajustes de Amount').click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="100"]')!,'Weight');
+  await act(async () => ui.button('Salvar').click());
+  assert.equal(saved[1][0],'response');
+  assert.deepEqual(saved[1][1].map((field) => field.id),['answer','reps','sets']);
+  assert.match(document.body.textContent!,/Weight/);
+  assert.match(document.body.textContent!,/Reflexão/);
+  assert.deepEqual(value.entryTypes[1].fields,workoutFields,'the challenge input is not mutated');
+ } finally {await ui.cleanup();}
+});
+
+test('the multi-item log uses today’s answers for its title instead of a custom session name', async () => {
+ const ui = await setup(); let saves = 0;
+ const value = {...challenge,entryTypes:[
+  {id:'day',name:'Custom workout title',purpose:'checkin',fields:[]},
+  {...challenge.entryTypes[0],name:'Exercise records',parentTypeId:'day'},
+ ]} as ChallengeDetail;
+ try {
+  await ui.render(<SessionLog challenge={value} spec={sessionSpecOf(value)!} entries={[]} userId="me" canEdit onSave={async () => {saves++;return {id:'unused',children:[]};}} />);
+  await act(async () => ui.button('＋ Registrar as respostas de hoje').click());
+  const dialog = document.querySelector('[role="dialog"]')!;
+  assert.equal(dialog.querySelector('h2')!.textContent,'Respostas de hoje');
+  assert.doesNotMatch(dialog.textContent!,/Custom workout title|Exercise records/);
+  assert.equal(saves,0);
+  await act(async () => ui.button('Pronto').click());
+  assert.equal(document.querySelector('[role="dialog"]'),null);
+ } finally {await ui.cleanup();}
+});
+
+test('workout field creation hides unavailable sharing and failed saves preserve the draft', async () => {
  const ui = await setup();
  const value = {...challenge,entryTypes:[{...challenge.entryTypes[0],parentTypeId:'day'}]} as ChallengeDetail;
  try {
   await ui.render(<AdminScreen {...adminProps({challenge:value,onSaveFields:async () => {throw new Error('Field save failed');}})} />);
   await act(async () => ui.button('Adicionar campo').click());
-  const toggle = document.querySelector<HTMLButtonElement>('dialog button[role="switch"][aria-label="Campo compartilhado"]')!;
-  assert.equal(toggle.disabled,true);
+  assert.equal(document.querySelector('dialog button[role="switch"][aria-label="Campo compartilhado"]'),null);
+  assert.doesNotMatch(document.querySelector('dialog')!.textContent!,/Campo compartilhado|listas respondidas uma vez por item|Check-ins diários mantêm/);
   await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="100"]')!,'Keep this field');
   await act(async () => ui.button('Adicionar campo').click());
   assert.match(document.body.textContent!,/Field save failed/);

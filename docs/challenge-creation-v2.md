@@ -21,7 +21,7 @@ Repetition applies to the whole challenge. Questions do not individually switch 
 6. Replace user-facing sheet/column language with challenge, items, and questions/measures. Keep a neutral optional text field, “Your response,” as the starting editable question.
 7. Remove the table-header preview entirely.
 8. Restore the “New personal challenge” page heading. Replace the old preset-oriented subtitle with an explanation of List / Daily check-in.
-9. Reorder manual creation: Challenge → Items (when using a library) → Questions and measures → Participants (group challenges).
+9. Reorder manual creation: Challenge → Items (when using a library) → Response → Participants (group challenges).
 10. Give the guided creator the same order after choosing personal/group: name, mode/library and optional deadline together; items when applicable; questions/measures; create.
 11. Add optional start/end dates to the guided creator. Previously this version always submitted no deadline. Both creators now say “With a deadline / No deadline” so this choice is distinct from daily recording.
 12. Explain the questions at their point of configuration: once per item, again each day, or per selected item in each check-in.
@@ -39,6 +39,10 @@ Repetition applies to the whole challenge. Questions do not individually switch 
 There are no new schema changes, migrations or edits to existing challenge definitions/records in this revision. A list still uses the existing once-per-item path. A daily check-in without a library uses the existing daily path (one entry per participant/date). A daily check-in with a library uses the existing parent/child record path, which already supports several selected items and multiple activities on the same date. Creation does not add a session-name prompt or an automatic day-level comment.
 
 The two opt-in API metadata options introduced in version 1 remain in use. Results calculations, targets, working-set controls, the logging form and calendar behavior are unchanged by this revision. Library item properties and challenge response questions remain separate. Existing library validation still applies. Stage date visibility is an editor rule; historical/API records are not rewritten.
+
+Older reading presets (`library` and `progress`) created two response types automatically: daily progress plus a separate completion/rating response. Renaming both to “Your response” did not combine them. Fresh custom creation uses the configured questions together; a multi-item daily check-in adds only an empty internal date container. Older progress drafts retain their original recipe for compatibility, and existing daily history and once-only ratings are not converted by these interface changes. Entry fields shows the configured fields together directly, with no additional response heading.
+
+The Items step uses one round + at the far right of its heading, before and after items are added. Each item uses the standard sliders edit icon beside the remove icon, with equal button and glyph sizes. The guided creator uses the same item controls. Opening Add again starts an empty selection rather than reusing the previously submitted draft.
 
 ## Verification
 

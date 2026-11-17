@@ -46,7 +46,7 @@ test("Done during a pending workout save reuses the returned workout and exercis
       return calls.length === 1 ? first : { id: "saved-visit", children: [{ id: "saved-record", itemId: "bench", values: {} }] };
     };
     await act(async () => ui.root.render(withIntl(<SessionLog challenge={workout} spec={sessionSpecOf(workout)!} entries={[]} userId="me" canEdit onSave={onSave} />)));
-    await act(async () => ui.button("＋ Registrar o treino de hoje").click());
+    await act(async () => ui.button("＋ Registrar as respostas de hoje").click());
     await act(async () => ui.button("Bench+").click());
     await act(async () => ui.button("Mais Weight").click());
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 950)); });

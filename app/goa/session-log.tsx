@@ -552,7 +552,7 @@ export function SessionLog({
                       <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10.4l3.200 3.200L15 6.800" /></svg>
                     </span>
                     <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { name: spec.visit.name, number: index + 1 }) : spec.visit.name}</strong>
+                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { number: index + 1 }) : t("answers")}</strong>
                       <span className="block text-xs text-[var(--muted)]">{t("visitCount", { count: records.length })}</span>
                     </span>
                   </span>
@@ -570,7 +570,7 @@ export function SessionLog({
               );
               const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 text-left";
               return canEdit ? (
-                <StateButton key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit", { name: spec.visit.name })} className={cx(shell, "cursor-pointer transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
+                <StateButton key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit")} className={cx(shell, "cursor-pointer transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
                   {body}
                 </StateButton>
               ) : (
@@ -584,7 +584,7 @@ export function SessionLog({
             ) : null}
             {canEdit ? (
               <Button className="w-full rounded-full" onClick={() => openSheet(null)}>
-                ＋ {dayVisits.length ? t("newVisitOnDay", { name: spec.visit.name.toLowerCase() }) : day === today ? t("logToday", { name: spec.visit.name.toLowerCase() }) : t("logOnDay", { name: spec.visit.name.toLowerCase(), date: f.date(day, { day: "numeric", month: "short" }) })}
+                ＋ {dayVisits.length ? t("newVisitOnDay") : day === today ? t("logToday") : t("logOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })}
               </Button>
             ) : unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
           </div>
@@ -592,7 +592,7 @@ export function SessionLog({
       </section>
 
       {sheetOpen ? (
-        <BottomSheet tall title={day === today ? t("sheetToday", { name: spec.visit.name }) : t("sheetOnDay", { name: spec.visit.name, date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
+        <BottomSheet tall title={day === today ? t("sheetToday") : t("sheetOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
           {/* One even rhythm: status, today's items, the rest to pick from, the check-in's own fields. */}
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-3">

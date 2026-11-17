@@ -16,7 +16,7 @@ function editor(types: Partial<EntryTypeView>[]) {
   return new JSDOM(renderWithIntl(createElement(AdminScreen, props)));
 }
 
-test("Entry fields shows workout properties rather than replacing them with the day comment", () => {
+test("Entry fields shows all workout and day fields together without a redundant response heading", () => {
   const dom = editor([
     { id: "day", name: "Treino", purpose: "checkin", fields: [{ id: "note", key: "note", label: "Como foi?", type: "text", required: false }] },
     { id: "exercise", name: "Desempenho", semanticKey: "desempenho", purpose: "progress", parentTypeId: "day", isPrimary: true,
@@ -26,8 +26,11 @@ test("Entry fields shows workout properties rather than replacing them with the 
     const doc = dom.window.document;
     assert.match(doc.body.textContent!, /Carga/);
     assert.match(doc.body.textContent!, /Repetições — Série 1/);
-    assert.doesNotMatch(doc.body.textContent!, /Como foi\?/);
-    assert.equal(doc.querySelector('button[aria-pressed="true"]')?.textContent, "Sua resposta");
+    assert.match(doc.body.textContent!, /Como foi\?/);
+    assert.equal(doc.querySelector('h2'), null);
+    assert.equal(doc.querySelector('button[aria-pressed]'), null, "no response group tabs");
+    assert.doesNotMatch(doc.body.textContent!, /Treino|Desempenho|Detalhes do check-in|Configurações da resposta/);
+    assert.equal(doc.querySelector('button[aria-label="Ajustes do registro"]'), null);
     assert.equal(doc.querySelector('button[role="switch"][aria-label="Progresso"]'), null, "workout performance is not a completion goal");
   } finally { dom.window.close(); }
 });

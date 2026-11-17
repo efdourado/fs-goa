@@ -199,7 +199,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
           <div>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-light">{ts("itemsStep")}</h2>
-              {!cineItems.length && itemLibraries.length ? (
+              {itemLibraries.length ? (
                 <StateButton
                   type="button"
                   onClick={() => setItemsAdding(true)}
@@ -224,7 +224,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
                 onProblem={setItemProblem}
                 addDialogOpen={itemsAdding}
                 onAddDialogOpenChange={setItemsAdding}
-                showEmptyAddButton={false}
+                showAddButton={false}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
           </div>

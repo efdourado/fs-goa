@@ -10,7 +10,7 @@ import { AdminMetrics } from "../admin-metrics";
 import { CheckpointPlanner, type ChallengeItemTools } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { ConfirmDialog, FormDialog } from "../dialog";
-import { ResponseSettingsDialog, SharedGlyph } from "../shared-responses";
+import { SharedGlyph } from "../shared-responses";
 import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, FieldConfigInputs, newFieldConfig, uniqueFieldKey, useFieldTypeOptions } from "../fields";
 import { type CatalogScope } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
@@ -288,20 +288,16 @@ const rowIconClass = "grid h-8 w-8 flex-none cursor-pointer place-items-center t
 function AdminFields({
   challenge,
   onSave,
-  onRenameType,
   onSetExpectation,
   onSetTracking,
   onAddShared,
-  onRemoveType,
 }: {
   challenge: ChallengeDetail;
   /** `deleteAnswers`: a removed field that already has answers takes them with it (asked for first). */
   onSave: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
-  onRenameType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetTracking: (propertyKey: string | false) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
-  onRemoveType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
 }) {
   const tCount = useTranslations("countSettings");
   // What a count on these items can run up to: their library's number properties (a book's pages, a route's distance).
@@ -333,37 +329,30 @@ function AdminFields({
   const types = ownTypes.length
     ? ownTypes
     : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
-  const [selectedTypeId, setSelectedTypeId] = useState(
-    types.find((type) => type.isPrimary)?.id ?? types[0]?.id ?? "",
+  const defaultType = types.find((type) => type.isPrimary) ?? types[0];
+  const orderedTypes = [defaultType, ...types.filter((type) => type.id !== defaultType.id)];
+  // One visible response; keep each field's original owner for saves and existing answers.
+  const [fieldsByType, setFieldsByType] = useState<Record<Id, ChallengeField[]>>(
+    () => Object.fromEntries(types.map((type) => [type.id, type.fields])),
   );
-  const activeType = types.find((type) => type.id === selectedTypeId) ?? types[0];
-  const [fields, setFields] = useState(activeType?.fields ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [editing, setEditing] = useState<ChallengeField | "new" | null>(null);
-  const [managingType, setManagingType] = useState(false);
+  const [editing, setEditing] = useState<{ typeId: Id; field: ChallengeField | "new" } | null>(null);
+  const activeType = types.find((type) => type.id === editing?.typeId) ?? defaultType;
+  const fields = fieldsByType[activeType.id] ?? activeType.fields;
+  const fieldRows = orderedTypes.flatMap((type) => (fieldsByType[type.id] ?? type.fields).map((field, index) => ({type, field, index})));
   const locked = challenge.status === "closed";
-  const otherResponseCount = types.filter((type) => type.id !== activeType?.id && type.purpose !== "expectation").length;
-  const removable = otherResponseCount > 0 && activeType?.purpose !== "expectation";
   const canAddShared = challenge.submissionMode === "item" && !locked && !challenge.entryTypes.some((type) => type.parentTypeId) && types.some((type) => !type.parentTypeId && type.submissionMode === "item");
 
-  function pickType(id: Id) {
-    setSelectedTypeId(id);
-    const type = types.find((candidate) => candidate.id === id);
-    setFields(type?.fields ?? []);
-    setError(null);
-    setSuccess(null);
-  }
-
-  async function commit(next: ChallengeField[], message: string, deleteAnswers = false, propagate = false) {
+  async function commit(typeId: Id, next: ChallengeField[], message: string, deleteAnswers = false, propagate = false) {
     setBusy(true);
     setError(null);
     setSuccess(null);
     try {
-      await onSave(selectedTypeId, cleanFields(next), deleteAnswers);
-      setFields(next);
+      await onSave(typeId, cleanFields(next), deleteAnswers);
+      setFieldsByType((current) => ({ ...current, [typeId]: next }));
       setSuccess(message);
     } catch (cause) {
       // Removing is confirmed in the field's own modal, which shows the error itself.
@@ -374,12 +363,13 @@ function AdminFields({
     }
   }
 
-  function move(index: number, delta: number) {
+  function move(typeId: Id, index: number, delta: number) {
+    const fields = fieldsByType[typeId] ?? [];
     const target = index + delta;
     if (target < 0 || target >= fields.length) return;
     const next = [...fields];
     [next[index], next[target]] = [next[target], next[index]];
-    void commit(next, t("fieldsSaved"));
+    void commit(typeId, next, t("fieldsSaved"));
   }
 
   return (
@@ -390,7 +380,7 @@ function AdminFields({
         {!locked ? (
           <StateButton
             type="button"
-            onClick={() => { setError(null); setEditing("new"); }}
+            onClick={() => { setError(null); setEditing({typeId: defaultType.id, field: "new"}); }}
             aria-label={t("addField")}
             title={t("addField")}
             className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
@@ -399,56 +389,28 @@ function AdminFields({
           </StateButton>
         ) : null}
       </div>
-      {types.length > 1 || canAddShared || activeType?.id ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
-          {types.map((type) => {
-            const active = type.id === selectedTypeId;
-            return (
-              <StateButton
-                key={type.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => pickType(type.id)}
-                className={cx(
-                  "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-                  active ? "border-[var(--main)] bg-[var(--main)] font-medium text-white" : "border-[var(--line)] hover:border-[var(--main-line)]",
-                )}
-              >
-                {type.answerScope === "shared" ? <SharedGlyph /> : null}
-                {type.answerScope === "shared" || type.purpose === "expectation" ? type.name : type.id === types.find((candidate) => candidate.isPrimary)?.id || types.length === 1 ? t("yourResponse") : type.purpose === "checkin" ? t("checkinDetails") : t("yourResponse")}
-                {type.answerScope === "shared" ? <span className={cx("rounded-full px-2 py-0.5 text-[10px] font-medium", active ? "bg-white/20" : "bg-[var(--main)]/10")}>{tSr("badge")}</span> : null}
-              </StateButton>
-            );
-          })}
-          {/* The picked response's own settings (its name, removing it): at the end of the row that picks it. */}
-          {activeType?.id && !locked && removable ? (
-            <StateButton type="button" aria-label={t("responseSettings")} title={t("responseSettings")} onClick={() => { setError(null); setManagingType(true); }} className={cx(rowIconClass, "ml-auto")}>
-              <SlidersIcon className="h-4 w-4" />
-            </StateButton>
-          ) : null}
-        </div>
-      ) : null}
       <div className="mb-4"><StatusMessage error={error} success={success} /></div>
-      {fields.length ? (
+      {fieldRows.length ? (
         <ul className="divide-y divide-[var(--line)] border-t border-[var(--line)]">
-          {fields.map((field, index) => (
-            <li className="flex items-center gap-3 py-3.5" key={field.id ?? field.key}>
+          {fieldRows.map(({type, field, index}) => (
+            <li className="flex items-center gap-3 py-3.5" key={`${type.id}:${field.id ?? field.key}`}>
               <div className="min-w-0 flex-1">
                 <strong className="block text-[15px] font-medium">{field.label}</strong>
                 <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
                   {tf(`type.${field.type}`)}
                   {field.required ? <span>· {t("fieldRequiredShort")}</span> : null}
+                  {type.answerScope === "shared" ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--main)]/10 px-2 py-0.5"><SharedGlyph />{tSr("badge")}</span> : null}
                 </span>
               </div>
               {!locked ? (
                 <div className="flex flex-none items-center gap-0.5">
-                  <StateButton type="button" className={rowIconClass} disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label={tf("moveUp")}>
+                  <StateButton type="button" className={rowIconClass} disabled={index === 0 || busy} onClick={() => move(type.id, index, -1)} aria-label={tf("moveUp")}>
                     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 10l4-4 4 4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </StateButton>
-                  <StateButton type="button" className={rowIconClass} disabled={index === fields.length - 1 || busy} onClick={() => move(index, 1)} aria-label={tf("moveDown")}>
+                  <StateButton type="button" className={rowIconClass} disabled={index === (fieldsByType[type.id] ?? type.fields).length - 1 || busy} onClick={() => move(type.id, index, 1)} aria-label={tf("moveDown")}>
                     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </StateButton>
-                  <StateButton type="button" aria-label={t("fieldSettings", { label: field.label })} title={t("edit")} onClick={() => { setError(null); setEditing(field); }} className={rowIconClass}>
+                  <StateButton type="button" aria-label={t("fieldSettings", { label: field.label })} title={t("edit")} onClick={() => { setError(null); setEditing({typeId: type.id, field}); }} className={rowIconClass}>
                     <SlidersIcon className="h-4 w-4" />
                   </StateButton>
                 </div>
@@ -458,47 +420,37 @@ function AdminFields({
         </ul>
       ) : locked
         ? <EmptyState title={t("fieldsEmptyTitle")} />
-        : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing("new"); }} />}
+        : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing({typeId: defaultType.id, field: "new"}); }} />}
 
       {editing ? (
         <FieldEditorDialog
-          field={editing === "new" ? undefined : editing}
-          sharedChoice={editing === "new" ? {available: canAddShared, defaultShared: !types.some((type) => type.answerScope !== "shared" && type.purpose !== "expectation")} : undefined}
-          takenKeys={fields.filter((candidate) => candidate !== editing).map((candidate) => candidate.key)}
-          lockType={challenge.status !== "draft" && editing !== "new" && Boolean(editing.id)}
+          field={editing.field === "new" ? undefined : editing.field}
+          sharedChoice={editing.field === "new" ? {available: canAddShared, defaultShared: !types.some((type) => type.answerScope !== "shared" && type.purpose !== "expectation")} : undefined}
+          takenKeys={fields.filter((candidate) => candidate !== editing.field).map((candidate) => candidate.key)}
+          lockType={challenge.status !== "draft" && editing.field !== "new" && Boolean(editing.field.id)}
           countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { goals: countGoals } : undefined}
           onCancel={() => setEditing(null)}
-          onRemove={editing === "new" || fields.length < 2 ? undefined : async () => {
-            await commit(fields.filter((candidate) => candidate !== editing), t("fieldsSaved"), true);
+          onRemove={editing.field === "new" || fields.length < 2 ? undefined : async () => {
+            await commit(activeType.id, fields.filter((candidate) => candidate !== editing.field), t("fieldsSaved"), true);
             setEditing(null);
           }}
           onSave={async (built, shared) => {
-            if (editing === "new" && shared) {
+            if (editing.field === "new" && shared) {
               await onAddShared({name: built.label, sharedEditPolicy: "members_fill_admin_corrects", field: built});
               setEditing(null); return;
             }
-            if (editing === "new" && activeType?.answerScope === "shared") {
+            if (editing.field === "new" && activeType?.answerScope === "shared") {
               const individual = types.find((type) => type.isPrimary && type.answerScope !== "shared") ?? types.find((type) => type.answerScope !== "shared" && type.purpose !== "expectation");
               if (!individual) throw new Error(t("noIndividualResponse"));
-              await onSave(individual.id, cleanFields([...individual.fields, built]));
-              pickType(individual.id); setEditing(null); return;
+              await commit(individual.id, [...(fieldsByType[individual.id] ?? individual.fields), built], t("fieldAdded"), false, true);
+              setEditing(null); return;
             }
-            const next = editing === "new"
+            const next = editing.field === "new"
               ? [...fields, built]
-              : fields.map((candidate) => candidate === editing ? { ...candidate, ...built } : candidate);
-            await commit(next, editing === "new" ? t("fieldAdded") : t("fieldsSaved"), false, true);
+              : fields.map((candidate) => candidate === editing.field ? { ...candidate, ...built } : candidate);
+            await commit(activeType.id, next, editing.field === "new" ? t("fieldAdded") : t("fieldsSaved"), false, true);
             setEditing(null);
           }}
-        />
-      ) : null}
-
-      {managingType && activeType ? (
-        <ResponseSettingsDialog
-          type={activeType}
-          hideName
-          onCancel={() => setManagingType(false)}
-          onRename={async (name) => { await onRenameType(activeType.id, name); setManagingType(false); setSuccess(t("fieldsSaved")); }}
-          onRemove={removable ? async (confirmed) => { await onRemoveType(activeType.id, confirmed); setManagingType(false); } : undefined}
         />
       ) : null}
 
@@ -616,7 +568,7 @@ export function FieldEditorDialog({
   const f = useGoaFormat();
   const initial = field ?? { key: "", label: "", type: "text" as const, required: true, config: newFieldConfig("text") };
   const [draft, setDraft] = useState<ChallengeField>(initial);
-  const [shared, setShared] = useState(sharedChoice?.defaultShared ?? false);
+  const [shared, setShared] = useState(Boolean(sharedChoice?.available && sharedChoice.defaultShared));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -628,7 +580,7 @@ export function FieldEditorDialog({
     setBusy(true);
     setError(null);
     try {
-      await onSave({ ...draft, label, key: draft.key || uniqueFieldKey(label, takenKeys) }, shared);
+      await onSave({ ...draft, label, key: draft.key || uniqueFieldKey(label, takenKeys) }, Boolean(sharedChoice?.available && shared));
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
 
@@ -644,7 +596,7 @@ export function FieldEditorDialog({
       submitDisabled={!draft.label.trim()}
       onDelete={onRemove ? { body: t("fieldDeleteBody"), onConfirm: onRemove } : undefined}
     >
-      {sharedChoice ? <Toggle checked={shared} disabled={!sharedChoice.available} onChange={setShared} label={t("sharedField")} hint={t(sharedChoice.available ? "sharedFieldHint" : "sharedFieldUnavailable")} /> : null}
+      {sharedChoice?.available ? <Toggle checked={shared} onChange={setShared} label={t("sharedField")} hint={t("sharedFieldHint")} /> : null}
       <Field label={tf("labelLabel")}>
         <input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} />
       </Field>
@@ -819,11 +771,9 @@ export function AdminScreen({
   onDelete,
   onSaveParticipants,
   onSaveFields,
-  onRenameEntryType,
   onSetExpectation,
   onSetPageCount,
   onAddSharedResponse,
-  onRemoveEntryType,
   onSaveCheckpoints,
   onAssignCheckpointItems,
   itemTools,
@@ -930,7 +880,7 @@ export function AdminScreen({
 
           </>
         ) : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetTracking={onSetPageCount} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSetExpectation={onSetExpectation} onSetTracking={onSetPageCount} onAddShared={onAddSharedResponse} /> : null}
         {activeTab === "checkpoints" ? <><CheckpointPlanner challenge={challenge} entries={entries} itemTools={itemTools} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /><div className="mx-auto max-w-2xl"><AdminItemsSection challenge={challenge} entries={entries} onReorder={onAssignCheckpointItems} /></div></> : null}
         {activeTab === "results" ? <AdminMetrics challenge={challenge} entries={entries} onSaveSettings={onSaveBasics} onSaveMetric={onSaveMetric} onDeleteMetric={onDeleteMetric} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
