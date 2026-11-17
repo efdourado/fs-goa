@@ -352,7 +352,7 @@ export function GroupScreen({
           <form onSubmit={inviteMember} className="mt-6">
             <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
               <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
-              <StateButton type="submit" disabled={memberBusy} aria-label={t("sendInvite")} title={t("sendInvite")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:opacity-55">
+              <StateButton readiness type="submit" disabled={memberBusy} aria-label={t("sendInvite")} title={t("sendInvite")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:opacity-55">
                 <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
               </StateButton>
             </div>

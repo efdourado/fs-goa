@@ -120,7 +120,7 @@ Recommendation: offer several items as a Daily log choice in the creation UI, wh
 
 - [ ] Decide inline form versus current modal after Step 3's flow is clear; do not recover the inline editor automatically.
 - [ ] Agree on what autosaves and what Done means; show the state plainly.
-- [x] Apply closed/open lock icons to blocked actions, including Save, with opaque grey disabled backgrounds. Existing validation and deletion behavior are preserved; see [button states](button-states.md).
+- [x] Apply closed/open lock icons to primary confirmation actions (Save, Done, Continue) with opaque grey disabled backgrounds. Edit, minimise and other ordinary controls keep their original icons and colours. Existing validation and deletion behavior are preserved; see [button states](button-states.md).
 - [ ] Keep saved/locked and editing states consistent; test failed saves and reopening the existing record.
 - [ ] If inline is chosen, place Delete left of Done and let the pair fill the row; remove redundant session headings.
 - [ ] Define fixed set fields versus repeated set records. Do not add “another record” to ordinary workout forms by default.

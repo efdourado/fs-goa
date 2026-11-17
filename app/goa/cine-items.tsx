@@ -372,7 +372,7 @@ export function ItemsAddBox({
             aria-label={t("typeLabel")}
             maxLength={160}
           />
-          <StateButton type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
+          <StateButton readiness type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
           </StateButton>
         </div>

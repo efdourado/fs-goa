@@ -1,6 +1,6 @@
 "use client";
 
-import { StateButton, StateFieldset } from "./state-button";
+import { StateButton } from "./state-button";
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -93,7 +93,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
     <StatusMessage error={error} success={success} />
     {closed ? <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{ta("metricsClosedNote")}</p> : null}
     <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <StateFieldset disabled={busy} className="min-w-0 space-y-4">
+      <fieldset disabled={busy} className="min-w-0 space-y-4">
         <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
           <div className="mb-3 flex items-center gap-3 border-b border-[var(--line)] pb-4">
             <Toggle bare disabled={closed} checked={!hidden.includes("thread")} onChange={(value) => show("thread", value)} ariaLabel={t("showPage", { title: t("thread") })} />
@@ -125,9 +125,9 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
           </ol>
           {!closed ? <AddRow label={ta("addMetric")} ariaLabel={ta("addMetric")} onClick={() => setEditing("new")} /> : null}
         </section>
-        <StateFieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></StateFieldset>
+        <fieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></fieldset>
         <Button type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</Button>
-      </StateFieldset>
+      </fieldset>
     </form>
     {preview ? <Dialog title={preview === "thread" ? t("thread") : rows.find((row) => row.id === preview)?.title ?? t("preview")} wide onClose={() => setPreview(null)}>
       <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{previewMetric ? t("metricExplanation", { operation: tm(`operationName.${previewMetric.operation}`), group: tm(`groupBy.${previewMetric.groupBy ?? "none"}`) }) : t(`pages.${preview === "thread" ? "thread" : preview}.description`)}</p>

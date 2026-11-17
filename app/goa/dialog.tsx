@@ -1,6 +1,6 @@
 "use client";
 
-import { StateButton, StateFieldset } from "./state-button";
+import { StateButton } from "./state-button";
 
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -116,7 +116,7 @@ export function FormDialog({
         </div>
       ) : null}
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
-        <StateFieldset disabled={busy} className="min-w-0 space-y-5">{children}</StateFieldset>
+        <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
         <ModalActions className="border-t border-[var(--line)] pt-4">
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}

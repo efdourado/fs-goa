@@ -1,6 +1,6 @@
 "use client";
 
-import { StateButton, StateFieldset } from "../state-button";
+import { StateButton } from "../state-button";
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
@@ -179,7 +179,7 @@ function AdminGeneral({
       <PageHeading title={t("basicsTitle")} />
       {lead ? <div className="mb-4">{lead}</div> : null}
       <form onSubmit={save}>
-        <StateFieldset disabled={locked} className="min-w-0 space-y-4">
+        <fieldset disabled={locked} className="min-w-0 space-y-4">
           {/* What the challenge is called and what it asks, in one box. */}
           <BoxSection title={t("titleLabel")}>
             <div className="space-y-5">
@@ -234,7 +234,7 @@ function AdminGeneral({
               </>
             )}
           </BoxSection>
-        </StateFieldset>
+        </fieldset>
 
         {!isPersonal ? (
           <div className="mt-4">

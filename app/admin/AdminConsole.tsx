@@ -111,7 +111,7 @@ function Button({
       )}
       type="button"
       tone={variant}
-      readiness={disabled !== undefined}
+      readiness={variant === "primary"}
       onClick={onClick}
       disabled={disabled}
     >

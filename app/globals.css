@@ -417,7 +417,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   height:24px;
 }
 
-/* Action readiness is shared by native buttons, including disabled fieldsets. */
+/* Primary confirmation actions share readiness; editing/navigation keep their own styling. */
 :root { --button-blocked-bg: #e5e7eb; --button-blocked-ink: #52525b; --button-blocked-line: #d4d4d8; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --button-blocked-bg: #35373b; --button-blocked-ink: #d4d4d8; --button-blocked-line: #52525b; }
@@ -425,15 +425,11 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] { --button-blocked-bg: #35373b; --button-blocked-ink: #d4d4d8; --button-blocked-line: #52525b; }
 .goa-button-content { display: contents; }
 .goa-readiness-marker { display: none; flex: none; }
-.goa-state-button[data-readiness="true"]:not([data-choice="true"]) > .goa-readiness-marker,
-.goa-state-button:disabled > .goa-readiness-marker { display: inline-flex; vertical-align: middle; margin-inline-start: .4rem; }
+.goa-state-button[data-readiness="true"] > .goa-readiness-marker { display: inline-flex; vertical-align: middle; margin-inline-start: .4rem; }
 .goa-lock-closed { display: none; }
 .goa-state-button:disabled .goa-lock-closed { display: initial; }
 .goa-state-button:disabled .goa-lock-open { display: none; }
-.goa-state-button[data-readiness="true"]:not([data-choice="true"]):not([data-button-tone="danger"]):not([data-button-tone="secondary"]):not([data-button-tone="ghost"]):enabled {
-  background: var(--main); color: white; border-color: transparent;
-}
-button:disabled {
+.goa-state-button[data-readiness="true"]:disabled {
   background: var(--button-blocked-bg) !important;
   color: var(--button-blocked-ink) !important;
   border-color: var(--button-blocked-line) !important;
