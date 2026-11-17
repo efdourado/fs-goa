@@ -30,7 +30,7 @@ import type {
   Member,
   SharedEditPolicy,
 } from "../types";
-import {
+import { SaveButton,
   BackButton,
   BoxSection,
   Button,
@@ -270,7 +270,7 @@ function AdminGeneral({
           {locked ? null : (
             <div className="space-y-2">
               <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : null}</span>
-              <Button type="submit" className="w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveBasics")}</Button>
+              <SaveButton type="submit" className="w-full px-6" disabled={saving || !dirty || (basicsDirty && scheduleMode === "period" && (!endsOn || (!endOnly && (!startsOn || endsOn < startsOn))))}>{saving ? tc("saving") : t("saveBasics")}</SaveButton>
             </div>
           )}
         </div>

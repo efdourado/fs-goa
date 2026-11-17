@@ -62,7 +62,7 @@
     "home": "Home",
     "catalogue": "Catalogue",
     "templates": "Templates",
-    "about": "The idea",
+    "about": "About",
     "admin": "Console",
     "account": "Your account",
     "signOut": "Sign out",
@@ -1084,7 +1084,10 @@
     "done": "Done",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
-    "openVisit": "Open {name}"
+    "openVisit": "Open {name}",
+    "addSet": "Add working set",
+    "addRecord": "Add another record",
+    "chooseSession": "Sessions on this day"
   },
   "checkinLog": {
     "title": "Your check-ins",
@@ -1416,7 +1419,7 @@
   },
   "about": {
     "back": "Back",
-    "title": "The idea",
+    "title": "About",
     "lede": "Private challenges for friends (or just you). Everyone logs; Goa does the maths and turns the round into a memory.",
     "stepsTitle": "How it works",
     "steps": [
@@ -2219,7 +2222,29 @@
       "chartAria": "Progress of {title}",
       "headlineFlat": "{count, plural, one {# exercise tracked.} other {# exercises tracked.}}",
       "sumPerSession": "Sum per session: {fields}",
-      "bestPerSession": "Best record per session: {fields}"
+      "bestPerSession": "Best record per session: {fields}",
+      "tracked": "{count, plural, one {# item tracked, every property visible.} other {# items tracked, every property visible.}}",
+      "allFields": "Start → latest session",
+      "openHistory": "Tap a property to see its best result and session history. Positive percentages mean improvement under the chosen rule; descriptive fields show raw change.",
+      "newBest": "New personal best",
+      "firstContext": "First record at this value",
+      "latest": "Latest",
+      "change": "Change from start",
+      "descriptiveChange": "Numeric change",
+      "previous": "Previous session",
+      "targetGain": "Distance to target reduced",
+      "direction": {
+        "higher": "Higher is better",
+        "lower": "Lower is better",
+        "target": "Closer to a target",
+        "descriptive": "Observe without ranking"
+      },
+      "atContext": "At {field}: {value} {unit}",
+      "noComparison": "First recorded session",
+      "absoluteChange": "Change: {value}",
+      "changeSinceStart": "{value} change since start",
+      "improvementSinceStart": "{value} improvement since start",
+      "latestPerSession": "Latest record per session: {fields}"
     },
     "notes": {
       "eyebrow": "In their words"
@@ -2391,10 +2416,10 @@
   "progressTracking": {
     "title": "Progress tracking",
     "performance": "Performance calculation",
-    "product": "Workload: multiply selected properties",
+    "product": "Workload + individual properties",
     "separate": "Track each property separately",
     "properties": "Properties to multiply",
-    "performanceHelp": "Choose exactly what you enter: weight × reps for one set, weight × reps × sets for identical sets, or track an already calculated total directly. Select only factors that are not already included in another field. For sets logged separately, add the records; for a single best performance, use the best record. Progress compares the first session with the best session. Missing factors are excluded, and zero baselines have no percentage.",
+    "performanceHelp": "Every selected property keeps its own history. A formula adds workload alongside its factors. The overview compares the latest session with the start; personal bests stay in the history. Same-value comparisons use the latest recorded context (for example, reps at the same weight). Missing values stay missing. A zero baseline has no percentage.",
     "preview": "{title}: first {first}, best {best}",
     "consistency": "Set a consistency goal",
     "target": "Target per period",
@@ -2409,7 +2434,21 @@
     "sumRecords": "Add all records",
     "trackedProperties": "Properties to track",
     "performanceTitle": "Performance calculations",
-    "checkinsTitle": "Check-in handling"
+    "checkinsTitle": "Check-in handling",
+    "direction": "How to compare {field}",
+    "targetValue": "Target value",
+    "compareAt": "Also compare at the same…",
+    "compareAtField": "Compare {field} at the same…",
+    "anyContext": "No additional comparison",
+    "seriesField": "Property identifying each set or attempt",
+    "noSeries": "Combine records within each session",
+    "seriesHelp": "To track working sets separately, add a numeric set number to each record and select it here. Rows are never matched by position.",
+    "directions": {
+      "higher": "Higher is better",
+      "lower": "Lower is better",
+      "target": "Closer to a target",
+      "descriptive": "Observe without ranking"
+    }
   },
   "metricsManage": {
     "description": "Choose what appears in Results, review each calculation, and preview it with the current records.",

@@ -13,7 +13,7 @@ import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import { NewChallengeButton } from "../welcome";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import { SaveButton, ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -323,7 +323,7 @@ export function GroupScreen({
             {/* Footer actions share the full available width equally. */}
             <ModalActions className="border-t border-[var(--line)] pt-4">
               {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : null}
-              <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
+              <SaveButton type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</SaveButton>
             </ModalActions>
             {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
           </form>

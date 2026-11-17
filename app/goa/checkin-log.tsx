@@ -20,7 +20,7 @@ import {
 import { useGoaFormat } from "./format";
 import { Segmented } from "./Segmented";
 import type { ChallengeField, Entry, Id } from "./types";
-import { ArrowRightIcon, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
+import { SaveButton, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
 import { valuesAsRecord } from "./utils";
 
 /** One logged day: the entry behind it and, for a counter, the number it holds. */
@@ -719,7 +719,7 @@ function CounterEditor({
   const disabled = !canEdit || busy;
 
   return (
-    <form className="space-y-4 border-t border-[var(--line)] pt-6" onSubmit={submit} noValidate>
+    <form className="space-y-4 rounded-[20px] border border-[var(--line)] p-5 sm:p-6" onSubmit={submit} noValidate>
       {compact ? null : (
         <DayHeading
           day={day}
@@ -801,7 +801,7 @@ function CounterEditor({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}<ArrowRightIcon /></Button>
+          <SaveButton type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}</SaveButton>
           {record && counter.onDelete ? <Button variant="ghost" disabled={busy} onClick={() => setConfirming(true)}>{t("remove")}</Button> : null}
         </div>
       )}

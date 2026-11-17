@@ -62,7 +62,7 @@ export function ItemEditorDialog({ item, library, maxTitleLength, requireAuthor 
   }
 
   return (
-    <FormDialog title={t("editTitle")} dirty={dirty} busy={busy} error={error ?? propertiesError} onCancel={onCancel} onSubmit={submit} submitDisabled={!properties || Boolean(propertiesError)} onDelete={onRemove}>
+    <FormDialog title={t("editTitle")} dirty={dirty} busy={busy} error={error ?? propertiesError} onCancel={onCancel} onSubmit={submit} submitDisabled={!properties || Boolean(propertiesError) || (requireAuthor && library?.kind === "book" && !String(values.author ?? "").trim())} onDelete={onRemove}>
       <Field label={t("titleLabel")}>
         <input className={inputClass} value={title} maxLength={maxTitleLength} required onChange={(event) => setTitle(event.target.value)} />
       </Field>

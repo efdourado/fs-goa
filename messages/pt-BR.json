@@ -1084,7 +1084,10 @@
     "done": "Pronto",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Nenhum item} one {# item} other {# itens}}",
-    "openVisit": "Abrir {name}"
+    "openVisit": "Abrir {name}",
+    "addSet": "Adicionar série",
+    "addRecord": "Adicionar outro registro",
+    "chooseSession": "Sessões deste dia"
   },
   "checkinLog": {
     "title": "Seus check-ins",
@@ -2219,7 +2222,29 @@
       "chartAria": "Progresso de {title}",
       "headlineFlat": "{count, plural, one {# exercício acompanhado.} other {# exercícios acompanhados.}}",
       "sumPerSession": "Soma por sessão: {fields}",
-      "bestPerSession": "Melhor registro por sessão: {fields}"
+      "bestPerSession": "Melhor registro por sessão: {fields}",
+      "tracked": "{count, plural, one {# item acompanhado, com todas as propriedades.} other {# itens acompanhados, com todas as propriedades.}}",
+      "allFields": "Início → sessão mais recente",
+      "openHistory": "Toque em uma propriedade para ver seu melhor resultado e o histórico. Percentuais positivos indicam melhora pela regra escolhida; campos descritivos mostram a variação numérica.",
+      "newBest": "Novo recorde pessoal",
+      "firstContext": "Primeiro registro com este valor",
+      "latest": "Mais recente",
+      "change": "Variação desde o início",
+      "descriptiveChange": "Variação numérica",
+      "previous": "Sessão anterior",
+      "targetGain": "Redução da distância ao valor desejado",
+      "direction": {
+        "higher": "Maior é melhor",
+        "lower": "Menor é melhor",
+        "target": "Mais perto de um valor desejado",
+        "descriptive": "Observar sem classificar"
+      },
+      "atContext": "Com {field}: {value} {unit}",
+      "noComparison": "Primeira sessão registrada",
+      "absoluteChange": "Variação: {value}",
+      "changeSinceStart": "{value} de variação desde o início",
+      "improvementSinceStart": "{value} de melhora desde o início",
+      "latestPerSession": "Último registro de cada sessão: {fields}"
     },
     "notes": {
       "eyebrow": "Nas palavras deles"
@@ -2391,10 +2416,10 @@
   "progressTracking": {
     "title": "Acompanhamento do progresso",
     "performance": "Cálculo de desempenho",
-    "product": "Volume: multiplicar propriedades selecionadas",
+    "product": "Volume + propriedades individuais",
     "separate": "Acompanhar cada propriedade separadamente",
     "properties": "Propriedades para multiplicar",
-    "performanceHelp": "Escolha exatamente o que registra: carga × repetições para uma série, carga × repetições × séries para séries iguais, ou acompanhe um total já calculado diretamente. Selecione apenas fatores ainda não incluídos em outro campo. Para séries registradas separadamente, some os registros; para um desempenho único, use o melhor registro. O progresso compara a primeira sessão com a melhor. Fatores ausentes ficam de fora e uma base zero não gera percentual.",
+    "performanceHelp": "Cada propriedade selecionada mantém seu histórico. Uma fórmula acrescenta o volume junto dos fatores. A visão geral compara a sessão mais recente com o início; os recordes ficam no histórico. As comparações com o mesmo valor usam o contexto mais recente (por exemplo, repetições com a mesma carga). Valores ausentes continuam ausentes. Uma base zero não gera percentual.",
     "preview": "{title}: início {first}, melhor {best}",
     "consistency": "Definir uma meta de consistência",
     "target": "Meta por período",
@@ -2409,7 +2434,21 @@
     "sumRecords": "Somar todos os registros",
     "trackedProperties": "Propriedades para acompanhar",
     "performanceTitle": "Cálculos de desempenho",
-    "checkinsTitle": "Como contar os check-ins"
+    "checkinsTitle": "Como contar os check-ins",
+    "direction": "Como comparar {field}",
+    "targetValue": "Valor desejado",
+    "compareAt": "Comparar também com o mesmo valor de…",
+    "compareAtField": "Comparar {field} com o mesmo valor de…",
+    "anyContext": "Sem comparação adicional",
+    "seriesField": "Campo que identifica cada série ou tentativa",
+    "noSeries": "Combinar registros de cada sessão",
+    "seriesHelp": "Para acompanhar séries separadamente, adicione um campo numérico com o número da série e selecione-o aqui. A posição das linhas não define a série.",
+    "directions": {
+      "higher": "Maior é melhor",
+      "lower": "Menor é melhor",
+      "target": "Mais perto de um valor desejado",
+      "descriptive": "Observar sem classificar"
+    }
   },
   "metricsManage": {
     "description": "Escolha o que aparece nos Resultados, confira cada cálculo e veja uma prévia com os registros atuais.",

@@ -42,7 +42,7 @@ import { AddItemsDialog } from "../cine-items";
 import type { CatalogScope } from "../libraries";
 import { ItemEditorDialog } from "./admin";
 import {
-  ArrowRightIcon,
+  SaveButton,
   AvatarMark,
   BackButton,
   Button,
@@ -65,6 +65,7 @@ import {
   dateKeyInSaoPaulo,
   displayAnswer,
   entryRatingReader,
+  entryValuesReady,
   findMissingRequiredField,
   formatRuntime,
   isChallengeScheduled,
@@ -211,6 +212,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // border with no heading text, an all-optional type gets a heading with no
   // border at all (nothing there to lock, see `alwaysEditable`).
   sectioned?: boolean;
+  boxed?: boolean;
+  onReadinessChange?: (state: { ready: boolean; active: boolean }) => void;
   // A short note rendered under the heading, before the summary/form — e.g.
   // the visibility policy sentence for this entry type.
   note?: ReactNode;
@@ -220,9 +223,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // The challenge's own zone, for reading the item's due date the way its admin set it.
   timeZone?: string;
   // Present only when this form is editing a saved entry the viewer may
-  // remove. There is no delete button: clearing a required field (e.g.
-  // tapping the already-picked rating again) and submitting calls this
-  // instead of blocking with a "fill this in" error.
+  // remove. Clearing a required field (e.g. tapping an already-picked rating)
+  // offers the deletion action, while a new incomplete entry keeps Save locked.
   onDelete?: () => Promise<void>;
   // Admin correction always wants the live form, never the read-only summary —
   // that IS the point of that screen. The participant's Today tab leaves this
@@ -246,6 +248,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   readOnlyInline = false,
   heading,
   sectioned: sectionedProp,
+  boxed = true,
+  onReadinessChange,
   note,
   timeZone,
   onSave,
@@ -266,6 +270,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // An already-answered checkpoint opens as a summary; editing is opt-in.
   const [editing, setEditing] = useState(alwaysEditable || !entry);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
+  const missingRequired = findMissingRequiredField(fields, values);
+  const emptySaveDeletes = isEmptySaveADelete(missingRequired, Boolean(entry), Boolean(onDelete));
+  const readyToSave = entryValuesReady(fields, values) || emptySaveDeletes;
+  const hasAnswer = Boolean(entry) || Object.values(values).some((value) => value !== null && value !== undefined && (typeof value !== "string" || Boolean(value.trim())));
+  useEffect(() => { onReadinessChange?.({ ready: readyToSave && !busy && !deleting, active: editing && canEdit && hasAnswer }); }, [readyToSave, busy, deleting, editing, canEdit, hasAnswer, onReadinessChange]);
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
@@ -338,9 +347,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   async function performSubmit(): Promise<boolean> {
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
-      // No separate delete button: clearing the required answer (e.g. tapping
-      // the already-picked rating again) and saving removes the entry — the
-      // same intent, without an extra control sitting on screen at all times.
+      // Clearing an existing required answer changes the primary action to deletion.
       if (isEmptySaveADelete(missing, Boolean(entry), Boolean(onDelete))) {
         setDeleting(true);
         setError(null);
@@ -408,7 +415,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const labelIsHeading = Boolean(heading) && namedFields.length === 1 && sameName(heading ?? "", namedFields[0].label);
 
   return (
-    <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
+    <div className={cx(boxed ? "rounded-[20px] border border-[var(--line)] p-5 sm:p-6" : sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
       {heading ? (
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className={sectionLabelClass}>
@@ -433,7 +440,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         // instead, taking no space of its own.
         <button
           type="button"
-          className="absolute -top-1 right-0 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
+          className="absolute right-4 top-4 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
           aria-label={t("editAnswer")}
           onClick={() => setEditing(true)}
         >
@@ -504,7 +511,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         <StatusMessage error={error} success={success} />
         {showsButtons ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
+            {!hideOwnSaveButton ? emptySaveDeletes ? <Button type="submit" variant="danger" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : tc("delete")}</Button> : <SaveButton type="submit" className="w-full sm:flex-1" disabled={busy || deleting || !readyToSave}>{busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}</SaveButton> : null}
             {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
@@ -866,6 +873,12 @@ function ItemEntryPanel({
     types.filter((type) => combinableTypeIds.includes(type.id) && !entryForType(type)).map((type) => type.id),
   ));
   const [savingAll, setSavingAll] = useState(false);
+  const [readiness, setReadiness] = useState<Record<Id, { ready: boolean; active: boolean }>>({});
+  const markReady = (id: Id, state: { ready: boolean; active: boolean }) => setReadiness((current) =>
+    current[id]?.ready === state.ready && current[id]?.active === state.active ? current : { ...current, [id]: state });
+  const activeStates = combinableTypeIds.filter((id) => openTypeIds.has(id)).map((id) => readiness[id]);
+  const sharedSaveReady = activeStates.some((state) => state?.active) && activeStates.every((state) => !state?.active || state.ready);
+
   const markOpen = (typeId: Id, open: boolean) => setOpenTypeIds((current) => {
     if (current.has(typeId) === open) return current;
     const next = new Set(current);
@@ -886,7 +899,7 @@ function ItemEntryPanel({
     }
   }
   return (
-    <div className={stacked || sharedTypes.length ? "space-y-8" : undefined}>
+    <div className={cx("rounded-[20px] border border-[var(--line)] p-5 sm:p-6", stacked || sharedTypes.length ? "space-y-8" : undefined)}>
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -931,6 +944,8 @@ function ItemEntryPanel({
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
               heading={heading}
               sectioned={stacked && hasRequiredField}
+              boxed={false}
+              onReadinessChange={combinable ? (state) => markReady(type.id, state) : undefined}
               alwaysEditable={!hasRequiredField && !combinable}
               hideOwnSaveButton={combinable}
               onEditingChange={combinable ? (open) => markOpen(type.id, open) : undefined}
@@ -956,9 +971,9 @@ function ItemEntryPanel({
         );
       })}
       {useSharedButton && anyOpenToSave ? (
-        <Button type="button" className="w-full" disabled={savingAll} onClick={saveAll}>
-          {savingAll ? tc("saving") : t("saveAllButton")}<ArrowRightIcon />
-        </Button>
+        <SaveButton type="button" className="w-full" disabled={savingAll || !sharedSaveReady} onClick={saveAll}>
+          {savingAll ? tc("saving") : t("saveAllButton")}
+        </SaveButton>
       ) : null}
       {sharedTypes.map((type) => (
         <SharedAnswerSection
@@ -1814,6 +1829,7 @@ export function ParticipantChallengeScreen({
             <EmptyState title={t("closedTitle")} />
           ) : sessionSpec ? (
             <SessionLog
+              key={`${challenge.id}:${user?.id ?? ""}`}
               challenge={challenge}
               spec={sessionSpec}
               entries={entries}

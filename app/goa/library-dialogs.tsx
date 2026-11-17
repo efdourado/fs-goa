@@ -438,7 +438,7 @@ export function LibraryPropertiesDialog({
                 </div>
                 {editing?.key === property.key ? (
                   <form className="space-y-3 pb-1 pt-3" onSubmit={(event) => { event.preventDefault(); void saveProperty(property); }}>
-                    <ArrowField key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
+                    <ArrowField save key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
                     {property.storage === "attribute" && !(property.filled ?? 0) ? (
                       <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={editing.type} disabled={busyKey !== null} onChange={(type) => setEditing({ ...editing, type: type as PropertyType })} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
                     ) : null}

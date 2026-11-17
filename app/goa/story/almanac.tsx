@@ -4,6 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf } from "../catalog-cover";
+import { comparisonScore, progressChange } from "../../../lib/progress-tracking";
 import { arrangeResultPages, isResultMetric } from "../../../lib/result-presentation";
 import { MetricBlock } from "../metrics-view";
 import { metricHasData } from "../utils";
@@ -89,20 +90,27 @@ function Chapter({ lead, children, bottom, className, ...rest }: { lead?: ReactN
   );
 }
 
-/** A quiet summary; the session details live in the exercise dialog. */
-function Progression({ title, row, tone, onOpen }: {
-  title: string;
-  row: { first: number; best: number; sessions: number };
-  tone: string;
-  onOpen: () => void;
-}) {
-  const t = useTranslations("story");
-  const gain = row.first > 0 ? Math.round(((row.best - row.first) / row.first) * 100) : null;
+/** A field keeps its own units, baseline, and comparison rule. */
+function Progression({ row, tone, onOpen }: { row: RecordRow; tone: string; onOpen: () => void }) {
+  const t = useTranslations("story.records");
+  const nf = useFormatter();
+  const latest = row.series.at(-1)!;
+  const change = progressChange(row.first, latest, row.rule);
+  const fmt = (value: number) => `${nf.number(value, { maximumFractionDigits: 2 })}${row.unit ? ` ${row.unit}` : ""}`;
+  const descriptive = row.rule?.direction === "descriptive";
+  const newBest = !descriptive && row.series.length > 1 && row.series.slice(0, -1).every((value) => comparisonScore(latest, row.rule) > comparisonScore(value, row.rule));
   return <li>
-    <button type="button" onClick={onOpen} className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_3.5rem] items-center gap-3 rounded-lg py-2.5 text-left text-sm transition hover:bg-[var(--wash)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20">
-      <span className="min-w-0 truncate">{title}</span>
-      <span className="text-xs text-[var(--muted)]">{t("records.sessions", { count: row.sessions })}</span>
-      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>{gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%`}</strong>
+    <button type="button" onClick={onOpen} className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg py-3 text-left text-sm transition-opacity duration-150 hover:opacity-80 active:opacity-70 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 motion-reduce:transition-none">
+      <span className="min-w-0 flex-1"><span className="block font-medium">{row.label ?? row.item.title}</span>
+        <span className="mt-0.5 block text-xs text-[var(--muted)]">{row.context ? t("atContext", { field: row.context.label, value: nf.number(row.context.value), unit: row.context.unit }) : t("sessions", { count: row.sessions })}</span>
+        {row.rule?.direction === "target" ? <span className="mt-0.5 block text-xs text-[var(--muted)]">{t("direction.target")}: {fmt(row.rule.target!)}</span> : null}
+        {newBest ? <span className="mt-1 block text-[11px] text-[var(--ok)]">{t("newBest")}</span> : null}
+      </span>
+      <span className="text-right"><span className="block tabular-nums">{fmt(row.first)} → <strong className="font-medium">{fmt(latest)}</strong></span>
+        <span className="mt-0.5 block text-xs tabular-nums" style={{ color: descriptive || change === null || change === 0 ? "var(--muted)" : change > 0 ? tone : "var(--danger)" }}>
+          {row.sessions < 2 ? t(row.context ? "firstContext" : "noComparison") : change === null ? t("absoluteChange", { value: nf.number(latest - row.first, { signDisplay: "exceptZero" }) }) : t(descriptive ? "changeSinceStart" : "improvementSinceStart", { value: `${change > 0 ? "+" : ""}${change}%` })}
+        </span>
+      </span>
     </button>
   </li>;
 }
@@ -122,7 +130,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const withUnit = (value: number) => `${fmt(value)}${unit ? ` ${unit}` : ""}`;
   // Months are always abbreviated; the year only where it tells something (the period up top, or a history that crosses years).
   const day = (key: string, withYear = false) => nf.dateTime(new Date(`${key}T12:00:00Z`), { day: "numeric", month: "short", ...(withYear ? { year: "numeric" as const } : {}), timeZone: "UTC" });
-  const gain = row.first > 0 ? Math.round(((row.best - row.first) / row.first) * 100) : null;
+  const latest = row.series.at(-1)!;
+  const gain = progressChange(row.first, latest, row.rule);
   const width = 560;
   const height = 190;
   const pad = { top: 26, right: 18, bottom: 26, left: 18 };
@@ -133,22 +142,27 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const x = (index: number) => (last <= 0 ? width / 2 : pad.left + (index * (width - pad.left - pad.right)) / last);
   const y = (value: number) => height - pad.bottom - ((value - low) / span) * (height - pad.top - pad.bottom);
   const line = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
-  const bestIndex = row.series.indexOf(high);
+  const bestIndex = row.series.indexOf(row.best);
   const crossesYears = row.days[0].slice(0, 4) !== row.days[last].slice(0, 4);
 
   const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
-    { label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay), strong: true },
+    { label: t("records.latest"), value: withUnit(latest), note: day(row.days.at(-1)!), strong: true },
+    ...(row.series.length > 1 ? [{ label: t("records.previous"), value: withUnit(row.series.at(-2)!), note: day(row.days.at(-2)!) }] : []),
+    ...(row.rule?.direction !== "descriptive" ? [{ label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay) }] : []),
     { label: t("records.first"), value: withUnit(row.first), note: day(row.days[0]) },
-    { label: t("records.gain"), value: gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%` },
+    { label: t(row.rule?.direction === "target" ? "records.targetGain" : row.rule?.direction === "descriptive" ? "records.descriptiveChange" : "records.change"), value: gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%` },
     { label: t("records.sessionsLabel"), value: String(row.sessions) },
   ];
   return (
     <Dialog title={row.item.title} onClose={onClose} wide>
       <div>
-        {row.label ? <p className="mb-2 text-sm">{t(row.sessionAggregation === "sum" ? "records.sumPerSession" : "records.bestPerSession", { fields: row.label })}</p> : null}
+        {row.seriesLabel ? <p className="mb-2 text-sm">{row.seriesLabel} {row.seriesValue}</p> : null}
+        {row.context ? <p className="mb-2 text-sm">{t("records.atContext", { field: row.context.label, value: fmt(row.context.value), unit: row.context.unit })}</p> : null}
+        {row.rule ? <p className="mb-2 text-xs text-[var(--muted)]">{t(`records.direction.${row.rule.direction}`)}{row.rule.direction === "target" ? `: ${withUnit(row.rule.target!)}` : ""}</p> : null}
+        {row.label ? <p className="mb-2 text-sm">{t(row.sessionAggregation === "sum" ? "records.sumPerSession" : row.rule?.direction === "descriptive" ? "records.latestPerSession" : "records.bestPerSession", { fields: row.label })}</p> : null}
         <p className="text-xs text-[var(--muted)]">{[person, `${day(row.days[0], true)} – ${day(row.days[last], true)}`].filter(Boolean).join(" · ")}</p>
 
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
           {stats.map((stat) => (
             <div key={stat.label} className="min-w-0">
               <dt className="text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{stat.label}</dt>
@@ -168,7 +182,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
             {row.series.map((value, index) => (
               <circle key={`${row.days[index]}:${index}`} cx={x(index)} cy={y(value)} r={index === bestIndex ? 5 : 2.8} fill={index === bestIndex ? tone : "var(--paper)"} stroke={tone} strokeWidth={1.6} />
             ))}
-            <text x={Math.min(width - 60, Math.max(60, x(bestIndex)))} y={Math.max(13, y(high) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(high)}</text>
+            <text x={Math.min(width - 60, Math.max(60, x(bestIndex)))} y={Math.max(13, y(row.best) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(row.best)}</text>
             <text x={pad.left} y={height - 7} fontSize={11} fill="var(--muted)">{day(row.days[0])}</text>
             <text x={width - pad.right} y={height - 7} textAnchor="end" fontSize={11} fill="var(--muted)">{day(row.days[last])}</text>
           </svg>
@@ -183,8 +197,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
               <li key={`${row.days[index]}:${index}`} className="flex items-center gap-3 py-2.5 text-sm">
                 <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], crossesYears)}</span>
                 <strong className="flex-1 font-medium tabular-nums">{withUnit(value)}</strong>
-                {index === bestIndex ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
-                <span className={cx("w-16 flex-none text-right text-xs tabular-nums", change === null || change === 0 ? "text-[var(--muted)]" : change > 0 ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
+                {index === bestIndex && row.rule?.direction !== "descriptive" ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
+                <span className={cx("w-16 flex-none text-right text-xs tabular-nums", change === null || change === 0 ? "text-[var(--muted)]" : row.rule?.direction === "descriptive" ? "text-[var(--muted)]" : comparisonScore(value, row.rule) > comparisonScore(row.series[index - 1], row.rule) ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
                   {/* Nothing to say (the first session, or no change): nothing shown. */}
                   {change === null || change === 0 ? "" : `${change > 0 ? "+" : "−"}${fmt(Math.abs(change))}`}
                 </span>
@@ -197,19 +211,37 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   );
 }
 
-/** The records page's list: each exercise a row to tap, opening its own page. */
-function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
+/** One item/person card, with every field and explicitly numbered set retained. */
+export function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
   const [open, setOpen] = useState<RecordRow | null>(null);
-  return (
-    <>
-      <ul className="divide-y divide-[var(--line)]">
-        {rows.map((row) => (
-          <Progression key={`${row.person.id}-${row.item.id}-${row.metricKey ?? ""}`} title={row.item.title} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
-        ))}
-      </ul>
-      {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
-    </>
-  );
+  const t = useTranslations("story.records");
+  const groups = new Map<string, RecordRow[]>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.person.id, row.item.id]);
+    const group = groups.get(key) ?? [];
+    group.push(row);
+    groups.set(key, group);
+  }
+  return <>
+    <div className="space-y-5">
+      {[...groups.entries()].map(([key, group]) => {
+        const sets = new Map<string, RecordRow[]>();
+        for (const row of group) {
+          const label = row.seriesLabel ? `${row.seriesLabel} ${row.seriesValue}` : "";
+          sets.set(label, [...(sets.get(label) ?? []), row]);
+        }
+        return <section key={key} className="rounded-xl bg-[var(--surface-muted)] px-4 py-3">
+          <h3 className="text-base font-medium">{group[0].item.title}{showPerson ? <span className="ml-2 text-xs text-[var(--muted)]">{firstName(group[0].person.name)}</span> : null}</h3>
+          {[...sets.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([label, metrics]) => <div key={label}>
+            {label ? <h4 className="mt-4 text-xs font-medium text-[var(--muted)]">{label}</h4> : null}
+            <ul className="divide-y divide-[var(--line)]">{metrics.map((row) => <Progression key={`${row.metricKey ?? ""}:${row.context?.value ?? ""}`} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />)}</ul>
+          </div>)}
+        </section>;
+      })}
+    </div>
+    <p className="mt-3 text-xs text-[var(--muted)]">{t("openHistory")}</p>
+    {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
+  </>;
 }
 
 /**
@@ -1184,12 +1216,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "records",
         title: t("records.eyebrow"),
-        headline: s.records[0].first > 0 && s.records[0].best > s.records[0].first
-          ? t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) })
-          : t("records.headlineFlat", { count: new Set(s.records.map((row) => row.item.id)).size }),
+        headline: t("records.tracked", { count: new Set(s.records.map((row) => row.item.id)).size }),
         body: (
           <Grid>
-            <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
+            <Block title={t("records.allFields")} wide>
               <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} />
             </Block>
           </Grid>

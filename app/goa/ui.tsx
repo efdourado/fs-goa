@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { createContext, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, Fragment, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
@@ -67,6 +67,15 @@ export function ArrowRightIcon({ className = "h-4 w-4" }: { className?: string }
   );
 }
 
+/** Save readiness, independent of the lock used to reopen an existing answer. */
+export function SaveLockIcon({ unlocked }: { unlocked: boolean }) {
+  return <svg data-save-lock={unlocked ? "open" : "closed"} viewBox="0 0 20 20" className="h-4 w-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4.5" y="9" width="11" height="8" rx="2" />
+    <path d={unlocked ? "M7 9V6a3 3 0 0 1 5.8-1" : "M7 9V6a3 3 0 0 1 6 0v3"} />
+    <path d="M10 12.5v1.5" />
+  </svg>;
+}
+
 /** Set by a modal (dialog, bottom sheet): its buttons are pills. */
 export const InModal = createContext(false);
 
@@ -77,6 +86,7 @@ export function Button({
   disabled,
   onClick,
   className,
+  ref,
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -84,6 +94,7 @@ export function Button({
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   const inModal = useContext(InModal);
   const tones = {
@@ -94,6 +105,7 @@ export function Button({
   };
   return (
     <button
+      ref={ref}
       className={cx(
         "cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 border px-4 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         inModal ? "rounded-full" : "rounded-xl",
@@ -107,6 +119,31 @@ export function Button({
       {children}
     </button>
   );
+}
+
+/** All saves share one readiness icon. Native constraints complement each form's explicit domain rules. */
+export function SaveButton({ children, disabled, ...props }: ComponentProps<typeof Button>) {
+  const button = useRef<HTMLButtonElement>(null);
+  const snapshot = useCallback(() => {
+    const form = button.current?.form;
+    if (!form) return true;
+    return Array.from(form.elements).every((element) => {
+      const field = element as HTMLInputElement;
+      return !field.willValidate || (field.validity.valid && (!field.required || field.type === "checkbox" || field.type === "radio" || Boolean(field.value.trim())));
+    });
+  }, []);
+  const subscribe = useCallback((notify: () => void) => {
+    const form = button.current?.form;
+    if (!form) return () => {};
+    form.addEventListener("input", notify);
+    form.addEventListener("change", notify);
+    const observer = new form.ownerDocument.defaultView!.MutationObserver(notify);
+    observer.observe(form, { subtree: true, childList: true, attributes: true, attributeFilter: ["value", "required", "disabled", "min", "max", "minlength", "maxlength", "pattern", "type", "checked"] });
+    return () => { form.removeEventListener("input", notify); form.removeEventListener("change", notify); observer.disconnect(); };
+  }, []);
+  const nativeReady = useSyncExternalStore(subscribe, snapshot, () => true);
+  const locked = Boolean(disabled) || !nativeReady;
+  return <Button {...props} ref={button} disabled={locked}>{children}<SaveLockIcon unlocked={!locked} /></Button>;
 }
 
 function CircleCheckIcon({ className }: { className?: string }) {
@@ -540,7 +577,7 @@ export function choicePillClass({ active = false, dashed = false }: { active?: b
   );
 }
 
-export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false }: {
+export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false, save = false }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -553,6 +590,7 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   submitDisabled?: boolean;
   maxLength?: number;
   className?: string;
+  save?: boolean;
   /** Takes the cursor as it appears, its text selected (a suggestion is kept with Enter or replaced by typing). */
   takesCursor?: boolean;
 }) {
@@ -568,7 +606,7 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
     <div className={cx("flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15", className)}>
       <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
       <button type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
+        {save ? <SaveLockIcon unlocked={!disabled && !submitDisabled && Boolean(value.trim())} /> : <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>}
       </button>
     </div>
   );

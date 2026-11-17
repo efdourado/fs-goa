@@ -385,11 +385,23 @@ export async function updateChallenge(
     if (body.trackingSettings !== undefined) {
       try { trackingSettings = parseProgressTracking(body.trackingSettings); }
       catch (error) { throw new ApiError(400, "invalid_tracking", (error as Error).message); }
-      const ids = trackingSettings.performance?.fieldIds ?? [];
-      const recordType = allTypes.find((type) => type.parent_type_id);
+      const performance = trackingSettings.performance;
+      const ids = [...(performance?.fieldIds ?? []), ...(performance?.seriesFieldId ? [performance.seriesFieldId] : []),
+        ...Object.entries(performance?.rules ?? {}).flatMap(([id, rule]) => [id, ...(rule.contextFieldId ? [rule.contextFieldId] : [])])];
+      const trackingTypes = allTypes.filter((type) => type.answer_scope !== "shared" && type.purpose !== "rating" && type.purpose !== "expectation"
+        && (type.parent_type_id || type.submission_mode === "daily" || type.purpose === "checkin" || type.purpose === "progress"));
       const fields = await fieldsForChallenge(client, challengeId);
-      if (ids.some((id) => !fields.some((field) => field.id === id && field.type === "number" && field.entryTypeId === recordType?.id))) {
-        throw new ApiError(400, "invalid_tracking_fields", "Choose numeric properties from the exercise record.");
+      if (ids.some((id) => !fields.some((field) => field.id === id && field.type === "number" && trackingTypes.some((type) => type.id === field.entryTypeId)))) {
+        throw new ApiError(400, "invalid_tracking_fields", "Choose numeric properties from a progress record.");
+      }
+      const sourceOf = (id: string) => fields.find((field) => field.id === id)?.entryTypeId;
+      for (const [id, rule] of Object.entries(performance?.rules ?? {})) {
+        if (rule.contextFieldId && sourceOf(id) !== sourceOf(rule.contextFieldId)) throw new ApiError(400, "invalid_tracking_fields", "Comparison properties must belong to the same record.");
+      }
+      if (performance?.mode === "product" && new Set(performance.fieldIds.map(sourceOf)).size > 1) throw new ApiError(400, "invalid_tracking_fields", "Formula properties must belong to the same record.");
+      if (performance?.seriesFieldId) {
+        const selected = performance.fieldIds.length ? performance.fieldIds : fields.filter((field) => field.type === "number" && trackingTypes.some((type) => type.id === field.entryTypeId)).flatMap((field) => typeof field.id === "string" ? [field.id] : []);
+        if (selected.some((id) => sourceOf(id) !== sourceOf(performance.seriesFieldId!))) throw new ApiError(400, "invalid_tracking_fields", "Set or attempt numbers must belong to the same record as the tracked properties.");
       }
     }
     // Checkpoints are generated only for recipes that bind entries to them, not

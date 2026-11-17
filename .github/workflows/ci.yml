@@ -13,11 +13,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
           cache: npm
+      - run: npm install --global npm@12.2.2
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -51,11 +52,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://goa:goa_ci_only@localhost:5432/goa_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
           cache: npm
+      - run: npm install --global npm@12.2.2
       - run: npm ci
       - run: node scripts/migrate.mjs
       - run: npm run test:integration

@@ -30,17 +30,39 @@ localmente.
 ## Rodar
 
 ```bash
-docker compose up --build        # Postgres + migrações + conta admin + app em :3000
+docker compose up --build        # primeira execução, ou após mudar código/dependências
 ```
 
-Sem Docker para a aplicação (Node `22.20.0`, ver `.nvmrc`):
+Abra **http://localhost:3000** quando o app terminar de iniciar. O comando mantém
+os logs no terminal; `Ctrl+C` para os serviços. Para o uso diário, sem mudanças:
 
 ```bash
-cp .env.example .env.local       # uma vez
+docker compose up -d             # inicia em segundo plano, sem reconstruir a imagem
+docker compose logs -f app       # acompanha os logs (Ctrl+C sai dos logs)
+docker compose stop             # para os serviços; os dados continuam no volume
+```
+
+Após atualizar o projeto, use `docker compose up -d --build`. O serviço `setup`
+aplica as migrações antes de iniciar o app. Os dados ficam no volume do Postgres;
+`docker compose down` preserva esse volume. `docker compose down -v` apaga os dados.
+A imagem usa Node `26.13.1` LTS e npm `12.2.2`, com dependências fixadas no lockfile.
+O Postgres continua na versão 16 para reutilizar o volume existente.
+
+Para desenvolver com atualização automática ao salvar, rode o app fora do Docker
+(Node `26.13.1`, ver `.nvmrc`):
+
+```bash
+cp .env.example .env.local       # só na primeira vez; preserve seu arquivo existente
+nvm install && nvm use
+npm install --global npm@12.2.2
+docker compose stop app         # libera a porta 3000, se o app do Docker estiver rodando
 docker compose up -d postgres
 npm ci && npm run db:setup       # migrações + conta admin (admin / goa-admin-local)
 npm run dev
 ```
+
+Abra o mesmo **http://localhost:3000**. O modo Docker executa uma versão compilada;
+as alterações nos arquivos aparecem depois de reconstruir a imagem.
 
 ## Comandos
 
@@ -54,7 +76,13 @@ npm run dev
 | `npm run db:migrate` · `db:migrate:prod` | aplica migrações local · no Neon (WSS/443, via `.env.production.local`) |
 | `npm run db:seed-showcase` | dados de demonstração locais: um clube, um duo, um solo, hábitos |
 | `npm run db:seed-local` | 11 desafios sintéticos para testar telas (só local) |
+| `npm run db:seed-progress` | 5 desafios locais para comparar propriedades, séries, volume e valores desejados ([detalhes](scripts/seed-progress/README.md)) |
 | `npm run db:seed-reading[:prod]` | um desafio de leitura rico para @dudupizzas |
+
+O ESLint fica na última versão 9 compatível com os plugins de React/acessibilidade,
+e o TypeScript na última versão 6 aceita pelo `typescript-eslint`. O override de
+`esbuild` corrige a dependência antiga do loader do Drizzle Kit. O `allowScripts`
+registra as versões das dependências nativas que precisam de scripts no npm 12.
 
 ## Produção
 

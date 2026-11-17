@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useGoaFormat } from "./format";
 import { applyOrder, type OrderableItem, type OrderStrategy } from "./ordering";
 import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./types";
-import { AddRow, BoxSection, Button, ChevronIcon, CircleMinusIcon, EmptyState, labelClass, PageHeading, rowIconClass, StartLine, StatusMessage } from "./ui";
+import { SaveButton, AddRow, BoxSection, ChevronIcon, CircleMinusIcon, EmptyState, labelClass, PageHeading, rowIconClass, StartLine, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
 
@@ -389,7 +389,7 @@ export function CheckpointPlanner({
         ) : null}
 
         {drafts.length || savedCheckpoints.length ? (
-          <Button className="w-full" disabled={cpBusy || !dirty} onClick={() => void saveAll()}>{cpBusy ? tc("saving") : t("saveStages")}</Button>
+          <SaveButton className="w-full" disabled={cpBusy || !dirty || drafts.some((draft) => !draft.title.trim() || (Boolean(draft.startsAt && draft.dueAt) && Date.parse(draft.startsAt) > Date.parse(draft.dueAt)))} onClick={() => void saveAll()}>{cpBusy ? tc("saving") : t("saveStages")}</SaveButton>
         ) : null}
         <StatusMessage error={cpError} success={cpDone} />
       </div>

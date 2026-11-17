@@ -1,4 +1,4 @@
-import { consistencyProgress, performancePlans, type ProgressTracking } from "../../../lib/progress-tracking";
+import { comparisonScore, consistencyProgress, performancePlans, type ComparisonRule, type ProgressTracking } from "../../../lib/progress-tracking";
 import type { ChallengeDetail, ChallengeField, Entry, Id } from "../types";
 import { entryRatingReader, itemIdForEntry, valuesAsRecord } from "../utils";
 
@@ -35,7 +35,7 @@ export interface StoryExpectation { personId: Id; itemId: Id; value: number }
 /** One dated check-in: a habit's day, a day's pages, a workout. `value` only when the day has a number. */
 export interface StoryDay { personId: Id; day: string; value?: number | null; note?: string | null }
 /** One record inside a workout: this item, this day, this number (the load). */
-export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number; sessionId?: string; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; order?: string }
+export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number; sessionId?: string; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; order?: string; recordOrder?: string; rule?: ComparisonRule; context?: { label: string; value: number; unit: string }; seriesLabel?: string; seriesValue?: number }
 
 export interface StoryInput {
   resultPresentation?: import("../../../lib/result-presentation").ResultPresentation;
@@ -183,7 +183,7 @@ export interface DatedStory {
   /** The weekdays that stand out (tied at the top, clearly above the rest); empty when the week is even. */
   bestWeekdays: number[];
   /** Workouts: per exercise, where it started, the best it reached, and every session's number in order. */
-  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[]; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum" }>;
+  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[]; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; rule?: ComparisonRule; context?: StoryRecord["context"]; seriesLabel?: string; seriesValue?: number }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
   /** Two people: the days both of them showed up. */
   together: number | null;
@@ -527,30 +527,41 @@ function buildDated(input: StoryInput): DatedStory | null {
   // Workouts: for each item, where the number started and the best it reached.
   const records: DatedStory["records"] = [];
   const recordKeys = new Map<string, StoryRecord[]>();
-  for (const record of input.records.filter((row) => known.has(row.personId))) {
-    const key = `${record.personId}:${record.itemId}:${record.metricKey ?? ""}`;
-    recordKeys.set(key, [...(recordKeys.get(key) ?? []), record]);
+  const orderedRecords = input.records.filter((row) => known.has(row.personId))
+    .sort((a, b) => a.day.localeCompare(b.day) || (a.order ?? "").localeCompare(b.order ?? "") || (a.recordOrder ?? "").localeCompare(b.recordOrder ?? ""));
+  const baseKey = (row: StoryRecord) => JSON.stringify([row.personId, row.itemId, row.metricKey, row.seriesValue]);
+  // Contextual comparisons follow the latest recorded context, while retaining its complete history.
+  const latestContext = new Map<string, number>();
+  for (const row of orderedRecords) if (row.context) latestContext.set(baseKey(row), row.context.value);
+  for (const record of orderedRecords) {
+    if (record.context && latestContext.get(baseKey(record)) !== record.context.value) continue;
+    const key = JSON.stringify([baseKey(record), record.context?.value]);
+    const list = recordKeys.get(key) ?? [];
+    list.push(record);
+    recordKeys.set(key, list);
   }
-  // Every exercise that was logged, not only the ones that went up: one that held steady, or was done once, is still theirs.
-  for (const list of recordKeys.values()) {
-    const ordered = [...list].sort((a, b) => a.day.localeCompare(b.day) || (a.order ?? "").localeCompare(b.order ?? ""));
+  for (const ordered of recordKeys.values()) {
     const item = input.items.find((candidate) => candidate.id === ordered[0].itemId);
     if (!item) continue;
+    const rule = ordered[0].rule;
     const sessions = new Map<string, { day: string; value: number }>();
     for (const row of ordered) {
       const key = row.sessionId ?? row.day;
       const previous = sessions.get(key);
-      sessions.set(key, { day: row.day, value: row.sessionAggregation === "sum" ? (previous?.value ?? 0) + row.value : Math.max(previous?.value ?? -Infinity, row.value) });
+      const value = row.sessionAggregation === "sum" ? (previous?.value ?? 0) + row.value
+        : !previous || rule?.direction === "descriptive" || comparisonScore(row.value, rule) > comparisonScore(previous.value, rule) ? row.value : previous.value;
+      sessions.set(key, { day: row.day, value });
     }
     const series = [...sessions.values()];
-    const best = series.reduce((top, row) => row.value > top.value ? row : top);
+    const best = rule?.direction === "descriptive" ? series[series.length - 1]
+      : series.reduce((top, row) => comparisonScore(row.value, rule) > comparisonScore(top.value, rule) ? row : top);
     records.push({ item, first: series[0].value, best: best.value, bestDay: best.day,
       person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: series.length,
       series: series.map((row) => row.value), days: series.map((row) => row.day),
-      metricKey: ordered[0].metricKey, label: ordered[0].label, unit: ordered[0].unit, sessionAggregation: ordered[0].sessionAggregation });
+      metricKey: ordered[0].metricKey, label: ordered[0].label, unit: ordered[0].unit, sessionAggregation: ordered[0].sessionAggregation,
+      rule, context: ordered[0].context, seriesLabel: ordered[0].seriesLabel, seriesValue: ordered[0].seriesValue });
   }
-  // Biggest gain first; among equals, the one trained more often.
-  records.sort((a, b) => (b.first > 0 ? (b.best - b.first) / b.first : 0) - (a.first > 0 ? (a.best - a.first) / a.first : 0) || b.sessions - a.sessions);
+  // Stable item/field order makes every measurement visible, rather than ranking unrelated percentages.
 
   return {
     kind: "dated",
@@ -614,7 +625,13 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     !ratingTypes.has(type.id) && type.purpose !== "expectation" && type.id !== recordType?.id && type.answerScope !== "shared"
     && (type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day" || type.purpose === "checkin" || type.purpose === "progress" || type.submissionMode === "daily"));
   const counters = new Map(datedTypes.map((type) => [type.id, counterOf(type.fields)]));
-  const plans = performancePlans(recordType?.fields ?? [], challenge.trackingSettings?.performance);
+  const performance = challenge.trackingSettings?.performance;
+  const plans = performancePlans(recordType?.fields ?? [], performance);
+  const readNumber = (raw: unknown): number | null => {
+    if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !raw.trim())) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  };
   const recordField = plans[0]?.fields[0] ?? null;
 
   const ratings: StoryRating[] = [];
@@ -623,6 +640,35 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
   const records: StoryRecord[] = [];
   const visitOrder = new Map(entries.map((entry) => [entry.id, entry.submittedAt]));
   const visitDay = new Map(entries.map((entry) => [entry.id, entry.occurredOn ?? entry.submittedAt?.slice(0, 10) ?? null]));
+  const appendRecords = (entry: Entry, fields: ChallengeField[], itemId: string, day: string) => {
+    const values = valuesAsRecord(entry.values);
+    const seriesField = fields.find((field) => field.id === performance?.seriesFieldId);
+    const seriesValue = seriesField?.id ? readNumber(values[seriesField.id]) : null;
+    if (performance?.seriesFieldId && (!seriesField || seriesValue === null)) return;
+    for (const plan of performancePlans(fields, performance)) {
+      const raw = plan.fields.map((field) => values[field.id!]);
+      if (raw.some((value) => readNumber(value) === null)) continue;
+      const numbers = raw.map(Number);
+      if (numbers.some((value) => !Number.isFinite(value) || (plan.product && value < 0))) continue;
+      const value = plan.product ? numbers.reduce((product, n) => product * n, 1) : numbers[0];
+      if (!Number.isFinite(value)) continue;
+      const record: StoryRecord = { order: entry.parentEntryId ? visitOrder.get(entry.parentEntryId) : entry.submittedAt, recordOrder: entry.submittedAt, personId: entry.userId!, itemId, day, value, sessionId: entry.parentEntryId ?? entry.id,
+        // Component fields remain interpretable when the formula sums the workload across sets.
+        sessionAggregation: plan.product || performance?.mode !== "product" ? performance?.sessionAggregation : "best",
+        metricKey: plan.fields.map((field) => field.id).join(":"), label: plan.fields.map((field) => field.label).join(" × "),
+        unit: plan.product ? "" : plan.fields[0].config?.unit ?? plan.fields[0].label.match(/\(([^)]+)\)\s*$/)?.[1] ?? "",
+        rule: plan.rule, ...(seriesValue !== null ? { seriesLabel: seriesField!.label, seriesValue } : {}) };
+      records.push(record);
+      if (plan.product && seriesValue !== null && performance?.sessionAggregation === "sum") {
+        records.push({ ...record, metricKey: `${record.metricKey}:total`, seriesValue: undefined, seriesLabel: undefined });
+      }
+      const contextField = fields.find((field) => field.id === plan.rule?.contextFieldId);
+      const contextValue = contextField?.id ? readNumber(values[contextField.id]) : null;
+      if (contextField && contextValue !== null) records.push({ ...record,
+        metricKey: `${record.metricKey}:at:${contextField.id}`, sessionAggregation: "best",
+        context: { label: contextField.label, value: contextValue, unit: contextField.config?.unit ?? "" } });
+    }
+  };
   for (const entry of entries) {
     if (!entry.userId) continue;
     const values = valuesAsRecord(entry.values);
@@ -643,24 +689,15 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     } else if (recordType && entry.entryTypeId === recordType.id && itemId) {
       const day = entry.parentEntryId ? visitDay.get(entry.parentEntryId) : entry.occurredOn;
       if (!day) continue;
-      for (const plan of plans) {
-        const raw = plan.fields.map((field) => values[field.id!]);
-        if (raw.some((value) => value === null || value === undefined || value === "" || !["number", "string"].includes(typeof value))) continue;
-        const numbers = raw.map(Number);
-        if (numbers.some((value) => !Number.isFinite(value) || (plan.product && value < 0))) continue;
-        const value = plan.product ? numbers.reduce((product, n) => product * n, 1) : numbers[0];
-        if (!Number.isFinite(value)) continue;
-        records.push({ order: entry.parentEntryId ? visitOrder.get(entry.parentEntryId) : entry.submittedAt, personId: entry.userId, itemId, day, value, sessionId: entry.parentEntryId ?? entry.id,
-          sessionAggregation: challenge.trackingSettings?.performance?.sessionAggregation,
-          metricKey: plan.fields.map((field) => field.id).join(":"), label: plan.fields.map((field) => field.label).join(" × "),
-          unit: plan.product ? "" : plan.fields[0].config?.unit ?? plan.fields[0].label.match(/\(([^)]+)\)\s*$/)?.[1] ?? "" });
-      }
+      appendRecords(entry, recordType.fields, itemId, day);
     } else if (datedTypes.some((type) => type.id === entry.entryTypeId)) {
       const day = entry.occurredOn ?? entry.submittedAt?.slice(0, 10);
       if (!day) continue;
       const counter = counters.get(entry.entryTypeId ?? "");
-      const raw = counter?.id ? Number(values[counter.id]) : NaN;
-      days.push({ personId: entry.userId, day, value: Number.isFinite(raw) ? raw : null, note: note ?? null });
+      const raw = counter?.id ? readNumber(values[counter.id]) : null;
+      days.push({ personId: entry.userId, day, value: raw, note: note ?? null });
+      const type = datedTypes.find((type) => type.id === entry.entryTypeId)!;
+      appendRecords(entry, type.fields, itemId ?? `tracking:${type.id}`, day);
     }
   }
   const counterField = [...counters.values()].find(Boolean) ?? null;
@@ -671,10 +708,10 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     title: challenge.title,
     noun: kinds.size === 1 && kinds.has("film") ? "film" : kinds.size === 1 && kinds.has("book") ? "book" : challenge.recipeKey === "tables" ? "place" : "item",
     people: challenge.participants.filter((participant) => participant.userId).map((participant) => ({ id: participant.userId!, name: participant.name })),
-    items: challenge.items.map((item) => ({
+    items: [...challenge.items.map((item) => ({
       id: item.id, title: item.title, year: item.catalogItem?.year ?? null, genre: item.catalogItem?.mainGenre ?? null,
       runtime: item.catalogItem?.runtimeMinutes ?? null, properties: textProperties(item),
-    })),
+    })), ...datedTypes.filter((type) => type.fields.some((field) => field.type === "number")).map((type) => ({ id: `tracking:${type.id}`, title: datedTypes.length === 1 ? challenge.title : type.name }))],
     ratings,
     expectations,
     scale: { min: ratingField?.config?.min ?? 0, max: ratingField?.config?.max ?? 5 },

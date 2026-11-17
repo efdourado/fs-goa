@@ -271,6 +271,9 @@ export async function copyChallengeStructure(
     "SELECT tracking_settings FROM challenges WHERE id=$1", [sourceChallengeId]);
   const tracking = trackingSource.rows[0]?.tracking_settings ?? {};
   if (tracking.performance) tracking.performance.fieldIds = tracking.performance.fieldIds.flatMap((id) => fieldMap.has(id) ? [fieldMap.get(id)!] : []);
+  if (tracking.performance?.rules) tracking.performance.rules = Object.fromEntries(Object.entries(tracking.performance.rules).flatMap(([id, rule]) =>
+    fieldMap.has(id) ? [[fieldMap.get(id)!, { ...rule, ...(rule.contextFieldId ? { contextFieldId: fieldMap.get(rule.contextFieldId) } : {}) }]] : []));
+  if (tracking.performance?.seriesFieldId) tracking.performance.seriesFieldId = fieldMap.get(tracking.performance.seriesFieldId);
   await client.query("UPDATE challenges SET tracking_settings=$2::jsonb WHERE id=$1", [targetId, JSON.stringify(tracking)]);
 
   // The manual checkpoint layout (weeks, sessions, milestones) is the structural

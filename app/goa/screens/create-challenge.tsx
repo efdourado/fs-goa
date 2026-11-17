@@ -14,7 +14,7 @@ import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
 import { MAX_CHALLENGE_RULES } from "../../../lib/goa/domain/rule-limits";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeResponseInput, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
-import { AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage } from "../ui";
+import { SaveButton, AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage } from "../ui";
 
 /** Where the items come from: the books of a daily-progress challenge, the library a list picks, or none at all. */
 type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" | "tables" | "custom"; label: string | null };
@@ -718,7 +718,7 @@ export function CreateChallengeScreen({
               <span className="sr-only">{t("backStep")}</span>
             </Button>
           ) : null}
-          {step < lastStep ? <Button className="px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}<ArrowRightIcon /></Button> : <Button className="px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
+          {step < lastStep ? <Button className="px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}<ArrowRightIcon /></Button> : <SaveButton className="px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</SaveButton>}
         </div>
       </section>
       {leaving ? (
@@ -726,7 +726,7 @@ export function CreateChallengeScreen({
           <p className="text-sm leading-6 text-[var(--muted)]">{t("leaveBody")}</p>
           <ModalActions className="mt-6">
             <Button variant="secondary" className="!rounded-full" onClick={discardAndLeave}>{t("leaveDiscard")}</Button>
-            <Button className="!rounded-full" disabled={!onKeepDraft} onClick={saveDraftAndLeave}>{t("leaveSave")}</Button>
+            <SaveButton className="!rounded-full" disabled={!onKeepDraft} onClick={saveDraftAndLeave}>{t("leaveSave")}</SaveButton>
           </ModalActions>
         </Dialog>
       ) : null}

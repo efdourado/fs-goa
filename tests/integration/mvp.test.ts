@@ -9121,7 +9121,7 @@ test("progress tracking persists explicit workload factors, validates goals, and
   await addAnalysisMetric(owner, cid, { label: "Best load", operation: "max", fieldKey: "weight", groupBy: "item" });
   const initial = await get();
   const ids = initial.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);
-  const trackingSettings = { performance: { mode: "product", fieldIds: ids, sessionAggregation: "sum" }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
+  const trackingSettings = { performance: { mode: "product", fieldIds: ids.slice(0, 2), sessionAggregation: "sum", seriesFieldId: ids[2], rules: { [ids[1]]: { direction: "higher", contextFieldId: ids[0] } } }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
   const saved = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings } });
   assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
   assert.deepEqual((await get()).trackingSettings, trackingSettings);
@@ -9141,7 +9141,9 @@ test("progress tracking persists explicit workload factors, validates goals, and
   assert.deepEqual(copy.trackingSettings?.results?.hiddenPages, ["words", `metric-${copy.metrics.find((metric) => metric.label === initial.metrics[0].label)!.id}`]);
   assert.equal(copy.trackingSettings?.results?.pageOrder[1], "records");
   const copyFields = copy.entryTypes.find((type) => type.parentTypeId)!.fields;
-  assert.deepEqual(copy.trackingSettings?.performance?.fieldIds, copyFields.map((field) => field.id));
+  assert.deepEqual(copy.trackingSettings?.performance?.fieldIds, copyFields.slice(0, 2).map((field) => field.id));
+  assert.equal(copy.trackingSettings?.performance?.seriesFieldId, copyFields[2].id);
+  assert.deepEqual(copy.trackingSettings?.performance?.rules, { [copyFields[1].id!]: { direction: "higher", contextFieldId: copyFields[0].id } });
   assert.ok(copy.trackingSettings?.performance?.fieldIds.every((id) => !ids.includes(id)));
 });
 
@@ -9225,4 +9227,26 @@ test("legacy cleanup retires invisible calculations while preserving entries, au
     await client.query("ROLLBACK");
     client.release();
   }
+});
+
+
+test("progress comparisons validate daily properties, targets and context ownership", async () => {
+  const owner = await register("Daily progress", "daily_progress_rules");
+  const created = await call("POST", "/api/personal/challenges", { session: owner, body: {
+    recipe: "habit", title: "Running comparisons", fields: ["distance", "time", "temperature"].map((key) => ({ key, label: key, type: "number", required: true })),
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  const [distance, time, temperature] = detail.entryTypes.find((type) => type.purpose === "checkin")!.fields;
+  const performance = { mode: "separate", fieldIds: [distance.id, time.id, temperature.id], rules: {
+    [time.id!]: { direction: "lower", contextFieldId: distance.id }, [temperature.id!]: { direction: "target", target: 20 }, [distance.id!]: { direction: "descriptive" },
+  } };
+  const saved = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance } } });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail).trackingSettings?.performance, { ...performance, sessionAggregation: "best" });
+  const foreign = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance: { ...performance, rules: { [time.id!]: { direction: "lower", contextFieldId: "foreign" } } } } } });
+  assert.equal(foreign.response.status, 400);
+  const missingTarget = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance: { ...performance, rules: { [temperature.id!]: { direction: "target" } } } } } });
+  assert.equal(missingTarget.response.status, 400);
 });

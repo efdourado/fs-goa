@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "license": "FSL-1.1-ALv2",
-  "packageManager": "npm@10.9.3",
+  "packageManager": "npm@12.2.2",
   "engines": {
-    "node": "22.x"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -28,38 +28,50 @@
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:studio": "drizzle-kit studio",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "db:seed-progress": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-progress/index.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "drizzle-orm": "0.45.2",
+    "@neondatabase/serverless": "^1.2.1",
+    "drizzle-orm": "0.45.4",
     "html-to-image": "^1.11.13",
-    "next": "^16.4.3",
-    "next-intl": "^4.14.1",
-    "pg": "^8.23.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "next": "^16.4.6",
+    "next-intl": "^4.15.1",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.4",
-    "@next/eslint-plugin-next": "16.2.6",
-    "@tailwindcss/postcss": "4.2.1",
+    "@eslint/js": "9.39.5",
+    "@next/eslint-plugin-next": "16.4.6",
+    "@tailwindcss/postcss": "4.3.5",
     "@types/jsdom": "^30.0.0",
-    "@types/node": "22.19.19",
+    "@types/node": "26.6.6",
     "@types/pg": "^8.23.1",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "drizzle-kit": "0.31.10",
-    "eslint": "9.39.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.5",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "16.4.0",
-    "jsdom": "^29.1.1",
-    "tailwindcss": "4.2.1",
-    "tsx": "^4.23.12",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.59.3"
+    "globals": "17.14.0",
+    "jsdom": "^31.0.1",
+    "tailwindcss": "4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "@parcel/watcher@2.6.0": true,
+    "@swc/core@1.16.1": true
+  }
 }

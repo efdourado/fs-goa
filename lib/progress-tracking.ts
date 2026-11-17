@@ -1,5 +1,12 @@
 import { parseResultPresentation, type ResultPresentation } from "./result-presentation";
 
+export interface ComparisonRule {
+  direction: "higher" | "lower" | "target" | "descriptive";
+  target?: number;
+  /** Compare this field only with records having the same value in this other field. */
+  contextFieldId?: string;
+}
+
 /** Shared contract for the saved rules and the results that explain them. */
 export interface ProgressTracking {
   results?: ResultPresentation;
@@ -7,6 +14,9 @@ export interface ProgressTracking {
     mode: "product" | "separate";
     fieldIds: string[];
     sessionAggregation?: "best" | "sum";
+    rules?: Record<string, ComparisonRule>;
+    /** An explicitly recorded set/attempt number; never inferred from row order. */
+    seriesFieldId?: string;
   };
   consistency?: {
     target: number;
@@ -28,6 +38,23 @@ export function parseProgressTracking(raw: unknown): ProgressTracking {
       || (p.mode === "product" && p.fieldIds.length < 2)) throw new Error("Choose at least two numeric properties for workload");
     if (p.sessionAggregation !== undefined && !["best", "sum"].includes(String(p.sessionAggregation))) throw new Error("Choose how to combine session records");
     result.performance = { sessionAggregation: p.sessionAggregation === "sum" ? "sum" : "best", mode: p.mode as "product" | "separate", fieldIds: p.fieldIds as string[] };
+    if (p.seriesFieldId !== undefined) {
+      if (typeof p.seriesFieldId !== "string" || !p.seriesFieldId) throw new Error("Choose a set or attempt property");
+      if (p.fieldIds.includes(p.seriesFieldId)) throw new Error("A set or attempt number cannot be a performance factor");
+      result.performance.seriesFieldId = p.seriesFieldId;
+    }
+    if (p.rules !== undefined) {
+      if (!p.rules || typeof p.rules !== "object" || Array.isArray(p.rules) || Object.keys(p.rules).length > 20) throw new Error("Invalid comparison rules");
+      const rules: Record<string, ComparisonRule> = {};
+      for (const [id, rawRule] of Object.entries(p.rules)) {
+        const rule = rawRule as ComparisonRule | null;
+        if (!rule || !["higher", "lower", "target", "descriptive"].includes(rule.direction)
+          || (rule.direction === "target" && (typeof rule.target !== "number" || !Number.isFinite(rule.target)))
+          || (rule.contextFieldId !== undefined && (typeof rule.contextFieldId !== "string" || !rule.contextFieldId || rule.contextFieldId === id || rule.contextFieldId === p.seriesFieldId))) throw new Error("Choose a valid comparison rule");
+        rules[id] = { direction: rule.direction, ...(rule.direction === "target" ? { target: rule.target } : {}), ...(rule.contextFieldId ? { contextFieldId: rule.contextFieldId } : {}) };
+      }
+      result.performance.rules = rules;
+    }
   }
   if (value.consistency != null) {
     const c = value.consistency as Record<string, unknown>;
@@ -43,10 +70,23 @@ export function parseProgressTracking(raw: unknown): ProgressTracking {
 export interface TrackingField { id?: string; key: string; label: string; type: string; config?: { unit?: string | null } }
 /** Workload is explicit. Numeric fields alone cannot tell us whether reps are per set or a session total. */
 export function performancePlans(fields: TrackingField[], settings?: ProgressTracking["performance"]) {
-  const numeric = fields.filter((f) => f.id && f.type === "number");
+  const numeric = fields.filter((f) => f.id && f.type === "number" && f.id !== settings?.seriesFieldId);
   const selected = settings?.fieldIds.length ? numeric.filter((f) => settings.fieldIds.includes(f.id!)) : numeric;
-  if (settings?.mode === "product") return selected.length === settings.fieldIds.length && selected.length >= 2 ? [{ fields: selected, product: true }] : [];
-  return selected.map((f) => ({ fields: [f], product: false }));
+  const separate = selected.map((f) => ({ fields: [f], product: false, rule: settings?.rules?.[f.id!] }));
+  if (settings?.mode === "product") return selected.length === settings.fieldIds.length && selected.length >= 2 ? [{ fields: selected, product: true, rule: undefined }, ...separate] : [];
+  return separate;
+}
+
+export const comparisonScore = (value: number, rule?: ComparisonRule): number =>
+  rule?.direction === "lower" ? -value : rule?.direction === "target" ? -Math.abs(value - rule.target!) : value;
+
+/** Positive means improvement; descriptive fields keep their raw change without a success/failure verdict. */
+export function progressChange(first: number, current: number, rule?: ComparisonRule): number | null {
+  if (rule?.direction === "target") {
+    const distance = Math.abs(first - rule.target!);
+    return distance ? Math.round(100 * (distance - Math.abs(current - rule.target!)) / distance) : null;
+  }
+  return first === 0 ? null : Math.round(100 * (current - first) / Math.abs(first)) * (rule?.direction === "lower" ? -1 : 1);
 }
 
 const dayNumber = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000);

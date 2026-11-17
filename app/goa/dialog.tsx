@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useGoaFormat } from "./format";
-import { Button, cx, InModal, StatusMessage } from "./ui";
+import { Button, SaveButton, cx, InModal, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
 export function Dialog({ title, children, onClose, busy = false, wide = false }: {
@@ -101,6 +101,7 @@ export function FormDialog({
   const tc = useTranslations("common");
   const [discard, setDiscard] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const SubmitButton = danger ? Button : SaveButton;
   const close = () => { if (dirty) setDiscard(true); else onCancel(); };
   return (
     <Dialog title={title} busy={busy} onClose={close}>
@@ -119,9 +120,9 @@ export function FormDialog({
         <ModalActions className="border-t border-[var(--line)] pt-4">
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
           {footerStart ? <div className="contents">{footerStart}</div> : null}
-          <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
+          <SubmitButton type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
             {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
-          </Button>
+          </SubmitButton>
         </ModalActions>
         {onDelete && deleting ? <DeleteConfirm {...onDelete} /> : null}
       </form>

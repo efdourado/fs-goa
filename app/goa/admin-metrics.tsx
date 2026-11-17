@@ -13,7 +13,7 @@ import { useAlmanacPages } from "./story/almanac";
 import { useChallengeStory } from "./story/for-challenge";
 import { ThreadPanel } from "./story/view";
 import type { ChallengeDetail, ChallengeSummary, Entry, Id, Metric } from "./types";
-import { AddRow, Button, ChevronIcon, Disclosure, Field, inputClass, PageHeading, Select, SlidersIcon, StatusMessage, Toggle } from "./ui";
+import { SaveButton, AddRow, ChevronIcon, Disclosure, Field, inputClass, PageHeading, Select, SlidersIcon, StatusMessage, Toggle } from "./ui";
 
 const rowIcon = "grid h-8 w-8 flex-none cursor-pointer place-items-center text-[var(--muted)] transition hover:text-[var(--ink-strong)] disabled:cursor-default disabled:opacity-25";
 
@@ -43,7 +43,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
   const byId = new Map(pages.map((page) => [page.id, page]));
   const rated = story.kind === "rated" || (story.kind === "empty" && challenge.entryTypes.some((type) => type.purpose === "rating"));
   const automatic = (rated ? RATED_RESULT_PAGES : DATED_RESULT_PAGES)
-    .filter((id) => id !== "records" || challenge.entryTypes.some((type) => type.parentTypeId))
+    .filter((id) => id !== "records" || challenge.entryTypes.some((type) => (type.parentTypeId || type.submissionMode === "daily" || type.purpose === "progress" || type.purpose === "checkin") && type.answerScope !== "shared" && type.fields.some((field) => field.type === "number")))
     .filter((id) => !["duo", "brought"].includes(id) || input.people.length === 2)
     .filter((id) => id !== "solo" || input.people.length === 1)
     .filter((id) => id !== "people" || input.people.length > 2);
@@ -124,7 +124,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
           {!closed ? <AddRow label={ta("addMetric")} ariaLabel={ta("addMetric")} onClick={() => setEditing("new")} /> : null}
         </section>
         <fieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></fieldset>
-        <Button type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</Button>
+        <SaveButton type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</SaveButton>
       </fieldset>
     </form>
     {preview ? <Dialog title={preview === "thread" ? t("thread") : rows.find((row) => row.id === preview)?.title ?? t("preview")} wide onClose={() => setPreview(null)}>
@@ -226,7 +226,9 @@ function PerformanceDialog({ challenge, entries, onCancel, onSave }: {
   const [value, setValue] = useState(challenge.trackingSettings ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  return <FormDialog title={t("personalRecordsSettings")} dirty={JSON.stringify(value) !== JSON.stringify(challenge.trackingSettings ?? {})} busy={busy} error={error} onCancel={onCancel} onSubmit={async () => {
+  let valid = true;
+  try { parseProgressTracking(value); } catch { valid = false; }
+  return <FormDialog title={t("personalRecordsSettings")} submitDisabled={!valid} dirty={JSON.stringify(value) !== JSON.stringify(challenge.trackingSettings ?? {})} busy={busy} error={error} onCancel={onCancel} onSubmit={async () => {
     setBusy(true); setError(null);
     try { const parsed = parseProgressTracking(value); await onSave(parsed.performance); }
     catch (cause) { setError(f.error(cause)); }
