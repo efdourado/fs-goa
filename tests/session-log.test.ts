@@ -40,26 +40,21 @@ test("um check-in que guarda registros por item é reconhecido pelos tipos; um d
   assert.equal(sessionSpecOf({ entryTypes: [{ ...visitType, parentTypeId: null }] } as unknown as ChallengeDetail), null);
 });
 
-test("o dia de um treino abre o editor com os itens e Pronto, sem abrir uma folha", () => {
+test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', sem 'por item', só o seu histórico", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.doesNotMatch(html, /＋ Registrar o treino de hoje/);
-  assert.match(html, /aria-label="Registrar Treino"/);
-  assert.match(html, /Supino/);
-  assert.match(html, /Agachamento/);
-  assert.match(html, />Pronto<svg[^>]*data-save-lock="closed"/);
-  assert.doesNotMatch(html, /role="dialog"/);
+  assert.match(html, /＋ Registrar o treino de hoje/, "o caminho do dia, num botão só");
   assert.doesNotMatch(html, /Repetir o último/);
   assert.match(html, /<strong[^>]*>2<\/strong> dias com registro desde/, "só os seus dois treinos contam");
   assert.match(html, /semanas? seguidas?/, "um treino conta semanas seguidas, não dias");
   assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu log");
   assert.doesNotMatch(html, /Melhor ·|desde o primeiro/, "o 'por item' é dos Resultados");
-  assert.doesNotMatch(html, /Salvar treino/, "Pronto salva o mesmo editor inline");
+  assert.doesNotMatch(html, /Salvar treino/, "não há botão de salvar: o registro se salva sozinho, na folha");
 });
 
-test("o treino de hoje abre com os valores preenchidos e permite outra sessão inline", () => {
+test("o treino de hoje já registrado aparece num cartão que abre o treino, e dá para registrar outro no mesmo dia", () => {
   const spec = sessionSpecOf(challenge)!;
   const today = dateKeyInSaoPaulo(new Date());
   const withToday = [
@@ -70,10 +65,10 @@ test("o treino de hoje abre com os valores preenchidos e permite outra sessão i
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.match(html, /Supino/);
-  assert.match(html, /value="60"/, "a carga já aparece no campo");
-  assert.match(html, /value="8"/, "as repetições já aparecem no campo");
-  assert.doesNotMatch(html, /aria-label="Abrir Treino"/);
+  assert.match(html, />Treino<\/strong>/, "um treino só no dia: sem número");
+  assert.match(html, />1 item</);
+  assert.match(html, /Supino<\/span><span[^>]*>60 · 8<\/span>/, "cada exercício numa linha, com os números");
+  assert.match(html, /<button[^>]*aria-label="Abrir Treino"/, "o cartão inteiro abre o treino, sem botão Editar");
   assert.doesNotMatch(html, />Editar</);
   assert.match(html, /＋ Novo treino/, "outro treino no mesmo dia");
 });

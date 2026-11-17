@@ -7,7 +7,7 @@ import { Dialog, ModalActions } from "../dialog";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
-import { SaveButton, AvatarMark, BackButton, Button, Disclosure, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, Disclosure, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
 
 // Mirror of `PASSWORD_MIN_LENGTH` in lib/security — the server rejects shorter.
 const PASSWORD_MIN_LENGTH = 10;
@@ -197,25 +197,20 @@ export function AccountScreen({
           <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} disabled={profileBusy} />
         </Field>
         <StatusMessage error={profileMsg.error} success={profileMsg.success} />
-        <SaveButton type="submit" className="w-full" disabled={profileBusy}>{profileBusy ? tc("saving") : t("saveProfile")}</SaveButton>
+        <Button type="submit" className="w-full" disabled={profileBusy}>{profileBusy ? tc("saving") : t("saveProfile")}</Button>
       </form>
 
       <div className="mt-9 border-t border-[var(--line)]">
         <Disclosure summary={t("passwordTitle")}>
           <p className="mb-4 text-xs leading-5 text-[var(--muted)]">{t("passwordSubtitle")}</p>
-          <form className="space-y-4" onSubmit={changePassword} onInput={(event) => {
-            const form = event.currentTarget;
-            const password = form.elements.namedItem("newPassword") as HTMLInputElement;
-            const confirmation = form.elements.namedItem("confirmation") as HTMLInputElement;
-            confirmation.setCustomValidity(confirmation.value && confirmation.value !== password.value ? t("passwordsDontMatch") : "");
-          }}>
+          <form className="space-y-4" onSubmit={changePassword}>
             <Field label={t("currentPassword")}><input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required disabled={pwBusy} /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("newPassword")}><input className={inputClass} name="newPassword" type="password" autoComplete="new-password" required minLength={PASSWORD_MIN_LENGTH} disabled={pwBusy} /></Field>
               <Field label={t("confirmNewPassword")}><input className={inputClass} name="confirmation" type="password" autoComplete="new-password" required minLength={PASSWORD_MIN_LENGTH} disabled={pwBusy} /></Field>
             </div>
             <StatusMessage error={pwMsg.error} success={pwMsg.success} />
-            <SaveButton type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</SaveButton>
+            <Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button>
           </form>
         </Disclosure>
 

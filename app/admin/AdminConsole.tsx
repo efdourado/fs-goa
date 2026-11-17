@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../goa/state-button";
+
 import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
@@ -102,17 +104,19 @@ function Button({
     ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]",
   };
   return (
-    <button
+    <StateButton
       className={cx(
         "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
       )}
       type="button"
+      tone={variant}
+      readiness={disabled !== undefined}
       onClick={onClick}
       disabled={disabled}
     >
       {children}
-    </button>
+    </StateButton>
   );
 }
 
@@ -241,7 +245,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
 
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-black/[0.04] p-1" aria-label="Seções da administração">
         {tabs.map((item) => (
-          <button
+          <StateButton
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
@@ -251,7 +255,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
             )}
           >
             {item.label}
-          </button>
+          </StateButton>
         ))}
       </nav>
 

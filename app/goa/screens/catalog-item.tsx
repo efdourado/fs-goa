@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -25,7 +27,7 @@ function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemD
   return (
     <>
       {/* Settings stay beside the item name at every screen size. */}
-      <button
+      <StateButton
         type="button"
         disabled={!libraries}
         onClick={() => setOpen(true)}
@@ -34,7 +36,7 @@ function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemD
         className="grid h-12 w-12 flex-none cursor-pointer place-items-center rounded-xl text-[var(--muted)] transition duration-200 hover:scale-105 hover:text-[var(--ink)] focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <SlidersIcon className="h-[18px] w-[18px]" />
-      </button>
+      </StateButton>
       {open && libraries ? (
         <EditCatalogItemDialog
           scope={scope}
@@ -167,7 +169,7 @@ export function CatalogItemPage({ item, library, properties, onBack, backLabel, 
           {rounds.map((round) => <li key={round.challengeId} data-active={round.status === "active"}>
             <span className="catalog-item-historyDot" aria-hidden="true" />
             <div className="catalog-item-historyText">
-              <button type="button" className="catalog-item-roundTitle" onClick={() => onOpenChallenge(round.challengeId)}>{round.title}</button>
+              <StateButton type="button" className="catalog-item-roundTitle" onClick={() => onOpenChallenge(round.challengeId)}>{round.title}</StateButton>
               <p>{[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : null, t(`status.${round.status}`)].filter(Boolean).join(" · ")}</p>
               {round.ratingAvg !== null ? <div className="catalog-item-ratingTrack" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.min(100, round.ratingAvg / 5 * 100))}%` }} /></div> : null}
             </div>

@@ -9121,7 +9121,7 @@ test("progress tracking persists explicit workload factors, validates goals, and
   await addAnalysisMetric(owner, cid, { label: "Best load", operation: "max", fieldKey: "weight", groupBy: "item" });
   const initial = await get();
   const ids = initial.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);
-  const trackingSettings = { performance: { mode: "product", fieldIds: ids.slice(0, 2), sessionAggregation: "sum", seriesFieldId: ids[2], rules: { [ids[1]]: { direction: "higher", contextFieldId: ids[0] } } }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
+  const trackingSettings = { performance: { mode: "product", fieldIds: ids, sessionAggregation: "sum" }, consistency: { target: 4, periodDays: 7, count: "sessions" }, results: { hiddenPages: ["words", `metric-${initial.metrics[0].id}`], pageOrder: [`metric-${initial.metrics[0].id}`, "records"] } };
   const saved = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings } });
   assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
   assert.deepEqual((await get()).trackingSettings, trackingSettings);
@@ -9141,9 +9141,7 @@ test("progress tracking persists explicit workload factors, validates goals, and
   assert.deepEqual(copy.trackingSettings?.results?.hiddenPages, ["words", `metric-${copy.metrics.find((metric) => metric.label === initial.metrics[0].label)!.id}`]);
   assert.equal(copy.trackingSettings?.results?.pageOrder[1], "records");
   const copyFields = copy.entryTypes.find((type) => type.parentTypeId)!.fields;
-  assert.deepEqual(copy.trackingSettings?.performance?.fieldIds, copyFields.slice(0, 2).map((field) => field.id));
-  assert.equal(copy.trackingSettings?.performance?.seriesFieldId, copyFields[2].id);
-  assert.deepEqual(copy.trackingSettings?.performance?.rules, { [copyFields[1].id!]: { direction: "higher", contextFieldId: copyFields[0].id } });
+  assert.deepEqual(copy.trackingSettings?.performance?.fieldIds, copyFields.map((field) => field.id));
   assert.ok(copy.trackingSettings?.performance?.fieldIds.every((id) => !ids.includes(id)));
 });
 
@@ -9229,24 +9227,211 @@ test("legacy cleanup retires invisible calculations while preserving entries, au
   }
 });
 
-
-test("progress comparisons validate daily properties, targets and context ownership", async () => {
-  const owner = await register("Daily progress", "daily_progress_rules");
-  const created = await call("POST", "/api/personal/challenges", { session: owner, body: {
-    recipe: "habit", title: "Running comparisons", fields: ["distance", "time", "temperature"].map((key) => ({ key, label: key, type: "number", required: true })),
+test("goal settings cannot change workout properties or delete exercise records", async () => {
+  const owner = await register("Workout Fields", "workout_fields_fix");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Workout fields" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Exercises" } })).body as { id: string };
+  const created = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: {
+    recipe: "custom", recordingMode: "session", title: "Workout", libraryId: library.id, participantIds: [owner.user.id],
+    items: [{ title: "Squat" }], fields: [{ key: "weight", label: "Weight", type: "number", required: true }, { key: "reps", label: "Reps — Set 1", type: "number", required: true }],
   } });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
-  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
-  const [distance, time, temperature] = detail.entryTypes.find((type) => type.purpose === "checkin")!.fields;
-  const performance = { mode: "separate", fieldIds: [distance.id, time.id, temperature.id], rules: {
-    [time.id!]: { direction: "lower", contextFieldId: distance.id }, [temperature.id!]: { direction: "target", target: 20 }, [distance.id!]: { direction: "descriptive" },
-  } };
-  const saved = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance } } });
-  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
-  assert.deepEqual(((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail).trackingSettings?.performance, { ...performance, sessionAggregation: "best" });
-  const foreign = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance: { ...performance, rules: { [time.id!]: { direction: "lower", contextFieldId: "foreign" } } } } } });
-  assert.equal(foreign.response.status, 400);
-  const missingTarget = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { trackingSettings: { performance: { ...performance, rules: { [temperature.id!]: { direction: "target" } } } } } });
-  assert.equal(missingTarget.response.status, 400);
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  const before = await detail();
+  const exercise = before.entryTypes.find((type) => type.parentTypeId)!;
+  const values = Object.fromEntries(exercise.fields.map((field, index) => [field.id!, index ? 10 : 50]));
+  const saved = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: exercise.parentTypeId, occurredOn: "2026-11-17", children: [{ itemId: before.items[0].id, values }] } });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  const entries = async () => (await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body;
+  const savedEntries = await entries();
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/page-count`, { session: owner, body: { enabled: false } })).response.status, 200);
+  for (const enabled of [true, "page_count"]) {
+    const result = await call("PATCH", `/api/challenges/${cid}/page-count`, { session: owner, body: { enabled } });
+    assert.equal(result.response.status, 409, JSON.stringify(result.body));
+  }
+  assert.deepEqual((await detail()).entryTypes, before.entryTypes);
+  assert.deepEqual(await entries(), savedEntries, "the existing workout values and identities are untouched");
+
+  const reading = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "library", title: "Reading", startsOn: "2026-01-01", endsOn: "2026-12-31", items: [{ title: "Book", author: "Author" }] } });
+  assert.equal(reading.response.status, 201, JSON.stringify(reading.body));
+  const bookId = (reading.body as { id: string }).id;
+  const bookBefore = (await call("GET", `/api/challenges/${bookId}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  assert.equal((await call("PATCH", `/api/challenges/${bookId}/page-count`, { session: owner, body: { enabled: false } })).response.status, 200);
+  const bookAfter = (await call("GET", `/api/challenges/${bookId}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  assert.deepEqual(bookAfter.entryTypes, bookBefore.entryTypes, "a primary reading-progress field cannot be removed by the supplementary-goal toggle");
+});
+
+test("list/check-in creation maps optional libraries and repetition without injecting subject-specific fields", async () => {
+  const { challengeRecording } = await import("../../app/goa/challenge-creation");
+  const { challengeRequestBody } = await import("../../app/goa/challenge-request");
+  const owner = await register("Sheet Creator", "sheet_creator");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sheets" } })).body as { id: string }).id;
+  const lib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Things" } })).body as { id: string; kind: string };
+  const library = { ...lib, source: "custom" as const, label: "Things" };
+  for (const [linked, dated] of [[false, true], [true, true], [true, false]]) {
+    const input: import("../../app/goa/types").ChallengeCreationInput = {
+      ...challengeRecording(linked ? library : null, dated, "Your response", "Entry"), title: `Sheet ${linked} ${dated}`,
+      description: "", ruleSections: [], startsOn: null, endsOn: null, generateDaily: false,
+      fields: [{ key: "amount", label: "Amount", type: "number", required: true }, { key: "checked", label: "Checked", type: "boolean", required: true }],
+      items: linked ? [{ title: "A", position: 0 }, { title: "B", position: 1 }] : [], participantIds: [owner.user.id],
+    };
+    const created = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: challengeRequestBody(input) });
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+    const cid = (created.body as { id: string }).id;
+    const d = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+    const primary = d.entryTypes.find((type) => type.isPrimary)!;
+    assert.equal(primary.name, "Your response");
+    assert.deepEqual(primary.fields.map((field) => field.label), ["Amount", "Checked"]);
+    assert.equal(d.entryTypes.flatMap((type) => type.fields).length, 2, "only configured columns exist; no automatic day note, weight, score or goal");
+    assert.equal(d.entryTypes.some((type) => type.semanticKey === "paginas_livro"), false);
+    if (linked && dated) {
+      assert.ok(primary.parentTypeId);
+      assert.equal(d.entryTypes.find((type) => type.id === primary.parentTypeId)!.fields.length, 0);
+    } else assert.equal(primary.parentTypeId, null);
+    assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+    const values = { [primary.fields[0].id!]: 7, [primary.fields[1].id!]: false };
+    const payload = linked && dated
+      ? { entryTypeId: primary.parentTypeId, occurredOn: "2026-11-17", children: d.items.map((item) => ({ itemId: item.id, values })) }
+      : { entryTypeId: primary.id, ...(linked ? { itemId: d.items[0].id } : { occurredOn: "2026-11-17" }), values };
+    const saved = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: payload });
+    assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+    const entries = (await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body as { entries: import("../../app/goa/types").Entry[] };
+    assert.ok(entries.entries.some((entry) => entry.entryTypeId === primary.id && (entry.values as Record<string, unknown>)[primary.fields[1].id!] === false));
+    if (linked && dated) assert.equal(entries.entries.filter((entry) => entry.entryTypeId === primary.id).length, 2, "several selected items still save through the unchanged logger contract");
+  }
+});
+
+test("sheet metadata remains opt-in and validates response labels and note switches", async () => {
+  const owner = await register("Sheet Validation", "sheet_validation");
+  const base = { recipe: "custom", recordingMode: "session", title: "Sheet", libraryKind: "film", items: [{ title: "Item" }], fields: [{ key: "value", label: "Value", type: "text" }] };
+  for (const metadata of [{ responseName: "" }, { responseName: "x".repeat(121) }, { includeSessionNote: "no" }]) {
+    const result = await call("POST", "/api/personal/challenges", { session: owner, body: { ...base, ...metadata } });
+    assert.equal(result.response.status, 400, JSON.stringify(result.body));
+  }
+  const old = await call("POST", "/api/personal/challenges", { session: owner, body: base });
+  assert.equal(old.response.status, 201, JSON.stringify(old.body));
+  const detail = (await call("GET", `/api/challenges/${(old.body as { id: string }).id}`, { session: owner })).body as import("../../app/goa/types").ChallengeDetail;
+  assert.equal(detail.entryTypes.find((type) => !type.parentTypeId)!.fields[0].label, "Como foi?", "older clients retain their existing creation defaults");
+});
+
+test("performance comparisons validate sources, copy field references, and preserve stored workout data", async () => {
+  const owner = await register("Comparison Owner", "comparison_owner");
+  const gid = ((await call("POST", "/api/groups", {session: owner, body: {name: "Comparison tests"}})).body as {id: string}).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, {session: owner, body: {label: "Exercises"}})).body as {id: string};
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {session: owner, body: {
+    recipe: "custom", recordingMode: "session", title: "Set comparisons", libraryId: library.id, participantIds: [owner.user.id],
+    items: [{title: "Squat"}], fields: ["weight", "reps", "set_number"].map((key) => ({key, label: key, type: "number", required: true})),
+  }});
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as {id: string}).id;
+  const get = async (id = cid) => (await call("GET", `/api/challenges/${id}`, {session: owner})).body as import("../../app/goa/types").ChallengeDetail;
+  const before = await get();
+  const record = before.entryTypes.find((type) => type.parentTypeId)!;
+  const [weight, reps, set] = record.fields.map((field) => field.id!);
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, {session: owner, body: {status: "active"}})).response.status, 200);
+  for (const [occurredOn, amount, repetitions] of [["2026-09-01", 50, 8], ["2026-09-02", 50, 10]] as const) {
+    const saved = await call("POST", `/api/challenges/${cid}/entries`, {session: owner, body: {entryTypeId: record.parentTypeId, occurredOn, children: [{itemId: before.items[0].id, values: {[weight]: amount, [reps]: repetitions, [set]: 1}}]}});
+    assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  }
+  const definitionBefore = await get();
+  const entriesBefore = (await call("GET", `/api/challenges/${cid}/entries`, {session: owner})).body;
+
+  const performance = {mode: "separate", fieldIds: [weight, reps], seriesFieldId: set, rules: {[weight]: {direction: "descriptive"}, [reps]: {direction: "higher", contextFieldId: weight}}};
+  assert.equal((await call("PATCH", `/api/challenges/${cid}`, {session: owner, body: {trackingSettings: {performance}}})).response.status, 200);
+  for (const invalid of [
+    {...performance, rules: {[reps]: {direction: "higher", contextFieldId: "foreign-field"}}},
+    {...performance, seriesFieldId: "foreign-field"},
+    {...performance, fieldIds: [weight, reps, set]},
+    {...performance, rules: {[reps]: {direction: "higher", contextFieldId: reps}}},
+    {...performance, rules: {[reps]: {direction: "not-a-direction"}}},
+  ]) assert.equal((await call("PATCH", `/api/challenges/${cid}`, {session: owner, body: {trackingSettings: {performance: invalid}}})).response.status, 400);
+  const after = await get();
+  assert.deepEqual(after.entryTypes, definitionBefore.entryTypes, "comparison settings never alter configured fields");
+  assert.deepEqual((await call("GET", `/api/challenges/${cid}/entries`, {session: owner})).body, entriesBefore, "all record IDs, dates and values survive result settings changes");
+  assert.deepEqual(after.items, before.items);
+  const copyGroup = ((await call("POST", "/api/groups", {session: owner, body: {name: "Copied comparison group"}})).body as {id: string}).id;
+  const clone = await call("POST", `/api/challenges/${cid}/duplicate`, {session: owner, body: {title: "Copied comparisons", targetGroupId: copyGroup, mode: "structure_and_items"}});
+  assert.equal(clone.response.status, 201, JSON.stringify(clone.body));
+  const copied = await get((clone.body as {id: string}).id);
+  const [copiedWeight, copiedReps, copiedSet] = copied.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);
+  assert.deepEqual(copied.trackingSettings?.performance?.fieldIds, [copiedWeight, copiedReps]);
+  assert.equal(copied.trackingSettings?.performance?.seriesFieldId, copiedSet);
+  assert.equal(copied.trackingSettings?.performance?.rules?.[copiedReps].contextFieldId, copiedWeight);
+  assert.equal(copied.trackingSettings?.performance?.rules?.[copiedWeight].direction, "descriptive");
+
+  const dailyCreated = await call("POST", `/api/groups/${gid}/challenges`, {session: owner, body: {recipe: "habit", title: "Running", participantIds: [owner.user.id], fields: [{key: "distance", label: "Distance", type: "number", required: true}, {key: "time", label: "Time", type: "number", required: true}]}});
+  assert.equal(dailyCreated.response.status, 201, JSON.stringify(dailyCreated.body));
+  const dailyId = (dailyCreated.body as {id: string}).id;
+  const daily = await get(dailyId);
+  const [distance, time] = daily.entryTypes.find((type) => type.isPrimary)!.fields.map((field) => field.id!);
+  assert.equal((await call("PATCH", `/api/challenges/${dailyId}`, {session: owner, body: {trackingSettings: {performance: {mode: "separate", fieldIds: [distance, time], rules: {[time]: {direction: "lower", contextFieldId: distance}}}}}})).response.status, 200);
+  assert.equal((await call("PATCH", `/api/challenges/${dailyId}`, {session: owner, body: {trackingSettings: {performance: {mode: "separate", fieldIds: [time], rules: {[time]: {direction: "lower", contextFieldId: weight}}}}}})).response.status, 400, "foreign challenge contexts cannot be used");
+});
+
+test("items and stages use existing item APIs and shared-field creation rejects daily workout sessions", async () => {
+  const owner = await register("Items Stage Owner", "items_stage_owner");
+  const gid = ((await call("POST", "/api/groups", {session:owner,body:{name:"Items and stages"}})).body as {id:string}).id;
+  const lib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, {session:owner,body:{label:"Things"}})).body as {id:string};
+  const made = await call("POST", `/api/groups/${gid}/challenges`, {session:owner,body:{recipe:"custom",title:"Organise things",libraryId:lib.id,participantIds:[owner.user.id],items:[{title:"Existing item"}],fields:[{key:"value",label:"Value",type:"number",required:true}]}});
+  assert.equal(made.response.status,201,JSON.stringify(made.body));
+  const cid = (made.body as {id:string}).id;
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, {session:owner})).body as import("../../app/goa/types").ChallengeDetail;
+  const stages = await call("POST", `/api/challenges/${cid}/checkpoints`, {session:owner,body:{checkpoints:[{title:"Horror",kind:"session"},{title:"Comedy",kind:"session"}]}});
+  assert.equal(stages.response.status,200,JSON.stringify(stages.body));
+  const [a,b] = (stages.body as {checkpoints:Array<{id:string}>}).checkpoints;
+  const added = await call("POST", `/api/challenges/${cid}/items`, {session:owner,body:{items:[{title:"New item",checkpointId:b.id}]}});
+  assert.equal(added.response.status,201,JSON.stringify(added.body));
+  let value = await detail();
+  assert.equal(value.items.find((item) => item.title === "New item")!.checkpointId,b.id);
+  const item = value.items.find((item) => item.title === "Existing item")!;
+  const type = value.entryTypes.find((entry) => entry.isPrimary)!;
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, {session:owner,body:{status:"active"}})).response.status,200);
+  assert.equal((await call("POST", `/api/challenges/${cid}/entries`, {session:owner,body:{entryTypeId:type.id,itemId:item.id,values:{[type.fields[0].id!]:8}}})).response.status,201);
+  const entriesBefore = (await call("GET", `/api/challenges/${cid}/entries`, {session:owner})).body;
+  assert.equal((await call("POST", `/api/challenges/${cid}/items/assign`, {session:owner,body:{assignments:[{itemId:item.id,checkpointId:a.id,position:0}]}})).response.status,200);
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/items/${item.id}`, {session:owner,body:{title:"Edited item"}})).response.status,200);
+  value = await detail();
+  assert.equal(value.items.find((entry) => entry.id === item.id)!.title,"Edited item");
+  assert.equal(value.items.find((entry) => entry.id === item.id)!.checkpointId,a.id);
+  assert.deepEqual((await call("GET", `/api/challenges/${cid}/entries`, {session:owner})).body,entriesBefore);
+  const shared = await call("POST", `/api/challenges/${cid}/entry-types`, {session:owner,body:{name:"Verdict",field:{label:"Verdict",type:"text",required:false}}});
+  assert.equal(shared.response.status,201,JSON.stringify(shared.body));
+  const workout = await call("POST", `/api/groups/${gid}/challenges`, {session:owner,body:{recipe:"custom",recordingMode:"session",title:"Workout",libraryId:lib.id,participantIds:[owner.user.id],items:[{title:"Exercise"}],fields:[{key:"reps",label:"Reps",type:"number"}]}});
+  assert.equal(workout.response.status,201,JSON.stringify(workout.body));
+  const wid = (workout.body as {id:string}).id;
+  const before = (await call("GET", `/api/challenges/${wid}`, {session:owner})).body as import("../../app/goa/types").ChallengeDetail;
+  const rejected = await call("POST", `/api/challenges/${wid}/entry-types`, {session:owner,body:{name:"Shared daily value",field:{label:"Shared daily value",type:"number"}}});
+  assert.equal(rejected.response.status,409);
+  const after = (await call("GET", `/api/challenges/${wid}`, {session:owner})).body as import("../../app/goa/types").ChallengeDetail;
+  assert.deepEqual(after.entryTypes,before.entryTypes);
+});
+
+test("unsupported library properties cannot enable progress through current or legacy requests", async () => {
+  const owner = await register("Progress Availability", "progress_availability");
+  const custom = await call("POST", "/api/personal/catalog/libraries", {session:owner,body:{label:"Things without numeric properties"}});
+  assert.equal(custom.response.status,201,JSON.stringify(custom.body));
+  const library = custom.body as {id:string};
+  const made = await call("POST", "/api/personal/challenges", {session:owner,body:{recipe:"custom",title:"No library goal",libraryId:library.id,items:[{title:"Thing"}],fields:[{key:"response",label:"Response number",type:"number",required:false}]}});
+  assert.equal(made.response.status,201,JSON.stringify(made.body));
+  const cid = (made.body as {id:string}).id;
+  const get = async (id:string) => (await call("GET", `/api/challenges/${id}`, {session:owner})).body as import("../../app/goa/types").ChallengeDetail;
+  const before = await get(cid);
+  for (const enabled of [true,"distance","page_count"]) {
+    assert.equal((await call("PATCH", `/api/challenges/${cid}/page-count`, {session:owner,body:{enabled}})).response.status,409);
+  }
+  assert.deepEqual((await get(cid)).entryTypes,before.entryTypes,"response numbers do not create a library progress goal");
+
+  const books = await call("POST", "/api/personal/challenges", {session:owner,body:{recipe:"bookshelf",title:"Reading list",items:[{title:"A book",author:"An author"}]}});
+  assert.equal(books.response.status,201,JSON.stringify(books.body));
+  const bid = (books.body as {id:string}).id;
+  assert.equal((await call("PATCH", `/api/challenges/${bid}/page-count`, {session:owner,body:{enabled:true}})).response.status,200);
+  const withGoal = await get(bid);
+  const bookLibraryId = withGoal.libraries![0].id!;
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${bookLibraryId}/properties/page_count`, {session:owner,body:{hidden:true}})).response.status,200);
+  for (const enabled of [true,"page_count"]) {
+    assert.equal((await call("PATCH", `/api/challenges/${bid}/page-count`, {session:owner,body:{enabled}})).response.status,409,"hidden pages cannot be enabled even when an older goal exists");
+  }
+  assert.deepEqual((await get(bid)).entryTypes,withGoal.entryTypes,"rejected requests preserve existing fields instead of deleting an old goal");
 });

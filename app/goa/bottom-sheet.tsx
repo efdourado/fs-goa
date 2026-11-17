@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { cx, InModal } from "./ui";
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -72,14 +74,14 @@ export function BottomSheet({
         <div className="mx-auto mb-3 mt-1.5 h-1.5 w-10 rounded-full bg-[var(--wash-strong)]" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
           <h2 id={titleId} className="text-lg font-medium tracking-[-0.02em]">{title}</h2>
-          <button
+          <StateButton
             type="button"
             onClick={onClose}
             aria-label={title}
             className="grid h-9 w-9 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)]"
           >
             <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
-          </button>
+          </StateButton>
         </div>
         <InModal.Provider value>{children}</InModal.Provider>
       </div>

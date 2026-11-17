@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -59,7 +61,7 @@ export function KebabMenu({ label, children }: { label: string; children: (close
 
   return (
     <span className="flex-none">
-      <button
+      <StateButton
         ref={triggerRef}
         type="button"
         aria-haspopup="menu"
@@ -73,7 +75,7 @@ export function KebabMenu({ label, children }: { label: string; children: (close
         )}
       >
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="13" r="1.4" /></svg>
-      </button>
+      </StateButton>
       {open && box && typeof document !== "undefined"
         ? createPortal(
             <div

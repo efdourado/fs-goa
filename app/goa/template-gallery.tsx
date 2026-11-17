@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
@@ -34,7 +36,7 @@ function TemplateGallery({ templates, onOpen, moreHeadingLevel }: { templates: T
                 <span className="truncate text-[11px] text-[var(--muted)] sm:text-xs">{t(`mode.${template.submissionMode}`)}</span>
               </div>
               <h3 className="mt-3 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
-                <button type="button" title={template.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
+                <StateButton type="button" title={template.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</StateButton>
               </h3>
               {template.summary ? <p className="mt-2 hidden text-sm leading-6 text-[var(--muted)] sm:line-clamp-2">{template.summary}</p> : null}
               <p className="mt-4 hidden text-xs text-[var(--muted)] sm:block">

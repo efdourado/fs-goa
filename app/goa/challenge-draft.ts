@@ -11,6 +11,12 @@ import type { ChallengeField, ChallengeResponseInput, ChallengeRule, Id, SharedE
  */
 export interface ChallengeDraftForm {
   step: number;
+  /** Stable navigation when creation steps are reordered. */
+  creationStep?: "setup" | "fields" | "checkpoints" | "people";
+  /** Sheet creator choices; older drafts fall back to their stored structure/mode. */
+  sheetMode?: boolean;
+  libraryEnabled?: boolean;
+  dated?: boolean;
   /** The persisted behaviour behind the creator's "with items" or "without items" choice. */
   structure: "list" | "progress" | "daily";
   title: string;

@@ -1,7 +1,9 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
-import { createContext, Fragment, type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { Children, isValidElement, createContext, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
@@ -38,7 +40,7 @@ export function cx(...classes: Array<string | false | null | undefined>): string
 /** The one "← Back" control at the top of every screen — a chevron plus a label. */
 export function BackButton({ onClick, label, className, labelClassName }: { onClick: () => void; label: string; className?: string; labelClassName?: string }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onClick}
       className={cx(
@@ -54,7 +56,7 @@ export function BackButton({ onClick, label, className, labelClassName }: { onCl
       </svg>
       {/* The label names the parent screen — a group or challenge title can be long. */}
       <span className={cx("min-w-0 max-w-[12rem] truncate sm:max-w-xs", labelClassName)}>{label}</span>
-    </button>
+    </StateButton>
   );
 }
 
@@ -67,13 +69,11 @@ export function ArrowRightIcon({ className = "h-4 w-4" }: { className?: string }
   );
 }
 
-/** Save readiness, independent of the lock used to reopen an existing answer. */
-export function SaveLockIcon({ unlocked }: { unlocked: boolean }) {
-  return <svg data-save-lock={unlocked ? "open" : "closed"} viewBox="0 0 20 20" className="h-4 w-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="4.5" y="9" width="11" height="8" rx="2" />
-    <path d={unlocked ? "M7 9V6a3 3 0 0 1 5.8-1" : "M7 9V6a3 3 0 0 1 6 0v3"} />
-    <path d="M10 12.5v1.5" />
-  </svg>;
+export { LockStateIcon } from "./state-button";
+
+/** Creation uses the same readiness contract as every other action. */
+export function CreationButton(props: Parameters<typeof Button>[0]) {
+  return <Button {...props} />;
 }
 
 /** Set by a modal (dialog, bottom sheet): its buttons are pills. */
@@ -86,7 +86,6 @@ export function Button({
   disabled,
   onClick,
   className,
-  ref,
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -94,7 +93,6 @@ export function Button({
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
-  ref?: Ref<HTMLButtonElement>;
 }) {
   const inModal = useContext(InModal);
   const tones = {
@@ -104,8 +102,7 @@ export function Button({
     danger: "border-[var(--danger-line)] bg-transparent font-light text-[var(--danger)] hover:bg-[var(--danger-soft)]",
   };
   return (
-    <button
-      ref={ref}
+    <StateButton
       className={cx(
         "cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 border px-4 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         inModal ? "rounded-full" : "rounded-xl",
@@ -114,36 +111,13 @@ export function Button({
       )}
       type={type}
       disabled={disabled}
+      readiness={disabled !== undefined || type === "submit"}
+      tone={variant}
       onClick={onClick}
     >
-      {children}
-    </button>
+      {disabled !== undefined || type === "submit" ? Children.toArray(children).filter((child) => !isValidElement(child) || child.type !== ArrowRightIcon) : children}
+    </StateButton>
   );
-}
-
-/** All saves share one readiness icon. Native constraints complement each form's explicit domain rules. */
-export function SaveButton({ children, disabled, ...props }: ComponentProps<typeof Button>) {
-  const button = useRef<HTMLButtonElement>(null);
-  const snapshot = useCallback(() => {
-    const form = button.current?.form;
-    if (!form) return true;
-    return Array.from(form.elements).every((element) => {
-      const field = element as HTMLInputElement;
-      return !field.willValidate || (field.validity.valid && (!field.required || field.type === "checkbox" || field.type === "radio" || Boolean(field.value.trim())));
-    });
-  }, []);
-  const subscribe = useCallback((notify: () => void) => {
-    const form = button.current?.form;
-    if (!form) return () => {};
-    form.addEventListener("input", notify);
-    form.addEventListener("change", notify);
-    const observer = new form.ownerDocument.defaultView!.MutationObserver(notify);
-    observer.observe(form, { subtree: true, childList: true, attributes: true, attributeFilter: ["value", "required", "disabled", "min", "max", "minlength", "maxlength", "pattern", "type", "checked"] });
-    return () => { form.removeEventListener("input", notify); form.removeEventListener("change", notify); observer.disconnect(); };
-  }, []);
-  const nativeReady = useSyncExternalStore(subscribe, snapshot, () => true);
-  const locked = Boolean(disabled) || !nativeReady;
-  return <Button {...props} ref={button} disabled={locked}>{children}<SaveLockIcon unlocked={!locked} /></Button>;
 }
 
 function CircleCheckIcon({ className }: { className?: string }) {
@@ -250,7 +224,7 @@ export function SearchField({
         open ? openClassName : "w-9",
       )}
     >
-      <button
+      <StateButton
         type="button"
         aria-label={placeholder}
         aria-expanded={open}
@@ -259,7 +233,7 @@ export function SearchField({
         className={cx("absolute inset-y-0 left-0 z-10 grid w-9 cursor-pointer place-items-center rounded-full transition-colors hover:text-[var(--ink)]", open || value ? "text-[var(--ink)]" : "text-[var(--muted)]")}
       >
         <SearchIcon className="h-3.5 w-3.5" />
-      </button>
+      </StateButton>
       {open ? (
         <input
           ref={inputRef}
@@ -440,7 +414,7 @@ export function Select<T extends string>({
 
   return (
     <>
-      <button
+      <StateButton
         ref={triggerRef}
         type="button"
         id={id}
@@ -455,7 +429,7 @@ export function Select<T extends string>({
       >
         <span className={cx("min-w-0 truncate", !selected && "text-[var(--muted)]")}>{selected?.label ?? placeholder ?? ""}</span>
         {chevron ? <SwitchIcon className="h-3.5 w-3.5 flex-none text-[var(--muted)]" /> : null}
-      </button>
+      </StateButton>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <div
         ref={listRef}
@@ -476,7 +450,7 @@ export function Select<T extends string>({
           return (
             <Fragment key={option.value}>
             {heading ? <p className="px-3 pb-1 pt-2.5 text-xs text-[var(--muted)]" role="presentation">{heading}</p> : null}
-            <button
+            <StateButton
               type="button"
               role="option"
               aria-selected={chosen}
@@ -491,7 +465,7 @@ export function Select<T extends string>({
             >
               <span className="min-w-0 truncate">{option.label || "\u00a0"}</span>
               {chosen ? <CircleCheckIcon className="h-4 w-4 flex-none text-[var(--ink)]" /> : null}
-            </button>
+            </StateButton>
             </Fragment>
           );
         })}
@@ -521,17 +495,17 @@ export function LinkPill({ url, placeholder, copied, busy = false, onCopy, onRen
   const iconButton = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--ink)] transition hover:bg-[var(--wash)] disabled:cursor-default";
   return (
     <div className="flex h-[46px] items-center gap-2 rounded-full border border-[var(--line)] px-2">
-      <button type="button" onClick={onCopy} disabled={!url} aria-label={copied ? copiedLabel : copyLabel} title={copied ? copiedLabel : copyLabel} className={iconButton}>
+      <StateButton type="button" onClick={onCopy} disabled={!url} aria-label={copied ? copiedLabel : copyLabel} title={copied ? copiedLabel : copyLabel} className={iconButton}>
         <CopyCheckIcon done={copied} className="h-[18px] w-[18px]" />
-      </button>
+      </StateButton>
       {url ? (
         <input ref={inputRef} className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-[var(--ink)] outline-none" value={url} readOnly aria-label={urlLabel} onFocus={(event) => event.currentTarget.select()} />
       ) : (
         <span className="min-w-0 flex-1 truncate text-sm text-[var(--muted)]">{placeholder ?? "\u00a0"}</span>
       )}
-      <button type="button" onClick={onRenew} disabled={busy} aria-label={renewLabel} title={renewLabel} className={cx(iconButton, "disabled:opacity-55")}>
+      <StateButton type="button" onClick={onRenew} disabled={busy} aria-label={renewLabel} title={renewLabel} className={cx(iconButton, "disabled:opacity-55")}>
         <svg viewBox="0 0 16 16" className={cx("h-[18px] w-[18px]", busy && "animate-spin")} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.9h-2.9" /></svg>
-      </button>
+      </StateButton>
     </div>
   );
 }
@@ -556,7 +530,7 @@ export function BoxSection({ title, hint, danger = false, mark, children }: {
 export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLabel: string; onClick: () => void }) {
   return (
     <div className="relative flex items-center py-1 before:absolute before:left-[22px] before:right-0 before:top-1/2 before:h-px before:bg-[repeating-linear-gradient(90deg,var(--line)_0_6px,transparent_6px_12px)] before:content-['']">
-      <button type="button" onClick={onClick} aria-label={ariaLabel} className="relative z-[1] grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border border-[var(--ink)] bg-[var(--canvas)] text-xl font-light leading-none text-[var(--ink)] transition hover:bg-[var(--ink)] hover:text-[var(--canvas)]">＋</button>
+      <StateButton type="button" onClick={onClick} aria-label={ariaLabel} className="relative z-[1] grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border border-[var(--ink)] bg-[var(--canvas)] text-xl font-light leading-none text-[var(--ink)] transition hover:bg-[var(--ink)] hover:text-[var(--canvas)]">＋</StateButton>
       <span className="relative z-[1] ml-3.5 bg-[var(--canvas)] pr-2.5 text-sm text-[var(--muted)]" aria-hidden="true">{label}</span>
     </div>
   );
@@ -577,7 +551,7 @@ export function choicePillClass({ active = false, dashed = false }: { active?: b
   );
 }
 
-export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false, save = false }: {
+export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -590,7 +564,6 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   submitDisabled?: boolean;
   maxLength?: number;
   className?: string;
-  save?: boolean;
   /** Takes the cursor as it appears, its text selected (a suggestion is kept with Enter or replaced by typing). */
   takesCursor?: boolean;
 }) {
@@ -605,9 +578,9 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   return (
     <div className={cx("flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15", className)}>
       <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
-      <button type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
-        {save ? <SaveLockIcon unlocked={!disabled && !submitDisabled && Boolean(value.trim())} /> : <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>}
-      </button>
+      <StateButton type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
+      </StateButton>
     </div>
   );
 }
@@ -615,7 +588,7 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
 export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel: string; onClick: () => void }) {
   return (
     <div className="flex items-center border-t border-[var(--line)] py-3.5">
-      <button type="button" onClick={onClick} aria-label={ariaLabel} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full border border-dashed border-[var(--muted)] text-xs font-light leading-none transition hover:border-solid hover:border-[var(--ink)]">＋</button>
+      <StateButton type="button" onClick={onClick} aria-label={ariaLabel} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full border border-dashed border-[var(--muted)] text-xs font-light leading-none transition hover:border-solid hover:border-[var(--ink)]">＋</StateButton>
       <span className="ml-3.5 text-sm text-[var(--muted)]" aria-hidden="true">{label}</span>
     </div>
   );
@@ -764,9 +737,9 @@ export function Toaster() {
             ? <CircleExclamationIcon className="mt-[3px] h-3.5 w-3.5 flex-none text-[var(--danger)] opacity-70" />
             : <CircleCheckIcon className="mt-[3px] h-3.5 w-3.5 flex-none text-[var(--muted)]" />}
           <span className="min-w-0 flex-1 leading-5">{toast.text}</span>
-          <button type="button" onClick={() => dismissToasts((one) => one.id === toast.id)} aria-label={tc("close")} className="mt-[3px] flex-none cursor-pointer rounded-full text-[var(--muted)] opacity-60 transition hover:text-[var(--ink)] hover:opacity-100">
+          <StateButton type="button" onClick={() => dismissToasts((one) => one.id === toast.id)} aria-label={tc("close")} className="mt-[3px] flex-none cursor-pointer rounded-full text-[var(--muted)] opacity-60 transition hover:text-[var(--ink)] hover:opacity-100">
             <CircleMinusIcon className="h-3.5 w-3.5" />
-          </button>
+          </StateButton>
         </div>
       ))}
     </div>
@@ -797,13 +770,13 @@ export function EmptyState({
   );
   if (onClick) {
     return (
-      <button
+      <StateButton
         type="button"
         onClick={onClick}
         className={cx(shell, "group block cursor-pointer transition hover:border-[var(--main-line)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 [&_h3]:transition hover:[&_h3]:text-[var(--ink-strong)]")}
       >
         {body}
-      </button>
+      </StateButton>
     );
   }
   return (
@@ -951,7 +924,7 @@ export function Toggle({
   ariaLabel?: string;
 }) {
   const control = (
-    <button
+    <StateButton
       type="button"
       role="switch"
       aria-checked={checked}
@@ -964,7 +937,7 @@ export function Toggle({
       )}
     >
       <span className={cx("h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-5" : "translate-x-0")} />
-    </button>
+    </StateButton>
   );
   if (!label && !hint) return <span className={className}>{control}</span>;
   return (
@@ -998,7 +971,7 @@ export function SelectableCards<T extends string>({
         const active = option.value === value;
         const fillsLastRow = columns === 2 && options.length % 2 === 1 && index === options.length - 1;
         return (
-          <button
+          <StateButton
             key={option.value}
             type="button"
             disabled={disabled}
@@ -1014,7 +987,7 @@ export function SelectableCards<T extends string>({
           >
             <strong className="text-[13.5px] font-medium">{option.label}</strong>
             {option.hint ? <span className={cx("text-[11.5px]", active ? "text-white/75" : "text-[var(--muted)]")}>{option.hint}</span> : null}
-          </button>
+          </StateButton>
         );
       })}
     </div>
@@ -1095,7 +1068,7 @@ export function SchedulePeriodFields({
         {DURATION_PRESETS.map((preset) => {
           const active = matchesPreset(preset);
           return (
-            <button
+            <StateButton
               key={preset.key}
               type="button"
               disabled={disabled}
@@ -1107,7 +1080,7 @@ export function SchedulePeriodFields({
               )}
             >
               {t(`preset.${preset.key}`)}
-            </button>
+            </StateButton>
           );
         })}
       </div>
@@ -1202,12 +1175,12 @@ export function AppHeader({
     // A phone navigates by the dock, so it has no header at all (the logo lives on the About page).
     <header className="sticky top-0 z-30 hidden border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl sm:block">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
-        <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
+        <StateButton className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></StateButton>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenCatalog}>{t("catalogue")}</button>
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
-          <button
+          <StateButton className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</StateButton>
+          <StateButton className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenCatalog}>{t("catalogue")}</StateButton>
+          <StateButton className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</StateButton>
+          <StateButton
             className="hidden shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:flex"
             type="button"
             onClick={onOpenYou}
@@ -1218,7 +1191,7 @@ export function AppHeader({
               <strong className="block text-sm">{user.name}</strong>
               <span className="block text-xs text-[var(--muted)]">@{user.username}</span>
             </span>
-          </button>
+          </StateButton>
           <div className="hidden items-center gap-0.5 sm:flex sm:gap-2">
             <NotificationsMenu
               notifications={notifications}
@@ -1227,14 +1200,14 @@ export function AppHeader({
             />
             <SettingsMenu />
           </div>
-          <button
+          <StateButton
             className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}
             type="button"
             disabled={busy}
             onClick={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }}
           >
             {busy ? t("signingOut") : t("signOut")}
-          </button>
+          </StateButton>
         </div>
       </div>
     </header>
@@ -1305,14 +1278,14 @@ export function NotificationList({
             <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
             {/* Two halves of the row: Accept, the invite page's green pill in small; Decline, quiet. */}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}
+              <StateButton type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}
                 className="inline-flex min-h-8 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--main)] px-3 text-[13px] font-medium text-white shadow-[0_8px_20px_-10px_var(--main)] transition hover:-translate-y-px hover:shadow-[0_12px_24px_-10px_var(--main)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0">
                 {pendingId === request.id ? "…" : t("accept")}
-              </button>
-              <button type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}
+              </StateButton>
+              <StateButton type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}
                 className="inline-flex min-h-8 w-full cursor-pointer items-center justify-center rounded-full px-3 text-xs font-light text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55">
                 {t("decline")}
-              </button>
+              </StateButton>
             </div>
           </li>
         ))}
@@ -1352,7 +1325,7 @@ function NotificationsMenu({
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
+      <StateButton
         className="relative grid h-9 w-9 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -1360,7 +1333,7 @@ function NotificationsMenu({
         aria-expanded={open}
       >
         <NotificationBell count={count} />
-      </button>
+      </StateButton>
       {open ? (
         <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
           <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">

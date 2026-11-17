@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -86,9 +88,9 @@ export function InviteScreen({
             <div className="mt-10"><StatusMessage error={preview.status === "expired" ? t("expired") : preview.status === "revoked" ? t("revoked") : t("exhausted")} /></div>
           ) : (
             <div className="mt-10 flex flex-col items-center gap-3">
-              <button type="button" className={acceptButton} disabled={busy} onClick={() => void accept()}>
+              <StateButton type="button" className={acceptButton} disabled={busy} onClick={() => void accept()}>
                 {busy ? t("accepting") : user ? t("accept") : t("signInToAccept")}
-              </button>
+              </StateButton>
               {user ? <p className="text-xs text-[var(--muted)]">{t.rich("joiningAs", { name: user.name, b: strong })}</p> : null}
               {preview.expiresAt ? <p className="text-xs text-[var(--muted)]">{t("validUntil", { date: f.dateTime(preview.expiresAt) })}</p> : null}
             </div>
@@ -118,7 +120,7 @@ export function InviteAcceptedScreen({
           ? t.rich("acceptedBodyChallenge", { groupName: invitation.groupName, challengeTitle: invitation.challengeTitle ?? "", b: (chunks) => <strong className="font-semibold text-[var(--ink)]">{chunks}</strong> })
           : t.rich("acceptedBodyGroup", { groupName: invitation.groupName, b: (chunks) => <strong className="font-semibold text-[var(--ink)]">{chunks}</strong> })}
       </p>
-      <button type="button" className={cx(acceptButton, "mt-10")} onClick={onContinue}>{challenge ? t("openChallenge") : t("openGroup")}</button>
+      <StateButton type="button" className={cx(acceptButton, "mt-10")} onClick={onContinue}>{challenge ? t("openChallenge") : t("openGroup")}</StateButton>
     </main>
   );
 }

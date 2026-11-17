@@ -93,7 +93,7 @@ test("check-in handling has its own section, apart from performance calculations
   ] } as unknown as ChallengeDetail;
   const html = renderWithIntl(createElement(AdminMetrics, { challenge: workout, entries: [], onSaveSettings: noop, onSaveMetric: noop, onDeleteMetric: noop }));
   assert.doesNotMatch(html, /Cálculos de desempenho/);
-  assert.match(html, /Editar Recordes pessoais/);
+  assert.match(html, /Editar Progresso e recordes pessoais/);
   assert.match(html, /Como contar os check-ins/);
   assert.match(html, /aria-haspopup="listbox"/);
   assert.doesNotMatch(html, /<select/);

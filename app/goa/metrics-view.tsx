@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { metricMinimum } from "./metric-editor";
@@ -81,14 +83,14 @@ export function MetricBlock({ metric, hideThinLabel = false, showExplanation = f
           <>
             <ol className="mt-2">{shown.map(row)}</ol>
             {overflow > 0 ? (
-              <button
+              <StateButton
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
                 aria-expanded={expanded}
                 className="mt-3 min-h-9 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
               >
                 {expanded ? t("seriesShowLess") : t("seriesShowAll", { count: visibleRows.length })}
-              </button>
+              </StateButton>
             ) : null}
           </>
         ) : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>

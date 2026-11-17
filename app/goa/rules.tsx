@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
@@ -89,16 +91,16 @@ export function RuleSectionsEditor({
           return (
             <li className="border-t border-[var(--line)] first:border-t-0" key={index}>
               <div className="flex items-center gap-1">
-                <button type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : index)} className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2.5 text-left">
+                <StateButton type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : index)} className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2.5 text-left">
                   <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-[var(--ink)] text-[13px] font-medium tabular-nums">{index + 1}</span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[15px] font-medium">{rule.title.trim() || t("ruleN", { n: index + 1 })}</span>
                     <span className={cx("truncate text-xs", incomplete ? "text-[var(--danger)]" : "text-[var(--muted)]")}>{line}</span>
                   </span>
-                </button>
-                <button type="button" className={rowIconClass} disabled={disabled || index === 0} onClick={() => { move(index, -1); if (isOpen) setOpen(index - 1); }} aria-label={t("moveUp")} title={t("moveUp")}><ChevronIcon dir="up" /></button>
-                <button type="button" className={rowIconClass} disabled={disabled || index === value.length - 1} onClick={() => { move(index, 1); if (isOpen) setOpen(index + 1); }} aria-label={t("moveDown")} title={t("moveDown")}><ChevronIcon dir="down" /></button>
-                <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} disabled={disabled} onClick={() => removeRule(index)} aria-label={t("remove")} title={t("remove")}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+                </StateButton>
+                <StateButton type="button" className={rowIconClass} disabled={disabled || index === 0} onClick={() => { move(index, -1); if (isOpen) setOpen(index - 1); }} aria-label={t("moveUp")} title={t("moveUp")}><ChevronIcon dir="up" /></StateButton>
+                <StateButton type="button" className={rowIconClass} disabled={disabled || index === value.length - 1} onClick={() => { move(index, 1); if (isOpen) setOpen(index + 1); }} aria-label={t("moveDown")} title={t("moveDown")}><ChevronIcon dir="down" /></StateButton>
+                <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} disabled={disabled} onClick={() => removeRule(index)} aria-label={t("remove")} title={t("remove")}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
               </div>
               {isOpen ? (
                 <div className="space-y-3 pb-5 pl-[46px]">
@@ -110,7 +112,7 @@ export function RuleSectionsEditor({
                         <div key={topicIndex}>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <strong className="text-xs text-[var(--muted)]">{t("topicN", { n: `${index + 1}.${topicIndex + 1}` })}</strong>
-                            <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => removeTopic(index, topicIndex)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+                            <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => removeTopic(index, topicIndex)}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
                           </div>
                           <label className="block"><span className={labelClass}>{t("topicTitleLabel")}</span><input className={inputClass} value={topic.title} onChange={(event) => updateTopic(index, topicIndex, { title: event.target.value })} placeholder={t("topicTitlePlaceholder")} maxLength={160} disabled={disabled} /></label>
                           <label className="mt-2 block"><span className={labelClass}>{t("topicDescriptionLabel")}</span><textarea className={inputClass} rows={2} value={topic.description} onChange={(event) => updateTopic(index, topicIndex, { description: event.target.value })} placeholder={t("topicDescriptionPlaceholder")} maxLength={10000} disabled={disabled} /></label>

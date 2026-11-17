@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
@@ -66,7 +68,7 @@ function CompactSelect<T extends string>({ label, value, onChange, options, clas
  */
 function IndexRow({ label, count, on, onClick, box = false }: { label: string; count?: number; on: boolean; onClick: () => void; box?: boolean }) {
   return (
-    <button
+    <StateButton
       type="button"
       aria-pressed={on}
       onClick={onClick}
@@ -82,7 +84,7 @@ function IndexRow({ label, count, on, onClick, box = false }: { label: string; c
       )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count === undefined ? null : <span className="flex-none text-xs font-normal text-[var(--muted)]">{count}</span>}
-    </button>
+    </StateButton>
   );
 }
 
@@ -329,7 +331,7 @@ export function CatalogWorkspaceScreen({
           // "＋" of "＋ Library" below. On a computer they show on the open library, or on a row under the pointer.
           <div key={entry.id} className={cx("group flex min-h-11 items-center gap-2.5 text-[15px] lg:min-h-9 lg:text-sm", active ? "font-medium text-[var(--ink)]" : "text-[var(--muted)]")}>
             <span aria-hidden="true" className={cx("h-1.5 w-1.5 flex-none rounded-full", active ? "bg-[var(--main)]" : "bg-transparent")} />
-            <button
+            <StateButton
               type="button"
               aria-label={`${tl("libraryActions")}: ${libraryName(entry)}`}
               title={tl("libraryActions")}
@@ -341,8 +343,8 @@ export function CatalogWorkspaceScreen({
               )}
             >
               <SlidersIcon className="h-3 w-3" />
-            </button>
-            <button
+            </StateButton>
+            <StateButton
               type="button"
               aria-pressed={active}
               onClick={() => { chooseLibrary(entry.kind); setSheet(null); }}
@@ -350,16 +352,16 @@ export function CatalogWorkspaceScreen({
             >
               <span className="min-w-0 flex-1 truncate">{libraryName(entry)}</span>
               <span className="flex-none text-xs font-normal text-[var(--muted)]">{countByKind.get(entry.kind)?.total ?? 0}</span>
-            </button>
+            </StateButton>
           </div>
         );
       })}
       {canManage ? (
-        <button type="button" onClick={() => { setSheet(null); setDialog("new"); }} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
+        <StateButton type="button" onClick={() => { setSheet(null); setDialog("new"); }} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
           <span aria-hidden="true" className="w-1.5 flex-none" />
           <svg viewBox="0 0 12 12" className="h-3 w-3 flex-none" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" /></svg>
           {tl("addLibrary")}
-        </button>
+        </StateButton>
       ) : null}
     </div>
   );
@@ -372,12 +374,12 @@ export function CatalogWorkspaceScreen({
       <>
         {(open ? rows : rows.slice(0, FACET_SIZE)).map(render)}
         {open ? null : (
-          <button type="button" onClick={() => setOpenFacets([...openFacets, key])} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
+          <StateButton type="button" onClick={() => setOpenFacets([...openFacets, key])} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
             <span aria-hidden="true" className="grid w-4 flex-none place-items-center">
               <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><path d="M6 1.5v9M1.5 6h9" /></svg>
             </span>
             {t("moreFacets", { count: rows.length - FACET_SIZE })}
-          </button>
+          </StateButton>
         )}
       </>
     );
@@ -440,7 +442,7 @@ export function CatalogWorkspaceScreen({
 
           <section className="min-w-0 flex-1" aria-label={libraryName(library)}>
             <div className="mt-0.5 flex items-center justify-between gap-3 lg:hidden">
-              <button
+              <StateButton
                 type="button"
                 onClick={() => setSheet("libraries")}
                 aria-haspopup="dialog"
@@ -449,9 +451,9 @@ export function CatalogWorkspaceScreen({
               >
                 <span className="truncate">{libraryName(library)}</span>
                 <SwitchIcon className="h-5 w-5 flex-none text-[var(--muted)]" />
-              </button>
+              </StateButton>
               {canManage ? (
-                <button
+                <StateButton
                   type="button"
                   onClick={() => { setNotice(null); setDialog("add"); }}
                   aria-label={t("addItem")}
@@ -459,14 +461,14 @@ export function CatalogWorkspaceScreen({
                   className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:hidden"
                 >
                   <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-                </button>
+                </StateButton>
               ) : null}
             </div>
 
             {/* Search takes the row; Sort, Select and ＋ Item sit together at its end (on a phone, the row below it, with Filter). */}
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3 lg:mt-0">
               <div className="flex min-w-0 basis-full items-center gap-3 sm:mr-6 sm:basis-0 sm:flex-1">
-              <button
+              <StateButton
                 type="button"
                 onClick={toggleIndex}
                 aria-expanded={indexOpen}
@@ -476,7 +478,7 @@ export function CatalogWorkspaceScreen({
                 className="-ml-2 -mr-1 hidden h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:grid"
               >
                 <MenuIcon />
-              </button>
+              </StateButton>
               <label className="group relative flex h-11 min-w-0 flex-1 cursor-text items-center gap-2.5">
                 <SearchIcon />
                 <input
@@ -490,7 +492,7 @@ export function CatalogWorkspaceScreen({
                 {/* A hairline that grows in from the left while you type (and stays while there's text). */}
                 <span aria-hidden="true" className={cx("pointer-events-none absolute bottom-0 left-0 h-px bg-[var(--line)] transition-[width] duration-500 ease-[cubic-bezier(.22,1,.36,1)] group-focus-within:w-full motion-reduce:transition-none", query ? "w-full" : "w-0")} />
               </label>
-              <button
+              <StateButton
                 type="button"
                 onClick={() => setSheet("filters")}
                 aria-label={t("filter")}
@@ -499,16 +501,16 @@ export function CatalogWorkspaceScreen({
               >
                 <MenuIcon />
                 {activeChips.length ? <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--main)]" /> : null}
-              </button>
+              </StateButton>
               </div>
               {/* Sort and Select are left off phones for now. */}
               <div className="flex flex-1 items-center justify-end gap-2 max-sm:hidden sm:flex-none">
 
                 {scoped.length ? <CompactSelect<Sort> className="max-sm:hidden" label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} /> : null}
                 {canManage && scoped.length ? (
-                  <button type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={cx(chipClass(selecting), "max-sm:hidden")}>
+                  <StateButton type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={cx(chipClass(selecting), "max-sm:hidden")}>
                     {selecting ? t("doneSelecting") : t("select")}
-                  </button>
+                  </StateButton>
                 ) : null}
                 {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5 !text-[13px] max-sm:!hidden" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
               </div>
@@ -517,9 +519,9 @@ export function CatalogWorkspaceScreen({
             {activeChips.length ? (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {activeChips.map((chip) => (
-                  <button key={chip.key} type="button" onClick={chip.remove} aria-label={t("removeFilter", { name: chip.label })} className={chipClass(true)}>
+                  <StateButton key={chip.key} type="button" onClick={chip.remove} aria-label={t("removeFilter", { name: chip.label })} className={chipClass(true)}>
                     {chip.label}<span aria-hidden="true" className="text-[var(--muted)]">×</span>
-                  </button>
+                  </StateButton>
                 ))}
               </div>
             ) : null}
@@ -586,9 +588,9 @@ export function CatalogWorkspaceScreen({
                     </section>
                   ))}
                   {hiddenCount > 0 ? (
-                    <button type="button" onClick={() => setShown(shown + PAGE_SIZE)} className={cx(chipClass(), "mx-auto flex")}>
+                    <StateButton type="button" onClick={() => setShown(shown + PAGE_SIZE)} className={cx(chipClass(), "mx-auto flex")}>
                       {t("showMore", { count: Math.min(PAGE_SIZE, hiddenCount) })}
-                    </button>
+                    </StateButton>
                   ) : null}
                 </div>
               )}

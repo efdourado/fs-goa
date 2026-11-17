@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
@@ -134,7 +136,7 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
           {offered.map((trait) => {
             const on = chosen.includes(trait.key);
             return (
-              <button
+              <StateButton
                 key={trait.key}
                 type="button"
                 aria-pressed={on}
@@ -143,7 +145,7 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
               >
                 {on ? <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
                 {trait.label}
-              </button>
+              </StateButton>
             );
           })}
         </div>
@@ -161,7 +163,7 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
           </ul>
           <div className="mt-4 flex items-center justify-between">
             <p className="text-[13px] font-medium">{t("preview")}</p>
-            <button type="button" className="cursor-pointer text-xs text-[var(--main-strong)] hover:underline" onClick={() => setAttempt((value) => value + 1)}>{t("another")}</button>
+            <StateButton type="button" className="cursor-pointer text-xs text-[var(--main-strong)] hover:underline" onClick={() => setAttempt((value) => value + 1)}>{t("another")}</StateButton>
           </div>
           <ol className="mt-2 max-h-72 divide-y divide-[var(--line)] overflow-y-auto rounded-2xl border border-[var(--line)]">
             {result.order.map((key, index) => (

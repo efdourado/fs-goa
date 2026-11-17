@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
@@ -151,9 +153,9 @@ export function RevealPanel({
             <p className="text-sm text-white/80">{t("rateFirst")}</p>
           )
         ) : (
-          <button type="button" className="cursor-pointer text-sm text-white/70 underline underline-offset-4 hover:text-white" onClick={() => setPeek(true)}>
+          <StateButton type="button" className="cursor-pointer text-sm text-white/70 underline underline-offset-4 hover:text-white" onClick={() => setPeek(true)}>
             {t("showAnyway")}
-          </button>
+          </StateButton>
         )}
         {sealed && missing.some((participant) => participant.userId !== userId) ? (
           <span className="text-xs text-white/55">{t("stillMissing", { names: missing.map((participant) => participant.userId === userId ? t("you") : participant.name).join(", ") })}</span>
@@ -161,14 +163,14 @@ export function RevealPanel({
       </div>
       {sealed && onCreateInvite ? (
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
-          <button
+          <StateButton
             type="button"
             className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-xl border border-white/20 px-4 text-sm text-white/90 transition hover:bg-white/10 disabled:opacity-50"
             disabled={invite === "busy"}
             onClick={() => void shareInvite()}
           >
             {participants.length < 2 ? t("inviteFirst") : t("inviteMore")}
-          </button>
+          </StateButton>
           <span className="text-xs text-white/55" role="status">
             {invite === "copied" ? t("inviteCopied") : invite === "shared" ? t("inviteShared") : invite === "failed" ? t("inviteFailed") : t("inviteHint")}
           </span>
@@ -271,9 +273,9 @@ function RevealStage({
     <section key={run} className="relative overflow-hidden rounded-[24px] bg-[var(--spotlight)] p-5 text-[var(--spotlight-ink)] sm:p-8">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-xl font-light tracking-[-0.03em]">{item.title}</h3>
-        <button type="button" className="cursor-pointer text-xs text-white/60 underline-offset-4 hover:text-white hover:underline" onClick={() => setRun((value) => value + 1)}>
+        <StateButton type="button" className="cursor-pointer text-xs text-white/60 underline-offset-4 hover:text-white hover:underline" onClick={() => setRun((value) => value + 1)}>
           ↺ {t("replay")}
-        </button>
+        </StateButton>
       </div>
 
       <div className="mt-6">

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
@@ -62,16 +64,16 @@ export function ItemEditorDialog({ item, library, maxTitleLength, requireAuthor 
   }
 
   return (
-    <FormDialog title={t("editTitle")} dirty={dirty} busy={busy} error={error ?? propertiesError} onCancel={onCancel} onSubmit={submit} submitDisabled={!properties || Boolean(propertiesError) || (requireAuthor && library?.kind === "book" && !String(values.author ?? "").trim())} onDelete={onRemove}>
+    <FormDialog title={t("editTitle")} dirty={dirty} busy={busy} error={error ?? propertiesError} onCancel={onCancel} onSubmit={submit} submitDisabled={!properties || Boolean(propertiesError)} onDelete={onRemove}>
       <Field label={t("titleLabel")}>
         <input className={inputClass} value={title} maxLength={maxTitleLength} required onChange={(event) => setTitle(event.target.value)} />
       </Field>
       {properties ? <PropertyInputs properties={shown} values={values} onChange={(key, value) => setEdited({ ...values, [key]: value })} /> : <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>}
       {visible.length > VISIBLE_PROPERTIES ? (
-        <button type="button" aria-expanded={expanded} onClick={() => setExpanded((open) => !open)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--wash)] px-3 text-xs font-medium text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]">
+        <StateButton type="button" aria-expanded={expanded} onClick={() => setExpanded((open) => !open)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--wash)] px-3 text-xs font-medium text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]">
           <span aria-hidden="true">…</span>
           {expanded ? tFields("showLess") : tFields("showMore", { count: visible.length - VISIBLE_PROPERTIES })}
-        </button>
+        </StateButton>
       ) : null}
     </FormDialog>
   );

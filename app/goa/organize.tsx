@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -76,7 +78,7 @@ export function OrganizeBar({ colorFilter, onColorFilter, filteredCount }: {
     <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-4">
       {/* No "All": tapping the chosen colour again clears the filter. */}
       {CHALLENGE_COLOR_TAGS.map((tag) => (
-        <button
+        <StateButton
           key={tag}
           type="button"
           onClick={() => onColorFilter(colorFilter === tag ? null : tag)}
@@ -88,14 +90,14 @@ export function OrganizeBar({ colorFilter, onColorFilter, filteredCount }: {
           )}
         >
           <span className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-[var(--edge)]" style={{ backgroundColor: `var(--tag-${tag})` }} />
-        </button>
+        </StateButton>
       ))}
       <span className="flex-1" />
       {colorFilter ? (
-        <button type="button" onClick={() => onColorFilter(null)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)]">
+        <StateButton type="button" onClick={() => onColorFilter(null)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)]">
           <CircleMinusIcon className="h-4 w-4" />
           {t("filter.context", { count: filteredCount })}
-        </button>
+        </StateButton>
       ) : null}
     </div>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -249,9 +251,9 @@ export function TrashView({
       title={title}
       description={description}
       action={emptyScope && rows.length ? (
-        <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
+        <StateButton type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
           {t("empty")}
-        </button>
+        </StateButton>
       ) : undefined}
     />
   );
@@ -300,12 +302,12 @@ export function TrashView({
               {/* Two quiet words. From sm: up they fade in on the row's hover (or focus) and Excluir
                   reddens only under the pointer; on a phone, or any touch screen, they're simply there, under the details. */}
               <div className="flex w-full flex-none items-center justify-end gap-4 transition-opacity sm:w-auto sm:gap-3 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-                <button type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
+                <StateButton type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
                   {t("restore")}
-                </button>
-                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
+                </StateButton>
+                <StateButton type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
                   {t("purge")}
-                </button>
+                </StateButton>
               </div>
             </li>
           );

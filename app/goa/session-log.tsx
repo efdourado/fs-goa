@@ -1,18 +1,20 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { logRange } from "./checkin-days";
 import { CheckinLog, type LogRecord } from "./checkin-log";
 
+import { BottomSheet } from "./bottom-sheet";
 import { DeleteButton, DeleteConfirm } from "./dialog";
-import { comparisonScore, type ProgressTracking } from "../../lib/progress-tracking";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
-import { SaveButton, cardClass, cx, EmptyState, inputClass, labelClass, Select, StatusMessage } from "./ui";
-import { dateKeyInSaoPaulo, displayAnswer, entryValuesReady, findMissingRequiredField, valuesAsRecord } from "./utils";
+import { Button, cardClass, cx, EmptyState, inputClass, labelClass, Select, StatusMessage } from "./ui";
+import { dateKeyInSaoPaulo, displayAnswer, findMissingRequiredField, valuesAsRecord } from "./utils";
 
 /** The check-in and the type of record it holds — a workout and its exercise records. */
 export interface SessionSpec {
@@ -74,14 +76,11 @@ function ratingChoices(config?: FieldConfig): number[] {
 /** How many items the tray shows before "Show more". */
 const TRAY_LIMIT = 8;
 
-// Inputs keep a paper surface and a clear edge inside the tinted session form.
-const sessionInputClass = inputClass.replace("bg-transparent", "bg-[var(--paper)]").replace("border-[var(--line)]", "border-[var(--input-edge)]");
-
 /** One field of one record, sized for a card. */
 function CellInput({ field, value, disabled, id, onChange, className }: {
   field: ChallengeField; value: unknown; disabled: boolean; id: string; onChange: (value: unknown) => void; className?: string;
 }) {
-  const cls = className ?? sessionInputClass;
+  const cls = className ?? inputClass;
   const t = useTranslations("entryForm");
   const tc = useTranslations("common");
   if (field.type === "number") {
@@ -134,20 +133,14 @@ const numberValue = (raw: unknown): number | null => {
 };
 
 /** A best-so-far per numeric field of one item, read off the person's records (the check-in being edited left out). */
-export function bestValues(records: Iterable<Entry>, itemId: Id, fields: ChallengeField[], skipVisitId: Id | null,
-  performance?: ProgressTracking["performance"], currentValues: Record<Id, unknown> = {}, day?: string): Map<Id, number> {
+function bestValues(records: Iterable<Entry>, itemId: Id, fields: ChallengeField[], skipVisitId: Id | null): Map<Id, number> {
   const best = new Map<Id, number>();
   for (const record of records) {
     if (record.itemId !== itemId || (skipVisitId && record.parentEntryId === skipVisitId)) continue;
-    if (day && record.occurredOn && record.occurredOn > day) continue;
     const values = valuesAsRecord(record.values);
-    if (performance?.seriesFieldId && (numberValue(currentValues[performance.seriesFieldId]) === null || numberValue(values[performance.seriesFieldId]) !== numberValue(currentValues[performance.seriesFieldId]))) continue;
     for (const field of fields) {
-      const rule = performance?.rules?.[field.id!];
-      if (field.id === performance?.seriesFieldId || rule?.direction === "descriptive") continue;
-      if (rule?.contextFieldId && (numberValue(currentValues[rule.contextFieldId]) === null || numberValue(values[rule.contextFieldId]) !== numberValue(currentValues[rule.contextFieldId]))) continue;
       const value = numberValue(values[field.id as Id]);
-      if (value !== null && (!best.has(field.id as Id) || comparisonScore(value, rule) > comparisonScore(best.get(field.id as Id)!, rule))) best.set(field.id as Id, value);
+      if (value !== null && (!best.has(field.id as Id) || value > (best.get(field.id as Id) as number))) best.set(field.id as Id, value);
     }
   }
   return best;
@@ -178,8 +171,8 @@ function NumberStepper({ id, field, value, last, disabled, onChange }: {
   };
   const button = "w-10 flex-none cursor-pointer bg-[var(--wash)] text-lg text-[var(--muted)] transition hover:bg-[var(--wash-strong)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50";
   return (
-    <div className="flex items-stretch overflow-hidden rounded-xl border border-[var(--input-edge)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-[3px] focus-within:ring-[var(--main-soft)]">
-      <button type="button" className={button} disabled={disabled} aria-label={t("stepDown", { field: field.label })} onClick={() => nudge(-1)}>−</button>
+    <div className="flex items-stretch overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-[3px] focus-within:ring-[var(--main-soft)]">
+      <StateButton type="button" className={button} disabled={disabled} aria-label={t("stepDown", { field: field.label })} onClick={() => nudge(-1)}>−</StateButton>
       <input
         id={id}
         className="w-full min-w-0 border-0 bg-transparent px-1 py-2 text-center text-lg tabular-nums outline-none placeholder:text-[var(--muted)]/45 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -188,15 +181,15 @@ function NumberStepper({ id, field, value, last, disabled, onChange }: {
         value={typeof value === "number" || typeof value === "string" ? value : ""}
         onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}
       />
-      <button type="button" className={button} disabled={disabled} aria-label={t("stepUp", { field: field.label })} onClick={() => nudge(1)}>+</button>
+      <StateButton type="button" className={button} disabled={disabled} aria-label={t("stepUp", { field: field.label })} onClick={() => nudge(1)}>+</StateButton>
     </div>
   );
 }
 
 /**
  * A workout-style challenge on Today: the days you checked in (the same strip / month as a daily log, each day
- * showing how many items it held), and the inline editor for the picked day: pick its items, then each is one row —
- * last time's numbers a tap away, its fields, a new best marked — with more items behind "+ Add". Done saves now.
+ * showing how many items it held), and the check-in of the picked day: pick its items, then each is one row —
+ * last time's numbers a tap away, its fields, a new best marked — with more items behind "+ Add". One Save.
  * How each item went over time is Results' job, not this screen's.
  */
 export function SessionLog({
@@ -228,7 +221,6 @@ export function SessionLog({
   const nf = useFormatter();
   const libraryName = useLibraryName();
   const showValue = useShowValue();
-  const performance = challenge.trackingSettings?.performance;
   const today = dateKeyInSaoPaulo(new Date());
   const recordFields = useMemo(() => spec.record.fields.filter((field) => field.id), [spec.record.fields]);
   const numberFields = useMemo(() => recordFields.filter((field) => field.type === "number"), [recordFields]);
@@ -246,15 +238,14 @@ export function SessionLog({
   );
   const recordsByVisit = useMemo(() => {
     const map = new Map<Id, Entry[]>();
-    const visitDates = new Map(ownVisits.map((visit) => [visit.id, visit.occurredOn]));
     for (const entry of entries) {
       if (entry.entryTypeId !== spec.record.id || !entry.parentEntryId || entry.userId !== userId) continue;
       const list = map.get(entry.parentEntryId) ?? [];
-      list.push({ ...entry, occurredOn: entry.occurredOn ?? visitDates.get(entry.parentEntryId) });
+      list.push(entry);
       map.set(entry.parentEntryId, list);
     }
     return map;
-  }, [entries, ownVisits, spec.record.id, userId]);
+  }, [entries, spec.record.id, userId]);
   const ownRecords = useMemo(() => [...recordsByVisit.values()].flat(), [recordsByVisit]);
   const sortedRecords = (visitId: Id) => (recordsByVisit.get(visitId) ?? []).slice().sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
   // A saved record without a required field was made before that field existed (a later one could never be saved
@@ -307,12 +298,9 @@ export function SessionLog({
   const cardsRef = useRef<HTMLOListElement>(null);
   const isCreating = creating !== null;
   useEffect(() => { if (isCreating) newItemInput.current?.focus(); }, [isCreating]);
-  const [finishing, setFinishing] = useState(false);
-  const actionBusy = useRef(false);
-  const disabled = !canEdit || finishing || Boolean(creating?.busy);
+  const disabled = !canEdit;
 
   function load(visit: Entry | null, onDay: string) {
-    skipNextChange.current = true;
     setEditing(visit);
     setAdding(false);
     setRemoving(false);
@@ -322,77 +310,42 @@ export function SessionLog({
     setError(null);
   }
 
-  // The inline editor saves as you go; Done flushes any pending changes.
+  // ── Logging in the sheet, saved as you go ───────────────────────────────
   // Every change is kept on this device at once (a draft), and a moment later the rows that are complete are
-  // saved for real. Done flushes the same save chain immediately.
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "incomplete" | "error">(editing ? "saved" : "idle");
-  const saveRequest = useRef<Promise<void> | null>(null);
-  const saveTimer = useRef<number | null>(null);
-  const saveFailed = useRef(false);
+  // saved for real — so a dropped connection at the gym never loses a set, and there's no Save to remember.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "incomplete" | "error">("idle");
+  const saving = useRef(false);
   const retry = useRef(false);
   // A change made by loading or adopting a check-in, not by the person — nothing to save.
   const skipNextChange = useRef(true);
   const latest = useRef({ rows, visitValues, editing, occurredOn, day });
   useEffect(() => { latest.current = { rows, visitValues, editing, occurredOn, day }; });
 
-  const draftKey = (onDay: string, visitId?: Id | null) => `goa.workout.${challenge.id}.${onDay}${visitId === undefined ? "" : `.${visitId ?? "new"}`}`;
-  function readDraft(onDay: string, visitId: Id | null): WorkoutDraft | null {
+  const draftKey = (onDay: string) => `goa.workout.${challenge.id}.${onDay}`;
+  function readDraft(onDay: string): WorkoutDraft | null {
     try {
-      const raw = window.localStorage.getItem(draftKey(onDay, visitId)) ?? window.localStorage.getItem(draftKey(onDay));
-      const draft = raw ? JSON.parse(raw) as WorkoutDraft : null;
-      return draft?.visitId === visitId && Array.isArray(draft.rows) && draft.visitValues && typeof draft.visitValues === "object" ? draft : null;
-    } catch { return null; }
+      const raw = window.localStorage.getItem(draftKey(onDay));
+      return raw ? (JSON.parse(raw) as WorkoutDraft) : null;
+    } catch {
+      return null;
+    }
   }
   function writeDraft(onDay: string, draft: WorkoutDraft) {
-    try { window.localStorage.setItem(draftKey(onDay, draft.visitId), JSON.stringify(draft)); } catch { /* storage refused: the server save still runs */ }
+    try { window.localStorage.setItem(draftKey(onDay), JSON.stringify(draft)); } catch { /* storage refused: the server save still runs */ }
   }
-  function clearDraft(onDay: string, visitId: Id | null) {
-    try {
-      window.localStorage.removeItem(draftKey(onDay, visitId));
-      const legacy = window.localStorage.getItem(draftKey(onDay));
-      if (legacy && JSON.parse(legacy).visitId === visitId) window.localStorage.removeItem(draftKey(onDay));
-    } catch { /* nothing to clear */ }
-  }
-  function restoreDraft(onDay: string, visit: Entry | null) {
-    const draft = readDraft(onDay, visit?.id ?? null);
-    if (!draft) return;
-    skipNextChange.current = false;
-    setRows(draft.rows.map((row) => ({ ...row, key: newRowKey() })));
-    setVisitValues(draft.visitValues);
-  }
-  // Restore after hydration, without replacing the editor when autosave refreshes the server props.
-  useEffect(() => {
-    if (canEdit) restoreDraft(day, editing);
-    skipNextChange.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function cancelSaveTimer() {
-    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-    saveTimer.current = null;
+  function clearDraft(onDay: string) {
+    try { window.localStorage.removeItem(draftKey(onDay)); } catch { /* nothing to clear */ }
   }
 
-  /** Every caller awaits the same save chain, including edits queued during a request. */
-  function autosave(): Promise<void> {
-    if (saveRequest.current) { retry.current = true; return saveRequest.current; }
-    const request = (async () => {
-      do {
-        retry.current = false;
-        await saveCurrent();
-      } while (retry.current);
-    })();
-    saveRequest.current = request;
-    void request.finally(() => { if (saveRequest.current === request) saveRequest.current = null; });
-    return request;
-  }
-
-  async function saveCurrent() {
+  async function autosave() {
     if (!canEdit) return;
-    saveFailed.current = false;
+    if (saving.current) { retry.current = true; return; }
     const { rows: current, visitValues: values, editing: visit, occurredOn: on, day: onDay } = latest.current;
-    if (!current.length && !visit) { setSaveState("idle"); return; }
+    if (!current.length) { setSaveState("idle"); return; }
     const complete = current.filter((row) => row.itemId && !rowGap(row));
-    if ((!complete.length && current.length > 0) || visitGapOf(visit, values)) { setSaveState("incomplete"); return; }
+    if (!complete.length || visitGapOf(visit, values)) { setSaveState("incomplete"); return; }
+    saving.current = true;
     setSaveState("saving");
     try {
       const target = on || onDay;
@@ -413,62 +366,54 @@ export function SessionLog({
       setRows(nextRows);
       const allSaved = complete.length === current.length;
       setSaveState(allSaved ? "saved" : "incomplete");
-      clearDraft(onDay, visit?.id ?? null);
-      if (allSaved && !changed) clearDraft(onDay, saved.id);
+      if (allSaved && !changed) clearDraft(onDay);
       else writeDraft(onDay, { visitId: saved.id, rows: nextRows, visitValues: latest.current.visitValues });
     } catch (cause) {
-      saveFailed.current = true;
       setSaveState("error");
       setError(f.error(cause));
+    } finally {
+      saving.current = false;
+      if (retry.current) {
+        retry.current = false;
+        void autosave();
+      }
     }
   }
 
   // Each change: kept on the device now, saved for real a moment after the typing stops.
   useEffect(() => {
-    if (!canEdit) return;
+    if (!sheetOpen) return;
     if (skipNextChange.current) { skipNextChange.current = false; return; }
     writeDraft(day, { visitId: editing?.id ?? null, rows: rows.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues });
-    saveTimer.current = window.setTimeout(() => { saveTimer.current = null; void autosave(); }, 900);
-    return cancelSaveTimer;
+    const timer = window.setTimeout(() => { void autosave(); }, 900);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, visitValues]);
 
-  /** Saves the current editor before switching days/sessions, so a late response cannot overwrite another session. */
-  async function switchEditor(visit: Entry | null, onDay = day) {
-    if (actionBusy.current || disabled || (onDay === day && visit?.id === editing?.id)) return;
-    actionBusy.current = true;
-    setFinishing(true);
-    cancelSaveTimer();
-    try {
-      await autosave();
-      if (saveFailed.current) return;
-      setDay(onDay);
-      setCreating(null);
-      load(visit, onDay);
-      restoreDraft(onDay, visit);
-      setSaveState(visit ? "saved" : "idle");
-    } finally {
-      actionBusy.current = false;
-      setFinishing(false);
+  /** Opens the sheet on a check-in (or a new one), with whatever this device kept of it. */
+  function openSheet(visit: Entry | null) {
+    skipNextChange.current = true;
+    load(visit, day);
+    const draft = readDraft(day);
+    if (draft && draft.visitId === (visit?.id ?? null)) {
+      skipNextChange.current = false;
+      setRows(draft.rows.map((row) => ({ ...row, key: newRowKey() })));
+      setVisitValues(draft.visitValues);
     }
+    setSaveState(visit ? "saved" : "idle");
+    setSheetOpen(true);
   }
 
-  async function finishSession() {
-    if (actionBusy.current || disabled || !readyToFinish) return;
-    actionBusy.current = true;
-    setFinishing(true);
-    cancelSaveTimer();
-    try { await autosave(); }
-    finally { actionBusy.current = false; setFinishing(false); }
+  function closeSheet() {
+    setSheetOpen(false);
+    // Whatever was typed last gets its save now rather than waiting for the timer.
+    void autosave();
   }
 
   function selectDay(next: string) {
-    if (!canEdit) {
-      setDay(next);
-      load(visitsByDay.get(next)?.[0] ?? null, next);
-      return;
-    }
-    void switchEditor(visitsByDay.get(next)?.[0] ?? null, next);
+    setDay(next);
+    setCreating(null);
+    load(visitsByDay.get(next)?.[0] ?? null, next);
   }
 
   function focusCard(itemId: Id) {
@@ -490,7 +435,7 @@ export function SessionLog({
 
   function addItemRow(itemId: Id) {
     if (rows.some((row) => row.itemId === itemId)) { focusCard(itemId); return; }
-    setRows((current) => [...current, { key: newRowKey(), itemId, values: performance?.seriesFieldId ? { [performance.seriesFieldId]: 1 } : {} }]);
+    setRows((current) => [...current, { key: newRowKey(), itemId, values: {} }]);
     setError(null);
     requestAnimationFrame(() => focusCard(itemId));
   }
@@ -516,13 +461,12 @@ export function SessionLog({
   }
 
   /** The most recent record of an item before the check-in being edited: what each field's change is measured against. */
-  function lastRecordFor(itemId: Id, currentValues?: Record<Id, unknown>): { values: Record<Id, unknown> } | null {
+  function lastRecordFor(itemId: Id): { values: Record<Id, unknown> } | null {
     let latest: Entry | null = null;
     for (const [visitId, records] of recordsByVisit) {
       if (visitId === editing?.id) continue;
       for (const record of records) {
         if (record.itemId !== itemId) continue;
-        if (performance?.seriesFieldId && currentValues && numberValue(valuesAsRecord(record.values)[performance.seriesFieldId]) !== numberValue(currentValues[performance.seriesFieldId])) continue;
         if ((record.occurredOn ?? "") > occurredOn) continue;
         if (!latest || (record.occurredOn ?? "") > (latest.occurredOn ?? "")) latest = record;
       }
@@ -556,8 +500,8 @@ export function SessionLog({
   if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
   const dayVisits = visitsByDay.get(day) ?? [];
-  const availableVisits = [...dayVisits].reverse();
-  if (editing && !availableVisits.some((visit) => visit.id === editing.id)) availableVisits.push(editing);
+  // A check-in started on this device but not saved yet (its items still missing a number).
+  const draftWaiting = !sheetOpen && !dayVisits.length && Boolean(readDraft(day)?.rows.length);
   /** "62,5 kg · 8" — a saved record in one line. */
   const recordSummary = (record: Entry) => {
     const values = valuesAsRecord(record.values);
@@ -569,9 +513,6 @@ export function SessionLog({
   // What the draft still needs, said plainly: "Supino · Repetições".
   const firstGap = rows.map((row) => ({ row, missing: rowGap(row) })).find((candidate) => candidate.missing);
   const visitGap = visitGapOf(editing, visitValues);
-  const readyToFinish = Boolean(rows.length || editing) && !firstGap && !visitGap
-    && rows.every((row) => entryValuesReady(requiredFor(recordFields, row.id ? savedValues.get(row.id) : undefined), row.values))
-    && entryValuesReady(requiredFor(visitFields, editing ? valuesAsRecord(editing.values) : undefined), visitValues);
   const missingText = firstGap?.missing ? `${itemTitle(firstGap.row.itemId)} · ${firstGap.missing.label}` : visitGap?.label ?? "";
   // One thing at a time: an empty check-in starts by picking its items; once it has some, more wait behind "+ Add".
   const showTray = adding || !rows.length;
@@ -580,9 +521,7 @@ export function SessionLog({
     const diff = Number((current - previous).toFixed(4));
     if (diff === 0) return { text: t("deltaSame"), tone: "same" as const };
     const value = `${nf.number(Math.abs(diff), { maximumFractionDigits: 2 })}${field.config?.unit ? ` ${field.config.unit}` : ""}`;
-    const rule = performance?.rules?.[field.id!];
-    const tone = rule?.direction === "descriptive" || field.id === performance?.seriesFieldId ? "same" as const : comparisonScore(current, rule) > comparisonScore(previous, rule) ? "up" as const : "down" as const;
-    return { text: t(diff > 0 ? "deltaUp" : "deltaDown", { value }), tone };
+    return diff > 0 ? { text: t("deltaUp", { value }), tone: "up" as const } : { text: t("deltaDown", { value }), tone: "down" as const };
   };
 
   return (
@@ -601,12 +540,59 @@ export function SessionLog({
           openEnded={!challenge.startsOn && !challenge.endsOn}
           streakBy="week"
         >
-          {canEdit ? <form className="rounded-[20px] border border-[var(--line)] bg-[var(--session-surface)] p-5 sm:p-6" aria-label={t("composerTitle", { name: spec.visit.name })} noValidate onSubmit={(event) => { event.preventDefault(); void finishSession(); }}>
-            <h2 className="mb-4 text-lg font-medium tracking-[-0.02em]">{day === today ? t("sheetToday", { name: spec.visit.name }) : t("sheetOnDay", { name: spec.visit.name, date: f.date(day, { day: "numeric", month: "short" }) })}</h2>
-            {availableVisits.length ? <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label={t("chooseSession")}>
-              {availableVisits.map((visit, index) => <button key={visit.id} type="button" disabled={disabled} aria-pressed={editing?.id === visit.id} onClick={() => void switchEditor(visit)} className={cx("min-h-9 cursor-pointer rounded-full border px-3 text-xs transition disabled:opacity-50", editing?.id === visit.id ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]")}>{availableVisits.length > 1 ? t("visitNumbered", { name: spec.visit.name, number: index + 1 }) : spec.visit.name}</button>)}
-              <button type="button" disabled={disabled} aria-pressed={!editing} onClick={() => void switchEditor(null)} className="min-h-9 cursor-pointer rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:opacity-50">＋ {t("newVisitOnDay", { name: spec.visit.name.toLowerCase() })}</button>
-            </div> : null}
+          {/* The picked day: what's been logged, and one clear way in. Logging itself happens in the sheet. */}
+          <div className="space-y-3">
+            {dayVisits.slice().reverse().map((visit, index) => {
+              const records = sortedRecords(visit.id);
+              // One card per workout, the whole of it a way back in: no button to hunt for.
+              const body = (
+                <>
+                  <span className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10.4l3.200 3.200L15 6.800" /></svg>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { name: spec.visit.name, number: index + 1 }) : spec.visit.name}</strong>
+                      <span className="block text-xs text-[var(--muted)]">{t("visitCount", { count: records.length })}</span>
+                    </span>
+                  </span>
+                  {records.length ? (
+                    <span className="mt-3.5 block divide-y divide-[var(--line)] border-t border-[var(--line)]">
+                      {records.map((record) => (
+                        <span key={record.id} className="flex items-baseline justify-between gap-4 py-2.5 text-sm last:pb-0">
+                          <span className="min-w-0 truncate">{itemTitle(record.itemId)}</span>
+                          <span className="flex-none text-[13px] tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                </>
+              );
+              const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 text-left";
+              return canEdit ? (
+                <StateButton key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit", { name: spec.visit.name })} className={cx(shell, "cursor-pointer transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
+                  {body}
+                </StateButton>
+              ) : (
+                <div key={visit.id} className={shell}>{body}</div>
+              );
+            })}
+            {draftWaiting ? (
+              <StateButton type="button" onClick={() => openSheet(null)} className="w-full cursor-pointer rounded-2xl border border-dashed border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3 text-left text-sm text-[var(--warn)]">
+                {t("draftWaiting")}
+              </StateButton>
+            ) : null}
+            {canEdit ? (
+              <Button className="w-full rounded-full" onClick={() => openSheet(null)}>
+                ＋ {dayVisits.length ? t("newVisitOnDay", { name: spec.visit.name.toLowerCase() }) : day === today ? t("logToday", { name: spec.visit.name.toLowerCase() }) : t("logOnDay", { name: spec.visit.name.toLowerCase(), date: f.date(day, { day: "numeric", month: "short" }) })}
+              </Button>
+            ) : unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
+          </div>
+        </CheckinLog>
+      </section>
+
+      {sheetOpen ? (
+        <BottomSheet tall title={day === today ? t("sheetToday", { name: spec.visit.name }) : t("sheetOnDay", { name: spec.visit.name, date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
           {/* One even rhythm: status, today's items, the rest to pick from, the check-in's own fields. */}
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-3">
@@ -620,12 +606,12 @@ export function SessionLog({
           {rows.length ? (
             <ol ref={cardsRef} className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] px-4">
               {rows.map((row) => {
-                const last = row.itemId ? lastRecordFor(row.itemId, row.values) : null;
-                const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null, performance, row.values, occurredOn) : new Map<Id, number>();
+                const last = row.itemId ? lastRecordFor(row.itemId) : null;
+                const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null) : new Map<Id, number>();
                 const newBests = recordFields.filter((field) => {
                   const value = numberValue(row.values[field.id as Id]);
                   const previous = best.get(field.id as Id);
-                  return value !== null && previous !== undefined && comparisonScore(value, performance?.rules?.[field.id!]) > comparisonScore(previous, performance?.rules?.[field.id!]);
+                  return value !== null && previous !== undefined && value > previous;
                 });
                 return (
                   <li key={row.key} data-item={row.itemId} className="py-4">
@@ -633,17 +619,15 @@ export function SessionLog({
                       <div className="min-w-0 flex-1">
                         <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
                       </div>
-                      <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="min-h-9 flex-none cursor-pointer px-1 text-[13px] font-light text-[var(--muted)]/80 transition hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
+                      <StateButton type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="min-h-9 flex-none cursor-pointer px-1 text-[13px] font-light text-[var(--muted)]/80 transition hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
                         {tc("remove")}
-                      </button>
+                      </StateButton>
                     </div>
                     <div className="mt-3 grid grid-cols-2 items-start gap-2.5 [&>*:last-child:nth-child(odd)]:col-span-2">
                       {recordFields.map((field) => {
                         const id = `${row.key}-${field.id}`;
                         const current = numberValue(row.values[field.id as Id]);
-                        const context = performance?.rules?.[field.id!]?.contextFieldId;
-                        const comparable = !context || (numberValue(row.values[context]) !== null && numberValue(row.values[context]) === numberValue(last?.values[context]));
-                        const previous = comparable ? lastNumber(last, field) : null;
+                        const previous = lastNumber(last, field);
                         const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
                         return (
                           <div key={field.id} className="min-w-0">
@@ -653,7 +637,7 @@ export function SessionLog({
                             {field.type === "number" ? (
                               <NumberStepper id={id} field={field} value={row.values[field.id as Id]} last={previous} disabled={disabled} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
                             ) : (
-                              <CellInput id={id} field={field} disabled={disabled} value={row.values[field.id as Id]} className={cx(sessionInputClass, "text-base")} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
+                              <CellInput id={id} field={field} disabled={disabled} value={row.values[field.id as Id]} className={cx(inputClass, "text-base")} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
                             )}
                             {delta ? (
                               <span className={cx("mt-1 block text-[11px] tabular-nums", delta.tone === "up" ? "text-[var(--ok)]" : delta.tone === "down" ? "text-[var(--warn)]" : "text-[var(--muted)]")}>{delta.text}</span>
@@ -662,11 +646,6 @@ export function SessionLog({
                         );
                       })}
                     </div>
-                    <button type="button" disabled={disabled} className="mt-3 cursor-pointer text-xs font-medium text-[var(--main-strong)] disabled:opacity-50" onClick={() => setRows((current) => {
-                      const fieldId = performance?.seriesFieldId;
-                      const next = fieldId ? Math.max(0, ...current.filter((candidate) => candidate.itemId === row.itemId).map((candidate) => numberValue(candidate.values[fieldId]) ?? 0)) + 1 : null;
-                      return [...current, { key: newRowKey(), itemId: row.itemId, values: fieldId ? { [fieldId]: next } : {} }];
-                    })}>{t(performance?.seriesFieldId ? "addSet" : "addRecord")}</button>
                     {newBests.length ? (
                       <p className="mt-2.5 flex flex-wrap gap-1.5">
                         {newBests.map((field) => (
@@ -692,7 +671,7 @@ export function SessionLog({
                     const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
                     return (
                       <li key={item.id}>
-                        <button
+                        <StateButton
                           type="button" aria-pressed={inside} disabled={disabled}
                           onClick={() => toggleItemRow(item.id)}
                           className={cx("flex min-h-14 w-full cursor-pointer items-center gap-3 px-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50", inside ? "bg-[var(--main-soft)]" : "hover:bg-[var(--wash)]")}
@@ -702,22 +681,22 @@ export function SessionLog({
                             {lastLead !== null ? <span className="block text-xs tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}{numberFields[0]?.config?.unit ? ` ${numberFields[0].config.unit}` : ""}</span> : null}
                           </span>
                           <span className={cx("grid h-8 w-8 flex-none place-items-center rounded-full text-sm", inside ? "bg-[var(--main)] text-white" : "border border-[var(--line)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
-                        </button>
+                        </StateButton>
                       </li>
                     );
                   })}
                   {hiddenTrayCount > 0 || trayOpen ? (
                     <li>
-                      <button type="button" onClick={() => setTrayOpen((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                      <StateButton type="button" onClick={() => setTrayOpen((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
                         {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
-                      </button>
+                      </StateButton>
                     </li>
                   ) : null}
                 </ul>
                 {/* A new one: the same dashed pill as "add a field". It opens a small box right here (never a second
-                    modal over the editor) with what it is, what it does, and the name to type. */}
+                    modal over the sheet) with what it is, what it does, and the name to type. */}
                 {onAddItem && creating ? (
-                  // A soft card in the pill's place (never a second modal over the editor): what it is, a large line to
+                  // A soft card in the pill's place (never a second modal over the sheet): what it is, a large line to
                   // type the name on, and underneath a way out on the left and an arrow to add on the right.
                   <div className="mt-3">
                     <div className="rounded-2xl bg-[var(--wash)] px-4 py-3">
@@ -735,8 +714,8 @@ export function SessionLog({
                         }}
                       />
                       <div className="mt-2 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-2">
-                        <button type="button" disabled={creating.busy} onClick={() => setCreating(null)} className="cursor-pointer text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">{tc("cancel")}</button>
-                        <button
+                        <StateButton type="button" disabled={creating.busy} onClick={() => setCreating(null)} className="cursor-pointer text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">{tc("cancel")}</StateButton>
+                        <StateButton
                           type="button"
                           disabled={creating.busy || !creating.title.trim()}
                           aria-label={t("newItemAdd")}
@@ -745,26 +724,26 @@ export function SessionLog({
                           className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full bg-[var(--ink)] text-[var(--paper)] transition hover:bg-[var(--ink-strong)] disabled:cursor-default disabled:bg-[var(--wash-strong)] disabled:text-[var(--muted)]"
                         >
                           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
-                        </button>
+                        </StateButton>
                       </div>
                     </div>
                     {creating.error ? <div className="mt-2"><StatusMessage error={creating.error} /></div> : null}
                   </div>
                 ) : onAddItem ? (
-                  <button
+                  <StateButton
                     type="button"
                     disabled={disabled}
                     onClick={startCreating}
                     className="mt-3 flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     ＋ {t("newItemPill")}
-                  </button>
+                  </StateButton>
                 ) : null}
               </section>
             ) : canEdit ? (
-              <button type="button" disabled={disabled} aria-label={t("addRows")} title={t("addRows")} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] text-lg text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] disabled:opacity-50">
+              <StateButton type="button" disabled={disabled} aria-label={t("addRows")} title={t("addRows")} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] text-lg text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] disabled:opacity-50">
                 <span aria-hidden="true">＋</span>
-              </button>
+              </StateButton>
             ) : null}
 
             {visitFields.length ? (
@@ -783,65 +762,20 @@ export function SessionLog({
               <DeleteConfirm
                 body={t("deleteBody", { count: (recordsByVisit.get(editing.id) ?? []).length })}
                 onConfirm={async () => {
-                  if (actionBusy.current || disabled) return;
-                  actionBusy.current = true;
-                  setFinishing(true);
-                  cancelSaveTimer();
-                  try {
-                    await autosave();
-                    await onDelete(editing.id);
-                    clearDraft(day, editing.id);
-                    load(null, day);
-                    setSaveState("idle");
-                  } finally {
-                    actionBusy.current = false;
-                    setFinishing(false);
-                  }
+                  await onDelete(editing.id);
+                  load(null, day);
+                  setSheetOpen(false);
                 }}
               />
             </div>
           ) : null}
           {/* The bar stays at the bottom, clear of the phone's home area. */}
-          <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex flex-col items-stretch gap-3 rounded-b-[20px] border-t border-[var(--line)] bg-[var(--session-surface)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:-mx-6 sm:-mb-6 sm:px-6">
-            {editing && onDelete ? <div className="self-start"><DeleteButton open={removing} disabled={disabled} onClick={() => setRemoving((open) => !open)} /></div> : null}
-            <SaveButton type="submit" className="w-full px-6" disabled={disabled || !readyToFinish}>{finishing ? t("autoSaving") : t("done")}</SaveButton>
+          <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
+            {editing && onDelete ? <DeleteButton open={removing} onClick={() => setRemoving((open) => !open)} /> : <span className="flex-1" />}
+            <Button className="px-6" onClick={closeSheet}>{t("done")}</Button>
           </div>
-          </form> : (
-          <div className="space-y-3">
-            {dayVisits.slice().reverse().map((visit, index) => {
-              const records = sortedRecords(visit.id);
-              // Closed/read-only sessions keep their compact summaries.
-              const body = (
-                <>
-                  <span className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">
-                      <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10.4l3.200 3.200L15 6.800" /></svg>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { name: spec.visit.name, number: index + 1 }) : spec.visit.name}</strong>
-                      <span className="block text-xs text-[var(--muted)]">{t("visitCount", { count: records.length })}</span>
-                    </span>
-                  </span>
-                  {records.length ? (
-                    <span className="mt-3.5 block divide-y divide-[var(--line)] border-t border-[var(--line)]">
-                      {records.map((record) => (
-                        <span key={record.id} className="flex items-baseline justify-between gap-4 py-2.5 text-sm last:pb-0">
-                          <span className="min-w-0 truncate">{itemTitle(record.itemId)}</span>
-                          <span className="flex-none text-[13px] tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </>
-              );
-              const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 text-left";
-              return <div key={visit.id} className={shell}>{body}</div>;
-            })}
-            {unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
-          </div>
-          )}
-        </CheckinLog>
-      </section>
+        </BottomSheet>
+      ) : null}
     </div>
   );
 }

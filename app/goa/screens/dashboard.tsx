@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
 
@@ -104,7 +106,7 @@ function ColorSwatch({ tag, selected, onClick, label }: {
   tag: ChallengeColorTag | null; selected: boolean; onClick: () => void; label: string;
 }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onClick}
       aria-label={label}
@@ -116,7 +118,7 @@ function ColorSwatch({ tag, selected, onClick, label }: {
       style={{ backgroundColor: tag ? `var(--tag-${tag})` : "var(--paper)" }}
     >
       {tag ? null : <CircleMinusIcon className="h-3.5 w-3.5 text-[var(--muted)]" />}
-    </button>
+    </StateButton>
   );
 }
 
@@ -147,15 +149,15 @@ function CardMenu({
             </div>
           </div>
           <div className="border-t border-[var(--line)] pt-1">
-            <button type="button" className={rowClass} onClick={() => { onTogglePin(); close(); }}>
+            <StateButton type="button" className={rowClass} onClick={() => { onTogglePin(); close(); }}>
               <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
               {challenge.pinned ? t("card.unpin") : t("card.pin")}
-            </button>
+            </StateButton>
           </div>
           <div className="border-t border-[var(--line)] pt-1">
-            <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</button>
+            <StateButton type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</StateButton>
             {canManageIt ? (
-              <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</button>
+              <StateButton type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</StateButton>
             ) : null}
           </div>
         </>
@@ -231,7 +233,7 @@ export function ActiveChallengeCard({
           {interactive ? (
             <div className="relative z-10 flex flex-none items-center gap-0.5">
               {onTogglePin ? (
-                <button
+                <StateButton
                   type="button"
                   onClick={() => onTogglePin(challenge.id)}
                   aria-label={challenge.pinned ? t("card.unpin") : t("card.pin")}
@@ -245,7 +247,7 @@ export function ActiveChallengeCard({
                   )}
                 >
                   <CirclePinIcon className="h-[18px] w-[18px]" filled={challenge.pinned} />
-                </button>
+                </StateButton>
               ) : null}
               {menu}
             </div>
@@ -253,9 +255,9 @@ export function ActiveChallengeCard({
         </div>
 
         <h3 className="mt-2.5 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
-          <button type="button" onClick={() => onOpen(challenge.id)} title={challenge.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+          <StateButton type="button" onClick={() => onOpen(challenge.id)} title={challenge.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
             {challenge.title}
-          </button>
+          </StateButton>
         </h3>
         {context ? <p className="mt-1 truncate text-xs text-[var(--muted)]">{context}</p> : null}
         {/* A phone-sized card has no room for the description; the title says enough. */}
@@ -281,7 +283,7 @@ function ArchiveChallengeRow({
   onOpen: () => void;
 }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onOpen}
       className={cx(cardClass, shelfCardWidth, "relative flex items-center gap-2.5 overflow-hidden px-3.5 py-3.5 text-left text-sm hover:border-[var(--muted)] sm:px-4 sm:py-4")}
@@ -289,7 +291,7 @@ function ArchiveChallengeRow({
       {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
       <span className="min-w-0 flex-1 truncate">{challenge.title}</span>
-    </button>
+    </StateButton>
   );
 }
 
@@ -310,14 +312,14 @@ function HomeSectionBlock({ title, first, children }: { title: string; first: bo
 /** The one quiet line a side of Home shrinks to while it has nothing (no group yet, nothing of your own) — never an empty shelf. */
 function HomeSideLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onClick}
       className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]"
     >
       <span aria-hidden="true">＋</span>
       <span>{label}</span>
-    </button>
+    </StateButton>
   );
 }
 
@@ -436,7 +438,7 @@ export function DashboardScreen({
         ? standardGroups.map((group) => {
             const count = group.memberCount ?? group.members?.length ?? 0;
             return (
-              <button
+              <StateButton
                 key={group.id}
                 type="button"
                 onClick={() => onOpenGroup(group.id)}
@@ -444,7 +446,7 @@ export function DashboardScreen({
               >
                 <span className="text-sm">{group.name}</span>
                 <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>
-              </button>
+              </StateButton>
             );
           })
         : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} onClick={atGroupLimit ? undefined : () => setShowGroupDialog(true)} /></div>}

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
@@ -268,7 +270,7 @@ export function FieldRows({ fields, onChange, max = 30 }: {
           return (
             <li className="border-t border-[var(--line)] first:border-t-0" key={field.id ?? field.key}>
               <div className="flex items-center gap-1">
-                <button
+                <StateButton
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => setOpen(isOpen ? null : field.key)}
@@ -279,11 +281,11 @@ export function FieldRows({ fields, onChange, max = 30 }: {
                     <span className="truncate text-[15px] font-medium">{field.label.trim() || t("questionN", { n: index + 1 })}</span>
                     <span className="truncate text-xs text-[var(--muted)]">{t(`type.${field.type}`)}{field.required ? ` · ${t("required")}` : ""}</span>
                   </span>
-                </button>
+                </StateButton>
                 {fields.length > 1 ? <>
-                  <button type="button" className={rowIconClass} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}><ChevronIcon dir="up" /></button>
-                  <button type="button" className={rowIconClass} disabled={index === fields.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}><ChevronIcon dir="down" /></button>
-                  <button
+                  <StateButton type="button" className={rowIconClass} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}><ChevronIcon dir="up" /></StateButton>
+                  <StateButton type="button" className={rowIconClass} disabled={index === fields.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}><ChevronIcon dir="down" /></StateButton>
+                  <StateButton
                     type="button"
                     className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")}
                     onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}
@@ -291,7 +293,7 @@ export function FieldRows({ fields, onChange, max = 30 }: {
                     title={t("remove")}
                   >
                     <CircleMinusIcon className="h-[18px] w-[18px]" />
-                  </button>
+                  </StateButton>
                 </> : null}
               </div>
               {isOpen ? (
@@ -383,7 +385,7 @@ export function FieldBuilder({
                   <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button>
                   <Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">{t("moveDown")}</span></Button>
                 </> : null}
-                {fields.length > minimumFields ? <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}><CircleMinusIcon className="h-[18px] w-[18px]" /></button> : null}
+                {fields.length > minimumFields ? <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton> : null}
               </div>
             </li>
           ))}

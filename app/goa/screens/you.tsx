@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
@@ -82,9 +84,9 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onTempl
       </header>
 
       <Section>
-        <button type="button" className={rowClass} onClick={onAccount}>{ICONS.account}{tNav("account")}<Chevron /></button>
-        <button type="button" className={rowClass} onClick={onTemplates}>{ICONS.catalog}{tNav("templates")}<Chevron /></button>
-        <button type="button" className={rowClass} onClick={onTrash}>{ICONS.trash}{tTrash("personalTitle")}<Chevron /></button>
+        <StateButton type="button" className={rowClass} onClick={onAccount}>{ICONS.account}{tNav("account")}<Chevron /></StateButton>
+        <StateButton type="button" className={rowClass} onClick={onTemplates}>{ICONS.catalog}{tNav("templates")}<Chevron /></StateButton>
+        <StateButton type="button" className={rowClass} onClick={onTrash}>{ICONS.trash}{tTrash("personalTitle")}<Chevron /></StateButton>
       </Section>
 
       <Section title={tSettings("legend")}>
@@ -100,12 +102,12 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onTempl
       </Section>
 
       <Section title="Goa">
-        <button type="button" className={rowClass} onClick={onAbout}>{ICONS.about}{tNav("about")}<Chevron /></button>
+        <StateButton type="button" className={rowClass} onClick={onAbout}>{ICONS.about}{tNav("about")}<Chevron /></StateButton>
         <a className={rowClass} href={`mailto:${CONTACT_EMAIL}`}>{ICONS.contact}{tAbout("contactButton")}<Chevron /></a>
         {user.platformAdmin ? <Link className={rowClass} href="/admin">{ICONS.admin}{tNav("admin")}<Chevron /></Link> : null}
       </Section>
 
-      <button
+      <StateButton
         type="button"
         disabled={signingOut}
         onClick={async () => { setSigningOut(true); try { await onLogout(); } finally { setSigningOut(false); } }}
@@ -113,7 +115,7 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onTempl
       >
         {ICONS.signOut}
         {signingOut ? tNav("signingOut") : tNav("signOut")}
-      </button>
+      </StateButton>
     </main>
   );
 }

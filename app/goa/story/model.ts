@@ -35,7 +35,7 @@ export interface StoryExpectation { personId: Id; itemId: Id; value: number }
 /** One dated check-in: a habit's day, a day's pages, a workout. `value` only when the day has a number. */
 export interface StoryDay { personId: Id; day: string; value?: number | null; note?: string | null }
 /** One record inside a workout: this item, this day, this number (the load). */
-export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number; sessionId?: string; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; order?: string; recordOrder?: string; rule?: ComparisonRule; context?: { label: string; value: number; unit: string }; seriesLabel?: string; seriesValue?: number }
+export interface StoryRecord { personId: Id; itemId: Id; day: string; value: number; sessionId?: string; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; order?: string; recordOrder?: string; workload?: boolean; rule?: ComparisonRule; context?: { label: string; value: number; unit: string }; seriesLabel?: string; seriesValue?: number }
 
 export interface StoryInput {
   resultPresentation?: import("../../../lib/result-presentation").ResultPresentation;
@@ -183,7 +183,7 @@ export interface DatedStory {
   /** The weekdays that stand out (tied at the top, clearly above the rest); empty when the week is even. */
   bestWeekdays: number[];
   /** Workouts: per exercise, where it started, the best it reached, and every session's number in order. */
-  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[]; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; rule?: ComparisonRule; context?: StoryRecord["context"]; seriesLabel?: string; seriesValue?: number }>;
+  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[]; metricKey?: string; label?: string; unit?: string; sessionAggregation?: "best" | "sum"; workload?: boolean; rule?: ComparisonRule; context?: StoryRecord["context"]; seriesLabel?: string; seriesValue?: number }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
   /** Two people: the days both of them showed up. */
   together: number | null;
@@ -559,9 +559,18 @@ function buildDated(input: StoryInput): DatedStory | null {
       person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: series.length,
       series: series.map((row) => row.value), days: series.map((row) => row.day),
       metricKey: ordered[0].metricKey, label: ordered[0].label, unit: ordered[0].unit, sessionAggregation: ordered[0].sessionAggregation,
-      rule, context: ordered[0].context, seriesLabel: ordered[0].seriesLabel, seriesValue: ordered[0].seriesValue });
+      workload: ordered[0].workload, rule, context: ordered[0].context, seriesLabel: ordered[0].seriesLabel, seriesValue: ordered[0].seriesValue });
   }
-  // Stable item/field order makes every measurement visible, rather than ranking unrelated percentages.
+  for (let index = records.length - 1; index >= 0; index--) {
+    const contextual = records[index];
+    if (!contextual.context || !contextual.metricKey?.includes(":at:")) continue;
+    const base = records.find((row) => row.person.id === contextual.person.id && row.item.id === contextual.item.id && row.seriesValue === contextual.seriesValue && row.metricKey === contextual.metricKey?.split(":at:")[0]);
+    if (base && JSON.stringify([base.series, base.days]) === JSON.stringify([contextual.series, contextual.days])) {
+      base.context = contextual.context;
+      records.splice(index, 1);
+    }
+  }
+  // Stable item/field order keeps unrelated percentages out of a global ranking.
 
   return {
     kind: "dated",
@@ -620,9 +629,10 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     ? dimensionFields.map((field) => ({ id: field.id!, label: field.label, min: field.config?.min ?? 0, max: field.config?.max ?? 5 }))
     : [];
   // Dated types: anything recorded per day that isn't a rating or an expectation.
-  const recordType = challenge.entryTypes.find((type) => type.parentTypeId);
+  const recordTypes = challenge.entryTypes.filter((type) => type.parentTypeId && type.answerScope !== "shared" && !ratingTypes.has(type.id) && type.purpose !== "expectation");
+  const recordType = recordTypes[0];
   const datedTypes = challenge.entryTypes.filter((type) =>
-    !ratingTypes.has(type.id) && type.purpose !== "expectation" && type.id !== recordType?.id && type.answerScope !== "shared"
+    !ratingTypes.has(type.id) && type.purpose !== "expectation" && !type.parentTypeId && type.answerScope !== "shared"
     && (type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day" || type.purpose === "checkin" || type.purpose === "progress" || type.submissionMode === "daily"));
   const counters = new Map(datedTypes.map((type) => [type.id, counterOf(type.fields)]));
   const performance = challenge.trackingSettings?.performance;
@@ -652,12 +662,12 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
       if (numbers.some((value) => !Number.isFinite(value) || (plan.product && value < 0))) continue;
       const value = plan.product ? numbers.reduce((product, n) => product * n, 1) : numbers[0];
       if (!Number.isFinite(value)) continue;
-      const record: StoryRecord = { order: entry.parentEntryId ? visitOrder.get(entry.parentEntryId) : entry.submittedAt, recordOrder: entry.submittedAt, personId: entry.userId!, itemId, day, value, sessionId: entry.parentEntryId ?? entry.id,
+      const record: StoryRecord = { order: entry.parentEntryId ? visitOrder.get(entry.parentEntryId) : entry.submittedAt, recordOrder: `${entry.submittedAt ?? ""}:${entry.id}`, personId: entry.userId!, itemId, day, value, sessionId: entry.parentEntryId ?? entry.id,
         // Component fields remain interpretable when the formula sums the workload across sets.
         sessionAggregation: plan.product || performance?.mode !== "product" ? performance?.sessionAggregation : "best",
         metricKey: plan.fields.map((field) => field.id).join(":"), label: plan.fields.map((field) => field.label).join(" × "),
         unit: plan.product ? "" : plan.fields[0].config?.unit ?? plan.fields[0].label.match(/\(([^)]+)\)\s*$/)?.[1] ?? "",
-        rule: plan.rule, ...(seriesValue !== null ? { seriesLabel: seriesField!.label, seriesValue } : {}) };
+        workload: plan.product, rule: plan.rule, ...(seriesValue !== null ? { seriesLabel: seriesField!.label, seriesValue } : {}) };
       records.push(record);
       if (plan.product && seriesValue !== null && performance?.sessionAggregation === "sum") {
         records.push({ ...record, metricKey: `${record.metricKey}:total`, seriesValue: undefined, seriesLabel: undefined });
@@ -674,6 +684,7 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     const values = valuesAsRecord(entry.values);
     const note = [...textFields].map((id) => values[id ?? ""]).find((raw) => typeof raw === "string" && raw.trim()) as string | undefined;
     const itemId = itemIdForEntry(entry);
+    const nestedType = recordTypes.find((type) => type.id === entry.entryTypeId);
     if (ratingTypes.has(entry.entryTypeId ?? "") && itemId) {
       const value = readRating(entry);
       const parts = dimensions.length
@@ -686,10 +697,10 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     } else if (expectationType && entry.entryTypeId === expectationType.id && expectationField && itemId) {
       const value = Number(values[expectationField]);
       if (Number.isFinite(value)) expectations.push({ personId: entry.userId, itemId, value });
-    } else if (recordType && entry.entryTypeId === recordType.id && itemId) {
+    } else if (nestedType && itemId) {
       const day = entry.parentEntryId ? visitDay.get(entry.parentEntryId) : entry.occurredOn;
       if (!day) continue;
-      appendRecords(entry, recordType.fields, itemId, day);
+      appendRecords(entry, nestedType.fields, itemId, day);
     } else if (datedTypes.some((type) => type.id === entry.entryTypeId)) {
       const day = entry.occurredOn ?? entry.submittedAt?.slice(0, 10);
       if (!day) continue;
@@ -711,7 +722,7 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     items: [...challenge.items.map((item) => ({
       id: item.id, title: item.title, year: item.catalogItem?.year ?? null, genre: item.catalogItem?.mainGenre ?? null,
       runtime: item.catalogItem?.runtimeMinutes ?? null, properties: textProperties(item),
-    })), ...datedTypes.filter((type) => type.fields.some((field) => field.type === "number")).map((type) => ({ id: `tracking:${type.id}`, title: datedTypes.length === 1 ? challenge.title : type.name }))],
+    })), ...(ratings.length ? [] : datedTypes.filter((type) => type.fields.some((field) => field.type === "number")).map((type) => ({ id: `tracking:${type.id}`, title: datedTypes.length === 1 ? challenge.title : type.name })))],
     ratings,
     expectations,
     scale: { min: ratingField?.config?.min ?? 0, max: ratingField?.config?.max ?? 5 },

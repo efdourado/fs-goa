@@ -720,6 +720,10 @@ export interface ChallengeCreationInput {
   sessionName?: string;
   /** With `session`: the label of the optional note on each check-in ("How did it go?"). */
   sessionNoteLabel?: string;
+  /** New sheet creation can omit the legacy automatic day-level note. */
+  includeSessionNote?: boolean;
+  /** Neutral primary response label for new sheet-based creation. */
+  responseName?: string;
   sharedEditPolicy?: SharedEditPolicy;
   participantIds: Id[];
 }

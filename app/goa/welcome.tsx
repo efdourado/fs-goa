@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
@@ -18,17 +20,17 @@ function StartChoices({ onChat, onManual }: { onChat: () => void; onManual: () =
   const t = useTranslations("welcome");
   return (
     <div className="space-y-2.5 text-left">
-      <button type="button" onClick={onChat} className={cx(optionClass, "border-[var(--main)] bg-[var(--main-soft)]")}>
+      <StateButton type="button" onClick={onChat} className={cx(optionClass, "border-[var(--main)] bg-[var(--main-soft)]")}>
         <span className="flex w-full items-center justify-between gap-3">
           <strong className="text-base font-medium text-[var(--main-strong)]">{t("choose.chat")}</strong>
           <span className="rounded-full bg-[var(--main)] px-2.5 py-0.5 text-[11px] font-medium text-white">{t("choose.recommended")}</span>
         </span>
         <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.chatBody")}</span>
-      </button>
-      <button type="button" onClick={onManual} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
+      </StateButton>
+      <StateButton type="button" onClick={onManual} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
         <strong className="text-base font-medium">{t("choose.manual")}</strong>
         <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.manualBody")}</span>
-      </button>
+      </StateButton>
     </div>
   );
 }
@@ -98,7 +100,7 @@ export function WelcomePanel({
   return (
     <>
       <div className="flex flex-none items-center">
-        <button
+        <StateButton
           type="button"
           onClick={() => setStep("how")}
           aria-label={t("starts.quick.cta")}
@@ -108,7 +110,7 @@ export function WelcomePanel({
           <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
             <path d="M8 3v10M3 8h10" />
           </svg>
-        </button>
+        </StateButton>
       </div>
 
       {step ? (
@@ -117,15 +119,15 @@ export function WelcomePanel({
             <StartChoices onChat={() => { setStep(null); onQuickCreate(); }} onManual={() => setStep("where")} />
           ) : (
             <div className="space-y-2.5 text-left">
-              <button type="button" disabled={busy} onClick={() => void go({ personal: true })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
+              <StateButton type="button" disabled={busy} onClick={() => void go({ personal: true })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
                 <strong className="text-base font-medium">{tq("justMe")}</strong>
                 <span className="text-sm leading-6 text-[var(--muted)]">{tq("justMeHint")}</span>
-              </button>
+              </StateButton>
               {groups.map((group) => (
-                <button key={group.id} type="button" disabled={busy} onClick={() => void go({ groupId: group.id })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
+                <StateButton key={group.id} type="button" disabled={busy} onClick={() => void go({ groupId: group.id })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
                   <strong className="text-base font-medium">{group.name}</strong>
                   <span className="text-sm leading-6 text-[var(--muted)]">{tq("groupHint", { count: group.members?.length ?? 1 })}</span>
-                </button>
+                </StateButton>
               ))}
               <form onSubmit={createGroup} className="rounded-2xl border border-dashed border-[var(--line)] p-4">
                 <strong className="block text-base font-medium">{t("choose.newGroupTitle")}</strong>

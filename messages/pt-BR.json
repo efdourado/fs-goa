@@ -320,7 +320,7 @@
       "unpin": "Desafixar",
       "color": "Cor",
       "open": "Abrir",
-      "manage": "Gerenciar"
+      "manage": "Editar"
     },
     "prefError": "Não foi possível salvar sua preferência.",
     "shelfAdd": {
@@ -554,7 +554,8 @@
     "skippedDuplicates": "{count, plural, one {# já estava na lista} other {# já estavam na lista}}",
     "moreDetails": "+{count} mais",
     "nameLabel": "Nome",
-    "recommendedByLabel": "Indicado por"
+    "recommendedByLabel": "Indicado por",
+    "fromCatalogCount": "Da coleção ({count, number})"
   },
   "createChallenge": {
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
@@ -760,7 +761,7 @@
       "items": "Itens",
       "metrics": "Resultados",
       "results": "Resultados",
-      "checkpoints": "Etapas",
+      "checkpoints": "Itens e etapas",
       "settings": "Configurações"
     },
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
@@ -967,7 +968,13 @@
     "changesSavedNewLink": "Salvo. O link público mudou.",
     "responseSettings": "Ajustes do registro",
     "fieldSettings": "Ajustes de {label}",
-    "fieldDeleteBody": "O campo sai do formulário e as respostas já dadas a ele são apagadas."
+    "fieldDeleteBody": "O campo sai do formulário e as respostas já dadas a ele são apagadas.",
+    "yourResponse": "Sua resposta",
+    "checkinDetails": "Detalhes do check-in",
+    "sharedField": "Campo compartilhado",
+    "sharedFieldHint": "Uma resposta por item para todo o grupo. Desative para cada participante ter sua própria resposta.",
+    "sharedFieldUnavailable": "Campos compartilhados estão disponíveis em listas respondidas uma vez por item. Check-ins diários mantêm respostas separadas por data.",
+    "noIndividualResponse": "Este desafio tem apenas respostas compartilhadas. Adicione um campo compartilhado para continuar."
   },
   "visibility": {
     "note": {
@@ -1013,7 +1020,7 @@
       "grupo": "Grupo"
     },
     "back": "Voltar",
-    "manage": "Gerenciar",
+    "manage": "Editar",
     "byAuthor": "por {name}",
     "groupCompletion": "{done} de {total} concluídos",
     "groupLastRegister": "{days, plural, =0 {Último registro hoje} =1 {Último registro ontem} other {Último registro há # dias}}",
@@ -1084,10 +1091,7 @@
     "done": "Pronto",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Nenhum item} one {# item} other {# itens}}",
-    "openVisit": "Abrir {name}",
-    "addSet": "Adicionar série",
-    "addRecord": "Adicionar outro registro",
-    "chooseSession": "Sessões deste dia"
+    "openVisit": "Abrir {name}"
   },
   "checkinLog": {
     "title": "Seus check-ins",
@@ -1506,10 +1510,10 @@
     "thanksBody": "Cada resposta é lida. Se você deixou um e-mail, talvez a gente escreva pra entender melhor."
   },
   "checkpointPlanner": {
-    "title": "Etapas",
-    "description": "Distribua o desafio em etapas: semanas; sessões; uma fase de grupos; ou pausas.",
+    "title": "Itens e etapas",
+    "description": "Organize os itens em grupos ordenados, como “Filmes de terror” ou “Fase 1”. Datas são opcionais quando o desafio tem prazo.",
     "stagesTitle": "As etapas",
-    "createTitle": "Crie etapas: uma semana; uma sessão; uma fase de grupos; ou uma pausa.",
+    "createTitle": "Agrupe os itens em etapas.",
     "dailyAutoNote": "Este desafio tem um registro por dia, gerado a partir do período. Ajuste as datas na aba Geral.",
     "noItemsNote": "Este desafio não tem itens para organizar em etapas.",
     "lockedNote": "Encerrado, as etapas ficam como estavam.",
@@ -1545,7 +1549,17 @@
     "doneEditing": "Pronto",
     "removeStage": "Remover etapa",
     "saveToFill": "Salve para colocar itens aqui.",
-    "saveStages": "Salvar etapas"
+    "saveStages": "Salvar etapas",
+    "undatedHint": "As etapas agrupam os itens em ordem. Defina um prazo na aba Geral se as etapas precisarem de datas.",
+    "itemsDescription": "Adicione e edite seus itens e organize-os em etapas quando precisar.",
+    "allItems": "Itens",
+    "noItems": "Nenhum item ainda. Adicione itens da biblioteca para começar.",
+    "stageSettings": "Configurações da etapa: {title}",
+    "chooseItems": "Escolher itens",
+    "itemsForStage": "Itens de {title}",
+    "chooseItemsHint": "Selecione os itens desta etapa. Selecionar um item de outra etapa o move para cá; desmarcá-lo o mantém no desafio, sem etapa.",
+    "removeStageBody": "Remover esta etapa? Os itens continuam no desafio, sem etapa. Etapas com registros salvos continuam protegidas.",
+    "searchItems": "Buscar itens"
   },
   "listImport": {
     "title": "Importar uma lista (JSON)",
@@ -1826,7 +1840,9 @@
     "removeMetricsPrompt": "Algumas métricas leem esta resposta. Confirme de novo para removê-las também.",
     "remove": "Remover resposta",
     "removeAnswersBody": "{count, plural, one {# resposta já dada some} other {# respostas já dadas somem}} junto.",
-    "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro."
+    "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro.",
+    "settingsTitle": "Configurações da resposta",
+    "settingsBody": "Os campos usam um título padrão de resposta. Remover uma resposta também afeta as respostas e métricas listadas na confirmação."
   },
   "sharedAnswers": {
     "badge": "Compartilhada com o grupo",
@@ -2209,42 +2225,33 @@
       "note": "Perder dias não é falhar. Voltar é o hábito."
     },
     "records": {
-      "eyebrow": "Recordes pessoais",
+      "eyebrow": "Progresso e recordes pessoais",
       "headline": "{title} subiu {gain}%.",
       "range": "{first}–{best} {unit}",
       "sessions": "{count, plural, one {# treino} other {# treinos}}",
-      "list": "{label}: o primeiro treino contra o melhor",
+      "list": "Início → atual, para cada propriedade acompanhada",
       "best": "Recorde",
       "first": "Começo",
-      "gain": "Ganho",
+      "gain": "Variação desde o início",
       "sessionsLabel": "Treinos",
       "history": "Últimos treinos",
       "chartAria": "Progresso de {title}",
-      "headlineFlat": "{count, plural, one {# exercício acompanhado.} other {# exercícios acompanhados.}}",
+      "headlineFlat": "{count, plural, one {# item acompanhado.} other {# itens acompanhados.}}",
       "sumPerSession": "Soma por sessão: {fields}",
       "bestPerSession": "Melhor registro por sessão: {fields}",
-      "tracked": "{count, plural, one {# item acompanhado, com todas as propriedades.} other {# itens acompanhados, com todas as propriedades.}}",
-      "allFields": "Início → sessão mais recente",
-      "openHistory": "Toque em uma propriedade para ver seu melhor resultado e o histórico. Percentuais positivos indicam melhora pela regra escolhida; campos descritivos mostram a variação numérica.",
+      "latest": "Mais recente",
+      "previous": "Sessão anterior",
+      "atContext": "Com {field}: {value} {unit}",
       "newBest": "Novo recorde pessoal",
       "firstContext": "Primeiro registro com este valor",
-      "latest": "Mais recente",
-      "change": "Variação desde o início",
-      "descriptiveChange": "Variação numérica",
-      "previous": "Sessão anterior",
-      "targetGain": "Redução da distância ao valor desejado",
-      "direction": {
-        "higher": "Maior é melhor",
-        "lower": "Menor é melhor",
-        "target": "Mais perto de um valor desejado",
-        "descriptive": "Observar sem classificar"
-      },
-      "atContext": "Com {field}: {value} {unit}",
       "noComparison": "Primeira sessão registrada",
       "absoluteChange": "Variação: {value}",
       "changeSinceStart": "{value} de variação desde o início",
       "improvementSinceStart": "{value} de melhora desde o início",
-      "latestPerSession": "Último registro de cada sessão: {fields}"
+      "workload": "Carga de trabalho",
+      "comparisonTarget": "Valor de referência",
+      "latestPerSession": "Registro mais recente por sessão: {fields}",
+      "declineSinceStart": "{value} de queda desde o início"
     },
     "notes": {
       "eyebrow": "Nas palavras deles"
@@ -2416,11 +2423,11 @@
   "progressTracking": {
     "title": "Acompanhamento do progresso",
     "performance": "Cálculo de desempenho",
-    "product": "Volume + propriedades individuais",
+    "product": "Carga de trabalho e propriedades individuais",
     "separate": "Acompanhar cada propriedade separadamente",
     "properties": "Propriedades para multiplicar",
-    "performanceHelp": "Cada propriedade selecionada mantém seu histórico. Uma fórmula acrescenta o volume junto dos fatores. A visão geral compara a sessão mais recente com o início; os recordes ficam no histórico. As comparações com o mesmo valor usam o contexto mais recente (por exemplo, repetições com a mesma carga). Valores ausentes continuam ausentes. Uma base zero não gera percentual.",
-    "preview": "{title}: início {first}, melhor {best}",
+    "performanceHelp": "A carga de trabalho é opcional: multiplique carga × repetições para uma série, ou carga × repetições × quantidade de séries somente para séries iguais. Não multiplique campos de séries diferentes entre si. As propriedades individuais continuam visíveis. A porcentagem compara o primeiro registro com o mais recente; os recordes ficam separados. Valores ausentes continuam ausentes; com início em zero, mostramos a variação absoluta.",
+    "preview": "{title}: início {first}, atual {latest}",
     "consistency": "Definir uma meta de consistência",
     "target": "Meta por período",
     "periodDays": "Duração do período em dias",
@@ -2436,19 +2443,19 @@
     "performanceTitle": "Cálculos de desempenho",
     "checkinsTitle": "Como contar os check-ins",
     "direction": "Como comparar {field}",
-    "targetValue": "Valor desejado",
-    "compareAt": "Comparar também com o mesmo valor de…",
-    "compareAtField": "Comparar {field} com o mesmo valor de…",
-    "anyContext": "Sem comparação adicional",
-    "seriesField": "Campo que identifica cada série ou tentativa",
-    "noSeries": "Combinar registros de cada sessão",
-    "seriesHelp": "Para acompanhar séries separadamente, adicione um campo numérico com o número da série e selecione-o aqui. A posição das linhas não define a série.",
     "directions": {
       "higher": "Maior é melhor",
       "lower": "Menor é melhor",
-      "target": "Mais perto de um valor desejado",
-      "descriptive": "Observar sem classificar"
-    }
+      "descriptive": "Observar sem classificar",
+      "target": "Mais perto de um valor escolhido"
+    },
+    "compareAt": "Também comparar com o mesmo valor de",
+    "compareAtField": "Comparar {field} com o mesmo valor de…",
+    "anyContext": "Sem comparação por contexto",
+    "seriesField": "Identificar séries ou tentativas registradas separadamente",
+    "noSeries": "Combinar registros de cada sessão",
+    "seriesHelp": "Opcional: escolha um campo existente que identifique a série ou tentativa (1, 2, 3…). O histórico de cada série fica separado. A quantidade total de séries não é um identificador. Para campos como Repetições 1, Repetições 2 e Repetições 3, deixe desativado: cada campo já tem seu histórico. Nenhum campo ou controle extra de registro é criado.",
+    "targetValue": "Referência da comparação"
   },
   "metricsManage": {
     "description": "Escolha o que aparece nos Resultados, confira cada cálculo e veja uma prévia com os registros atuais.",
@@ -2518,12 +2525,53 @@
         "description": "Totais e melhores dias de check-ins com um único contador numérico."
       },
       "records": {
-        "title": "Recordes pessoais",
-        "description": "A primeira sessão comparada à melhor, usando as propriedades e o agrupamento por sessão escolhidos abaixo. Valores ausentes ficam de fora; uma base zero não gera percentual."
+        "title": "Progresso e recordes pessoais",
+        "description": "Cada propriedade numérica acompanhada tem início, valor atual e histórico próprios. A carga de trabalho é um extra opcional. Os recordes ficam separados da variação mais recente."
       }
     },
     "missingValues": "Valores numéricos ausentes são ignorados. Somas e médias combinadas usam os campos selecionados presentes em cada registro.",
     "visibilityHint": "Ao ocultar durante o desafio, a métrica fica disponível apenas nos resultados após o encerramento.",
     "personalRecordsSettings": "Cálculo dos recordes pessoais"
+  },
+  "challengeCreate": {
+    "title": "Novo desafio",
+    "chatTitle": "Vamos criar seu desafio",
+    "subtitle": "Escolha uma lista ou um check-in diário e depois o que registrar.",
+    "name": "Nome do desafio",
+    "namePlaceholder": "Dê um nome ao seu desafio",
+    "modeQuestion": "Como você vai registrar suas respostas?",
+    "list": "Lista",
+    "listHint": "Responda uma vez para cada item.",
+    "daily": "Check-in diário",
+    "dailyHint": "Registre novas respostas a cada dia.",
+    "useLibrary": "Usar uma biblioteca",
+    "useLibraryHint": "Opcional. Escolha itens para registrar em cada check-in.",
+    "library": "Biblioteca",
+    "loadingLibraries": "Carregando suas bibliotecas…",
+    "listLibraryHint": "Escolha a biblioteca da sua lista.",
+    "dailyLibraryHint": "A cada dia, escolha um ou vários itens e responda às mesmas perguntas para cada um.",
+    "questions": "Perguntas e medidas",
+    "defaultField": "Sua resposta",
+    "listFieldsHint": "Responda a estas perguntas uma vez para cada item. Você pode editar uma resposta salva depois.",
+    "dailyFieldsHint": "Responda a estas perguntas novamente a cada dia. Cada data mantém suas próprias respostas.",
+    "dailyItemFieldsHint": "Em cada check-in, escolha um ou vários itens da biblioteca. Registre estas perguntas ou medidas para cada item; os registros anteriores ficam no histórico.",
+    "responseName": "Sua resposta",
+    "entryName": "Check-in",
+    "itemsHint": "Escolha os itens da biblioteca para este desafio. As propriedades da biblioteca continuam como estão.",
+    "setupQuestion": "Qual desafio você quer criar?",
+    "questionsQuestion": "O que você quer registrar?",
+    "itemsQuestion": "Quais itens fazem parte deste desafio?",
+    "savedGroups": "Este rascunho salvo contém grupos de respostas separados. Eles ficam aqui para revisão.",
+    "incompatibleGroups": "Grupos separados de respostas precisam de uma lista. Mantenha esse modo ou remova esses grupos explicitamente antes de mudar.",
+    "legacyDraft": "Este rascunho antigo mantém a configuração de progresso até você mudar o modo de registro ou a biblioteca.",
+    "itemsStep": "Itens",
+    "setupStep": "Desafio",
+    "noPeriodHint": "Sem prazo. Complete a lista no seu ritmo ou continue fazendo check-ins ao longo do tempo.",
+    "deadline": "O desafio tem prazo?",
+    "errNoItems": "Adicione pelo menos um item.",
+    "withDeadline": "Com prazo",
+    "withoutDeadline": "Sem prazo",
+    "deadlineHint": "Defina o início e o fim do desafio.",
+    "detailsTitle": "Prazo e extras"
   }
 }

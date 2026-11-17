@@ -40,7 +40,7 @@ test("FieldEditorDialog shows the type-specific config for a number field", () =
   assert.match(html, /Mínimo/);
   assert.match(html, /Máximo/);
   assert.match(html, /Intervalo/);
-  assert.match(html, /type="submit">Salvar</);
+  assert.match(html, /type="submit"[^>]*>Salvar</);
 });
 
 test("FieldEditorDialog names a rating's fixed scale in its type, with its two switches side by side", () => {
@@ -58,7 +58,7 @@ test("FieldEditorDialog in add mode has no field and a create action", () => {
     takenKeys: ["nota"], lockType: false, onCancel: () => undefined, onSave: noop,
   }));
   assert.match(html, /Adicionar campo/);
-  assert.doesNotMatch(html, /type="submit">Salvar</);
+  assert.doesNotMatch(html, /type="submit"[^>]*>Salvar</);
 });
 
 const catalogChallenge = {

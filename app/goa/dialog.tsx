@@ -1,10 +1,12 @@
 "use client";
 
+import { StateButton, StateFieldset } from "./state-button";
+
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useGoaFormat } from "./format";
-import { Button, SaveButton, cx, InModal, StatusMessage } from "./ui";
+import { Button, cx, InModal, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
 export function Dialog({ title, children, onClose, busy = false, wide = false }: {
@@ -36,7 +38,7 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
     >
       <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
         <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
-        <button
+        <StateButton
           type="button"
           onClick={() => { if (!busy) onClose(); }}
           disabled={busy}
@@ -45,7 +47,7 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
         >
           {/* Every modal closes with the circled minus. */}
           <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
-        </button>
+        </StateButton>
       </div>
       <div className="p-6"><InModal.Provider value>{children}</InModal.Provider></div>
     </dialog>
@@ -101,7 +103,6 @@ export function FormDialog({
   const tc = useTranslations("common");
   const [discard, setDiscard] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const SubmitButton = danger ? Button : SaveButton;
   const close = () => { if (dirty) setDiscard(true); else onCancel(); };
   return (
     <Dialog title={title} busy={busy} onClose={close}>
@@ -115,14 +116,14 @@ export function FormDialog({
         </div>
       ) : null}
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
-        <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
+        <StateFieldset disabled={busy} className="min-w-0 space-y-5">{children}</StateFieldset>
         <StatusMessage error={error} />
         <ModalActions className="border-t border-[var(--line)] pt-4">
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
           {footerStart ? <div className="contents">{footerStart}</div> : null}
-          <SubmitButton type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
+          <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
             {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
-          </SubmitButton>
+          </Button>
         </ModalActions>
         {onDelete && deleting ? <DeleteConfirm {...onDelete} /> : null}
       </form>

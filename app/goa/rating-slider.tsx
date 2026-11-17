@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter } from "next-intl";
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
 
@@ -109,7 +111,7 @@ export function RatingSlider({
           <span className="ml-1.5 text-sm text-[var(--muted)]">/ {fmt(choices[last] ?? 5)}</span>
         </p>
         {value !== null && !disabled ? (
-          <button type="button" onClick={() => onPick(null)} className="min-h-9 cursor-pointer px-1 text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline">{clearLabel}</button>
+          <StateButton type="button" onClick={() => onPick(null)} className="min-h-9 cursor-pointer px-1 text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline">{clearLabel}</StateButton>
         ) : null}
       </div>
       <div

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -127,7 +129,7 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" 
   if (story.kind === "empty" && !metrics.length) return null;
   return (
     <>
-      <button
+      <StateButton
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t("button")}
@@ -142,7 +144,7 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" 
           <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className={tone === "hero" ? "hidden sm:inline" : undefined}>{t("button")}</span>
-      </button>
+      </StateButton>
       {open ? <PagesDialog input={input} story={story} metrics={metrics} onClose={() => setOpen(false)} /> : null}
     </>
   );
@@ -238,9 +240,9 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
     <Dialog title={t("title")} onClose={onClose} busy={busy} wide>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-sm text-[var(--muted)]">{t("lede", { count: pages.length })}</p>
-        <button type="button" onClick={() => setSelected(allPicked ? [] : pages.map((page) => page.id))} className="cursor-pointer text-sm text-[var(--ink)] underline-offset-4 hover:underline">
+        <StateButton type="button" onClick={() => setSelected(allPicked ? [] : pages.map((page) => page.id))} className="cursor-pointer text-sm text-[var(--ink)] underline-offset-4 hover:underline">
           {allPicked ? t("clear") : t("selectAll", { count: pages.length })}
-        </button>
+        </StateButton>
       </div>
       <ol ref={grid} className="mt-5 grid" style={{ gap: GRID_GAP, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
         {pages.map((page, index) => {
@@ -256,11 +258,11 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
                   {page.node(index, pages.length)}
                 </div>
                 {/* One toggle over the whole preview (a button can't hold the page's own buttons). */}
-                <button type="button" aria-pressed={picked} aria-label={page.title} onClick={() => toggle(page.id)} className="absolute inset-0 cursor-pointer transition hover:bg-[var(--ink)]/[0.04] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/30">
+                <StateButton type="button" aria-pressed={picked} aria-label={page.title} onClick={() => toggle(page.id)} className="absolute inset-0 cursor-pointer transition hover:bg-[var(--ink)]/[0.04] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/30">
                   <span aria-hidden="true" className={cx("absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border transition", picked ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--canvas)]" : "border-[var(--line)] bg-[var(--paper)]/90 text-transparent")}>
                     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3.5 8.4 2.9 2.9 6.1-6.6" /></svg>
                   </span>
-                </button>
+                </StateButton>
               </div>
               <p className="mt-2 truncate text-sm font-medium"><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{page.title}</p>
             </li>
@@ -270,9 +272,9 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
       <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 space-y-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
         <span className="text-xs text-[var(--muted)]">{t(canShare ? "formatShare" : "format")}</span>
         <ModalActions>
-          <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
+          <StateButton type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
             {label}
-          </button>
+          </StateButton>
         </ModalActions>
       </div>
     </Dialog>

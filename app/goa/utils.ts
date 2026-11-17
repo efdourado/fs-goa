@@ -1,5 +1,4 @@
 import type { ChallengeDetail, ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, Metric, MetricOperation, RecipeKey, Role, SubmissionMode } from "./types";
-import { validateDateValue, validateNumberValue, validateTextValue } from "../../lib/validation";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -157,29 +156,16 @@ export function findMissingRequiredField(fields: ChallengeField[], values: Recor
   return fields.find((field) => {
     if (!field.required || !field.id) return false;
     const value = values[field.id];
-    return value === undefined || value === null || (typeof value === "string" && !value.trim());
-  });
-}
-
-/** The same readiness rule for native inputs and custom rating/yes-no/select controls. Zero and false are answers. */
-export function entryValuesReady(fields: ChallengeField[], values: Record<Id, unknown>): boolean {
-  if (findMissingRequiredField(fields, values)) return false;
-  return fields.every((field) => {
-    if (!field.id) return true;
-    const value = values[field.id];
-    if (value === undefined || value === null || value === "") return true;
-    if (field.type === "number" || field.type === "rating") return validateNumberValue(typeof value === "string" ? Number(value) : value, field.config).ok;
-    if (field.type === "text") return validateTextValue(value, { maxLength: field.config?.maxLength }).ok;
-    if (field.type === "boolean") return typeof value === "boolean";
-    if (field.type === "date") return validateDateValue(value).ok;
-    if (field.type === "select") return (field.config?.options ?? []).some((option) => (option.id ?? option.value ?? option.label) === value);
-    return true;
+    return value === undefined || value === null || value === "";
   });
 }
 
 /**
- * Clearing a required answer exposes a deletion action only for an existing removable entry.
- * A new answer with a missing required value stays incomplete, with Save locked.
+ * There is no delete button on an entry form: clearing the required answer
+ * (e.g. tapping an already-picked rating again) and submitting is the delete
+ * gesture instead, but only for an entry that already exists and can be
+ * removed — a first-time submission with a blank required field is still
+ * just an incomplete entry, not a request to delete something.
  */
 export function isEmptySaveADelete(missingField: ChallengeField | undefined, hasEntry: boolean, canDelete: boolean): boolean {
   return Boolean(missingField) && hasEntry && canDelete;

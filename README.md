@@ -76,7 +76,6 @@ as alterações nos arquivos aparecem depois de reconstruir a imagem.
 | `npm run db:migrate` · `db:migrate:prod` | aplica migrações local · no Neon (WSS/443, via `.env.production.local`) |
 | `npm run db:seed-showcase` | dados de demonstração locais: um clube, um duo, um solo, hábitos |
 | `npm run db:seed-local` | 11 desafios sintéticos para testar telas (só local) |
-| `npm run db:seed-progress` | 5 desafios locais para comparar propriedades, séries, volume e valores desejados ([detalhes](scripts/seed-progress/README.md)) |
 | `npm run db:seed-reading[:prod]` | um desafio de leitura rico para @dudupizzas |
 
 O ESLint fica na última versão 9 compatível com os plugins de React/acessibilidade,

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -50,7 +52,7 @@ export function PagedView({
       {pages.length ? (
         <div className="space-y-4" aria-label={contentAriaLabel}>
           {paged && pages.length > 1 ? <nav className={cx("flex gap-2 overflow-x-auto border-b border-[var(--line)] pb-3", centered && "sm:justify-center")} aria-label={t("pages")}>
-            {pages.map((item, index) => <button key={item.id} type="button" aria-current={bounded === index ? "page" : undefined} onClick={() => setPage(index)} className={cx("min-h-11 shrink-0 rounded-xl px-4 text-sm transition", bounded === index ? "bg-[var(--ink)] text-[var(--canvas)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{item.title}</button>)}
+            {pages.map((item, index) => <StateButton key={item.id} type="button" aria-current={bounded === index ? "page" : undefined} onClick={() => setPage(index)} className={cx("min-h-11 shrink-0 rounded-xl px-4 text-sm transition", bounded === index ? "bg-[var(--ink)] text-[var(--canvas)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{item.title}</StateButton>)}
           </nav> : null}
           {pages.map((pageItem, index) => (
             <section key={pageItem.id} className="space-y-4" aria-labelledby={`${pageItem.id}-title`} hidden={paged && index !== bounded}>
@@ -72,9 +74,9 @@ export function PagedView({
 
           {paged && pages.length > 1 ? (
             <nav className="flex items-center justify-center gap-3 pt-2" aria-label={t("pages")}>
-              <button type="button" className={arrow} onClick={() => setPage(bounded - 1)} disabled={bounded === 0} aria-label={t("prev")}>‹</button>
+              <StateButton type="button" className={arrow} onClick={() => setPage(bounded - 1)} disabled={bounded === 0} aria-label={t("prev")}>‹</StateButton>
               <span className="text-xs tabular-nums text-[var(--muted)]">{t("pageOf", { current: bounded + 1, total: pages.length })}</span>
-              <button type="button" className={arrow} onClick={() => setPage(bounded + 1)} disabled={bounded === pages.length - 1} aria-label={t("next")}>›</button>
+              <StateButton type="button" className={arrow} onClick={() => setPage(bounded + 1)} disabled={bounded === pages.length - 1} aria-label={t("next")}>›</StateButton>
             </nav>
           ) : null}
         </div>

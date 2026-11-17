@@ -171,7 +171,7 @@ test("campos de período oferecem atalhos de duração e refletem o span atual",
     onEndsOn: () => undefined,
   }));
   assert.match(withPeriod, /6 meses/);
-  assert.match(withPeriod, /aria-pressed="true"[\s\S]*?>90 dias<\/button>/);
+  assert.match(withPeriod, /aria-pressed="true"[\s\S]*?>90 dias</);
   assert.match(withPeriod, /90 dias · /);
 
   const empty = renderWithIntl(createElement(SchedulePeriodFields, {
@@ -310,7 +310,7 @@ test("uma resposta já salva mantém os mesmos campos (desabilitados) e troca os
   }));
   assert.match(answered, /aria-label="Editar resposta"/, "um ícone de cadeado reabre a resposta para edição");
   assert.match(answered, /aria-pressed="true" aria-label="Nota 4,5" disabled/, "o campo continua com o mesmo controle, só que desabilitado");
-  assert.doesNotMatch(answered, /type="submit">Salvar/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
+  assert.doesNotMatch(answered, /type="submit"[^>]*>Salvar/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
   assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
 });
 
@@ -368,7 +368,7 @@ test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em l
     onDelete: async () => undefined,
   }));
   assert.doesNotMatch(editing, /Excluir registro/, "o botão de excluir dedicado não existe mais");
-  assert.match(editing, /type="submit">Salvar/, "salvar continua presente");
+  assert.match(editing, /type="submit"[^>]*>Salvar/, "salvar continua presente");
 });
 
 test("Terminei mostra até seis campos opcionais diretamente", () => {
@@ -388,7 +388,7 @@ test("Terminei mostra até seis campos opcionais diretamente", () => {
   assert.match(collapsed, /Se terminei\.\.\./);
   assert.match(collapsed, /<form/);
   assert.match(collapsed, /Comentário/);
-  assert.match(collapsed, /type="submit">Salvar/);
+  assert.match(collapsed, /type="submit"[^>]*>Salvar/);
   assert.doesNotMatch(collapsed, /Mostrar mais|Ocultar campos opcionais/);
 
   const filled = renderWithIntl(createElement(DynamicEntryForm, {
@@ -401,7 +401,7 @@ test("Terminei mostra até seis campos opcionais diretamente", () => {
     onSave: async () => undefined,
   }));
   assert.match(filled, /<form/, "já tendo algo preenchido, abre direto");
-  assert.match(filled, /type="submit">Salvar/, "o botão de salvar aparece junto com os campos");
+  assert.match(filled, /type="submit"[^>]*>Salvar/, "o botão de salvar aparece junto com os campos");
 });
 
 test("limpar o campo obrigatório e salvar apaga o registro, em vez de bloquear com um erro", () => {
@@ -580,8 +580,8 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.ok(pointerCount >= 3, `esperava cursor clicável nos três controles; recebeu ${pointerCount}`);
   assert.match(header, /aria-label="Você"/, "o avatar abre a página Você");
   assert.match(header, /aria-label="Novidades"/);
-  assert.match(header, />Sair<\/button>/);
-  assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
+  assert.match(header, />Sair</);
+  assert.match(header, />Início</, "há um link 'Início' explícito, não só o logo");
   assert.doesNotMatch(header, /Meu espaço/, "Meu espaço agora é parte do Início, sem link próprio");
 });
 
@@ -614,7 +614,7 @@ test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de dur
   assert.match(html, /Sortear dentro de cada/);
   assert.match(html, /Sem etapa/, "há um balde para itens sem etapa");
   assert.doesNotMatch(html, /<option value="(week|session|milestone|day)"/, "etapas não têm mais um tipo para escolher");
-  assert.match(html, />Mover</, "um item sem etapa se move direto da caixa Sem etapa");
+  assert.match(html, /aria-label="Etapa de Filme B"/, "um item sem etapa pode ser movido a partir da caixa Sem etapa");
   assert.match(html, /aria-expanded="false"[^>]*>.*?Semana 1/, "cada etapa é uma linha que abre e fecha");
 });
 
@@ -628,9 +628,9 @@ test("planejador de etapas: fechada, uma etapa mostra só nome, datas e contagem
   const html = renderWithIntl(createElement(CheckpointPlanner, { challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined }));
   assert.match(html, /Fase de grupos/);
   assert.match(html, /12 itens/);
-  assert.match(html, /sem datas/);
+  assert.doesNotMatch(html, /sem datas/, "etapas sem prazo não precisam anunciar datas");
   assert.doesNotMatch(html, /Filme 1</, "os itens ficam dobrados até a etapa abrir");
-  assert.match(html, /disabled="">Salvar/, "sem mudanças, Salvar fica desligado");
+  assert.doesNotMatch(html, /Salvar etapas/, "a etapa é salva pelo modal, sem um segundo botão na página");
 });
 
 test("planejador de etapas: um desafio com dias automáticos não os edita à mão", () => {
@@ -720,6 +720,7 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
   assert.ok(html.indexOf("2019 · Drama") > html.indexOf(">Parasita</h2>"));
   assert.ok(html.indexOf("Bong Joon-ho") < html.indexOf("Salvar respostas"));
   assert.match(html, /Salvar respostas/, "um único botão salva as duas seções obrigatórias de uma vez");
+  assert.doesNotMatch(html, /border-l/, "expectation and rating fields have no decorative left border");
   assert.doesNotMatch(html, /Salvar registro/, "cada seção não carrega mais o próprio botão de salvar");
 });
 
@@ -751,7 +752,7 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
 test("boas-vindas de quem não tem nada: só o + fica no cabeçalho, sem conteúdo próprio no painel", () => {
   const html = renderWithIntl(createElement(WelcomePanel, { groups: [], onQuickCreate: () => undefined, onCreateManually: async () => undefined }));
   assert.doesNotMatch(html, /Modelos/);
-  assert.match(html, /aria-label="Começar"[^>]*><svg[^>]*>.*?<\/svg><\/button>/, "o botão circular + abre as opções para começar");
+  assert.match(html, /aria-label="Começar"/, "o botão circular + abre as opções para começar");
   assert.doesNotMatch(html, /Comece um desafio|Acompanhe o que você assiste, lê ou faz/);
   assert.equal((html.match(/<button/g) ?? []).length, 1, "somente a ação + do cabeçalho");
 });
@@ -765,7 +766,7 @@ test("a seção de modelos prontos pode ocupar a home vazia enquanto carrega a g
 test("Tables sem biblioteca: convida a criá-la e avisa que dá para criar outras, sem preset nem propriedades de partida", () => {
   const prompt = renderWithIntl(createElement(TablesLibraryPrompt, { scope: "personal", onCreated: () => undefined }));
   assert.match(prompt, /Comece com uma biblioteca Lugares/);
-  assert.match(prompt, />Criar biblioteca Lugares<\/button>/);
+  assert.match(prompt, />Criar biblioteca Lugares</);
   assert.match(prompt, /outras bibliotecas/, "sugere criar mais bibliotecas depois");
   assert.doesNotMatch(prompt, /Bairro|Endereço|cozinha/i);
   const dialog = renderWithIntl(createElement(NewLibraryDialog, { scope: "personal", onCancel: () => undefined, onCreated: () => undefined }));

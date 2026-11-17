@@ -320,7 +320,7 @@
       "unpin": "Unpin",
       "color": "Colour",
       "open": "Open",
-      "manage": "Manage"
+      "manage": "Edit"
     },
     "prefError": "Could not save your preference.",
     "shelfAdd": {
@@ -554,7 +554,8 @@
     "skippedDuplicates": "{count, plural, one {# was already on the list} other {# were already on the list}}",
     "moreDetails": "+{count} more",
     "nameLabel": "Name",
-    "recommendedByLabel": "Recommended by"
+    "recommendedByLabel": "Recommended by",
+    "fromCatalogCount": "From collection ({count, number})"
   },
   "createChallenge": {
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
@@ -760,7 +761,7 @@
       "items": "Items",
       "metrics": "Results",
       "results": "Results",
-      "checkpoints": "Stages",
+      "checkpoints": "Items and stages",
       "settings": "Settings"
     },
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
@@ -967,7 +968,13 @@
     "changesSavedNewLink": "Saved. The public link changed.",
     "responseSettings": "Response settings",
     "fieldSettings": "Settings for {label}",
-    "fieldDeleteBody": "The field leaves the form and the answers already given to it are erased."
+    "fieldDeleteBody": "The field leaves the form and the answers already given to it are erased.",
+    "yourResponse": "Your response",
+    "checkinDetails": "Check-in details",
+    "sharedField": "Shared field",
+    "sharedFieldHint": "One answer per item for the whole group. Leave off for each participant’s own answer.",
+    "sharedFieldUnavailable": "Shared fields are available for lists answered once per item. Daily check-ins keep separate dated answers.",
+    "noIndividualResponse": "This challenge only has shared responses. Add a shared field to continue."
   },
   "visibility": {
     "note": {
@@ -1013,7 +1020,7 @@
       "grupo": "Group"
     },
     "back": "Back",
-    "manage": "Manage",
+    "manage": "Edit",
     "byAuthor": "by {name}",
     "groupCompletion": "{done} of {total} completed",
     "groupLastRegister": "{days, plural, =0 {Last entry today} =1 {Last entry yesterday} other {Last entry # days ago}}",
@@ -1084,10 +1091,7 @@
     "done": "Done",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
-    "openVisit": "Open {name}",
-    "addSet": "Add working set",
-    "addRecord": "Add another record",
-    "chooseSession": "Sessions on this day"
+    "openVisit": "Open {name}"
   },
   "checkinLog": {
     "title": "Your check-ins",
@@ -1506,10 +1510,10 @@
     "thanksBody": "Every response is read. If you left an email, we might write to understand it better."
   },
   "checkpointPlanner": {
-    "title": "Stages",
-    "description": "Split the challenge into stages: weeks; sessions; a group stage; or breaks.",
+    "title": "Items and stages",
+    "description": "Organise items into ordered groups, such as “Horror movies” or “Phase 1”. Dates are optional when the challenge has a deadline.",
     "stagesTitle": "The stages",
-    "createTitle": "Create stages: a week; a session; a group stage; or a break.",
+    "createTitle": "Group items into stages.",
     "dailyAutoNote": "This challenge has one entry per day, generated from its period. Adjust the dates on the General tab.",
     "noItemsNote": "This challenge has no items to organise into stages.",
     "lockedNote": "Closed, so the stages stay as they were.",
@@ -1545,7 +1549,17 @@
     "doneEditing": "Done",
     "removeStage": "Remove stage",
     "saveToFill": "Save to put items here.",
-    "saveStages": "Save stages"
+    "saveStages": "Save stages",
+    "undatedHint": "Stages group items in order. Add a challenge deadline in General if stages need dates.",
+    "itemsDescription": "Add and edit your items, then group them into stages when useful.",
+    "allItems": "Items",
+    "noItems": "No items yet. Add items from your library to get started.",
+    "stageSettings": "Stage settings: {title}",
+    "chooseItems": "Choose items",
+    "itemsForStage": "Items in {title}",
+    "chooseItemsHint": "Select the items in this stage. Selecting an item from another stage moves it here; deselecting it keeps it in the challenge without a stage.",
+    "removeStageBody": "Remove this stage? Its items stay in the challenge without a stage. Stages with saved records remain protected.",
+    "searchItems": "Search items"
   },
   "listImport": {
     "title": "Import a list (JSON)",
@@ -1826,7 +1840,9 @@
     "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
     "remove": "Remove response",
     "removeAnswersBody": "{count, plural, one {# answer already given goes} other {# answers already given go}} with it.",
-    "removeAnswersPrompt": "Confirm again to delete the answers and remove the response."
+    "removeAnswersPrompt": "Confirm again to delete the answers and remove the response.",
+    "settingsTitle": "Response settings",
+    "settingsBody": "Fields use a default response label. Removing a response also affects the answers and metrics listed in the confirmation."
   },
   "sharedAnswers": {
     "badge": "Shared with the group",
@@ -2209,42 +2225,33 @@
       "note": "Missing days isn't failing. Coming back is the habit."
     },
     "records": {
-      "eyebrow": "Personal records",
+      "eyebrow": "Progress and personal bests",
       "headline": "{title} went up {gain}%.",
       "range": "{first}–{best} {unit}",
       "sessions": "{count, plural, one {# session} other {# sessions}}",
-      "list": "{label}: first session against the best",
+      "list": "Start → latest, for every tracked property",
       "best": "Best",
       "first": "Start",
-      "gain": "Gain",
+      "gain": "Change since start",
       "sessionsLabel": "Sessions",
       "history": "Latest sessions",
       "chartAria": "Progress of {title}",
-      "headlineFlat": "{count, plural, one {# exercise tracked.} other {# exercises tracked.}}",
+      "headlineFlat": "{count, plural, one {# item tracked.} other {# items tracked.}}",
       "sumPerSession": "Sum per session: {fields}",
       "bestPerSession": "Best record per session: {fields}",
-      "tracked": "{count, plural, one {# item tracked, every property visible.} other {# items tracked, every property visible.}}",
-      "allFields": "Start → latest session",
-      "openHistory": "Tap a property to see its best result and session history. Positive percentages mean improvement under the chosen rule; descriptive fields show raw change.",
+      "latest": "Latest",
+      "previous": "Previous session",
+      "atContext": "At {field}: {value} {unit}",
       "newBest": "New personal best",
       "firstContext": "First record at this value",
-      "latest": "Latest",
-      "change": "Change from start",
-      "descriptiveChange": "Numeric change",
-      "previous": "Previous session",
-      "targetGain": "Distance to target reduced",
-      "direction": {
-        "higher": "Higher is better",
-        "lower": "Lower is better",
-        "target": "Closer to a target",
-        "descriptive": "Observe without ranking"
-      },
-      "atContext": "At {field}: {value} {unit}",
       "noComparison": "First recorded session",
       "absoluteChange": "Change: {value}",
       "changeSinceStart": "{value} change since start",
       "improvementSinceStart": "{value} improvement since start",
-      "latestPerSession": "Latest record per session: {fields}"
+      "workload": "Workload",
+      "comparisonTarget": "Reference value",
+      "latestPerSession": "Latest record per session: {fields}",
+      "declineSinceStart": "{value} decline since start"
     },
     "notes": {
       "eyebrow": "In their words"
@@ -2416,11 +2423,11 @@
   "progressTracking": {
     "title": "Progress tracking",
     "performance": "Performance calculation",
-    "product": "Workload + individual properties",
+    "product": "Workload plus individual properties",
     "separate": "Track each property separately",
     "properties": "Properties to multiply",
-    "performanceHelp": "Every selected property keeps its own history. A formula adds workload alongside its factors. The overview compares the latest session with the start; personal bests stay in the history. Same-value comparisons use the latest recorded context (for example, reps at the same weight). Missing values stay missing. A zero baseline has no percentage.",
-    "preview": "{title}: first {first}, best {best}",
+    "performanceHelp": "Workload is optional: multiply weight × reps for one set, or weight × reps × set count only for identical sets. Do not multiply fields from different working sets together. Individual properties remain visible. Percentages compare the first recorded session with the latest; personal bests are separate. Missing values stay missing; a zero baseline shows absolute change.",
+    "preview": "{title}: start {first}, latest {latest}",
     "consistency": "Set a consistency goal",
     "target": "Target per period",
     "periodDays": "Period length in days",
@@ -2436,19 +2443,19 @@
     "performanceTitle": "Performance calculations",
     "checkinsTitle": "Check-in handling",
     "direction": "How to compare {field}",
-    "targetValue": "Target value",
-    "compareAt": "Also compare at the same…",
-    "compareAtField": "Compare {field} at the same…",
-    "anyContext": "No additional comparison",
-    "seriesField": "Property identifying each set or attempt",
-    "noSeries": "Combine records within each session",
-    "seriesHelp": "To track working sets separately, add a numeric set number to each record and select it here. Rows are never matched by position.",
     "directions": {
       "higher": "Higher is better",
       "lower": "Lower is better",
-      "target": "Closer to a target",
-      "descriptive": "Observe without ranking"
-    }
+      "descriptive": "Observe without ranking",
+      "target": "Closer to a chosen value"
+    },
+    "compareAt": "Also compare at the same value of",
+    "compareAtField": "Compare {field} at the same…",
+    "anyContext": "No contextual comparison",
+    "seriesField": "Identify separately recorded sets or attempts",
+    "noSeries": "Combine records within each session",
+    "seriesHelp": "Optional: choose an existing field containing the set/attempt identifier (1, 2, 3…). This keeps each set’s history separate. A total set count is not an identifier. For fields such as Reps 1, Reps 2 and Reps 3, leave this off: each field already has its own history. No fields or extra logging controls are added.",
+    "targetValue": "Comparison reference"
   },
   "metricsManage": {
     "description": "Choose what appears in Results, review each calculation, and preview it with the current records.",
@@ -2518,12 +2525,53 @@
         "description": "Totals and strongest days for a check-in with a single numeric counter."
       },
       "records": {
-        "title": "Personal records",
-        "description": "The first session compared with the best, using the selected properties and session aggregation below. Missing values are excluded; a zero baseline has no percentage."
+        "title": "Progress and personal bests",
+        "description": "Each tracked numeric property has its own start, latest value and history. Workload is an optional extra. Personal bests are shown separately from the latest change."
       }
     },
     "missingValues": "Missing numeric values are ignored. Combined sums and averages use the selected fields that are present in each record.",
     "visibilityHint": "Turning off visibility during the challenge keeps this metric for the closed results.",
     "personalRecordsSettings": "Personal record calculations"
+  },
+  "challengeCreate": {
+    "title": "New challenge",
+    "chatTitle": "Let’s create your challenge",
+    "subtitle": "Choose a list or a daily check-in, then decide what to record.",
+    "name": "Challenge name",
+    "namePlaceholder": "Give your challenge a name",
+    "modeQuestion": "How will you record your answers?",
+    "list": "List",
+    "listHint": "Answer once for each item.",
+    "daily": "Daily check-in",
+    "dailyHint": "Record new answers each day.",
+    "useLibrary": "Use a library",
+    "useLibraryHint": "Optional. Choose items to record in each check-in.",
+    "library": "Library",
+    "loadingLibraries": "Loading your libraries…",
+    "listLibraryHint": "Choose the library for your list.",
+    "dailyLibraryHint": "Each day, choose one or several items and answer the same questions for each.",
+    "questions": "Questions and measures",
+    "defaultField": "Your response",
+    "listFieldsHint": "Answer these questions once for each item. You can edit a saved answer later.",
+    "dailyFieldsHint": "Answer these questions again each day. Each date keeps its own answers.",
+    "dailyItemFieldsHint": "For each check-in, choose one or several library items. Record these questions or measures for each item; earlier records stay in your history.",
+    "responseName": "Your response",
+    "entryName": "Check-in",
+    "itemsHint": "Choose the library items for this challenge. Their library properties stay unchanged.",
+    "setupQuestion": "What challenge do you want to create?",
+    "questionsQuestion": "What do you want to record?",
+    "itemsQuestion": "Which items belong in this challenge?",
+    "savedGroups": "This saved draft contains separate response groups. They are kept here for review.",
+    "incompatibleGroups": "Separate response groups need a list. Keep that mode or explicitly remove those groups before switching.",
+    "legacyDraft": "This older draft keeps its progress settings until you change the recording mode or library.",
+    "itemsStep": "Items",
+    "setupStep": "Challenge",
+    "noPeriodHint": "No deadline. Complete the list at your own pace, or keep checking in over time.",
+    "deadline": "Does it have a deadline?",
+    "errNoItems": "Add at least one item.",
+    "withDeadline": "With a deadline",
+    "withoutDeadline": "No deadline",
+    "deadlineHint": "Set the challenge’s start and end dates.",
+    "detailsTitle": "Deadline and extras"
   }
 }

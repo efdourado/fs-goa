@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -187,7 +189,7 @@ export function LibraryPills({
         const active = selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind;
         const suggested = !active && suggestions.includes(choice);
         return (
-          <button
+          <StateButton
             key={choice.kind}
             type="button"
             aria-pressed={active}
@@ -196,17 +198,17 @@ export function LibraryPills({
           >
             {suggested ? <span aria-hidden="true">＋</span> : null}
             {libraryName(choice)}
-          </button>
+          </StateButton>
         );
       })}
       {onNew ? (
-        <button
+        <StateButton
           type="button"
           onClick={onNew}
           className={choicePillClass({ dashed: true })}
         >
           <span aria-hidden="true">＋</span>{t("addLibrary")}
-        </button>
+        </StateButton>
       ) : null}
     </div>
   );

@@ -1,9 +1,9 @@
 import { parseResultPresentation, type ResultPresentation } from "./result-presentation";
 
 export interface ComparisonRule {
-  direction: "higher" | "lower" | "target" | "descriptive";
+  direction: "higher" | "lower" | "descriptive" | "target";
   target?: number;
-  /** Compare this field only with records having the same value in this other field. */
+  /** Compare with earlier records having the same value in this other field. */
   contextFieldId?: string;
 }
 
@@ -15,7 +15,7 @@ export interface ProgressTracking {
     fieldIds: string[];
     sessionAggregation?: "best" | "sum";
     rules?: Record<string, ComparisonRule>;
-    /** An explicitly recorded set/attempt number; never inferred from row order. */
+    /** Optional existing field identifying a set/attempt. Never inferred from row order. */
     seriesFieldId?: string;
   };
   consistency?: {
@@ -39,21 +39,20 @@ export function parseProgressTracking(raw: unknown): ProgressTracking {
     if (p.sessionAggregation !== undefined && !["best", "sum"].includes(String(p.sessionAggregation))) throw new Error("Choose how to combine session records");
     result.performance = { sessionAggregation: p.sessionAggregation === "sum" ? "sum" : "best", mode: p.mode as "product" | "separate", fieldIds: p.fieldIds as string[] };
     if (p.seriesFieldId !== undefined) {
-      if (typeof p.seriesFieldId !== "string" || !p.seriesFieldId) throw new Error("Choose a set or attempt property");
-      if (p.fieldIds.includes(p.seriesFieldId)) throw new Error("A set or attempt number cannot be a performance factor");
+      if (typeof p.seriesFieldId !== "string" || !p.seriesFieldId || p.fieldIds.includes(p.seriesFieldId)) throw new Error("Choose a separate set or attempt property");
       result.performance.seriesFieldId = p.seriesFieldId;
     }
     if (p.rules !== undefined) {
       if (!p.rules || typeof p.rules !== "object" || Array.isArray(p.rules) || Object.keys(p.rules).length > 20) throw new Error("Invalid comparison rules");
-      const rules: Record<string, ComparisonRule> = {};
+      const rules: Record<string, ComparisonRule> = Object.create(null);
       for (const [id, rawRule] of Object.entries(p.rules)) {
         const rule = rawRule as ComparisonRule | null;
-        if (!rule || !["higher", "lower", "target", "descriptive"].includes(rule.direction)
+        if (!id || id === p.seriesFieldId || !rule || !["higher", "lower", "descriptive", "target"].includes(rule.direction)
           || (rule.direction === "target" && (typeof rule.target !== "number" || !Number.isFinite(rule.target)))
           || (rule.contextFieldId !== undefined && (typeof rule.contextFieldId !== "string" || !rule.contextFieldId || rule.contextFieldId === id || rule.contextFieldId === p.seriesFieldId))) throw new Error("Choose a valid comparison rule");
-        rules[id] = { direction: rule.direction, ...(rule.direction === "target" ? { target: rule.target } : {}), ...(rule.contextFieldId ? { contextFieldId: rule.contextFieldId } : {}) };
+        rules[id] = { direction: rule.direction, ...(rule.direction === "target" ? {target: rule.target} : {}), ...(rule.contextFieldId ? { contextFieldId: rule.contextFieldId } : {}) };
       }
-      result.performance.rules = rules;
+      result.performance.rules = { ...rules };
     }
   }
   if (value.consistency != null) {
@@ -73,14 +72,14 @@ export function performancePlans(fields: TrackingField[], settings?: ProgressTra
   const numeric = fields.filter((f) => f.id && f.type === "number" && f.id !== settings?.seriesFieldId);
   const selected = settings?.fieldIds.length ? numeric.filter((f) => settings.fieldIds.includes(f.id!)) : numeric;
   const separate = selected.map((f) => ({ fields: [f], product: false, rule: settings?.rules?.[f.id!] }));
-  if (settings?.mode === "product") return selected.length === settings.fieldIds.length && selected.length >= 2 ? [{ fields: selected, product: true, rule: undefined }, ...separate] : [];
-  return separate;
+  const formula = settings?.mode === "product" && selected.length === settings.fieldIds.length && selected.length >= 2
+    ? [{ fields: selected, product: true, rule: undefined }] : [];
+  return [...formula, ...separate];
 }
 
-export const comparisonScore = (value: number, rule?: ComparisonRule): number =>
-  rule?.direction === "lower" ? -value : rule?.direction === "target" ? -Math.abs(value - rule.target!) : value;
+export const comparisonScore = (value: number, rule?: ComparisonRule): number => rule?.direction === "lower" ? -value : rule?.direction === "target" ? -Math.abs(value - rule.target!) : value;
 
-/** Positive means improvement; descriptive fields keep their raw change without a success/failure verdict. */
+/** Zero has no percentage baseline. Descriptive values report raw change without judging improvement. */
 export function progressChange(first: number, current: number, rule?: ComparisonRule): number | null {
   if (rule?.direction === "target") {
     const distance = Math.abs(first - rule.target!);

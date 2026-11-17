@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
@@ -84,9 +86,9 @@ export function AuthScreen({
         <div className="w-full max-w-md">
           <div className="mb-10 flex items-center justify-between gap-3 lg:hidden"><Brand /><SettingsMenu /></div>
           {invitePending ? (
-            <button className="mb-5 w-full rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 py-3 text-left text-sm text-[var(--main-strong)]" type="button" onClick={onShowInvite}>
+            <StateButton className="mb-5 w-full rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 py-3 text-left text-sm text-[var(--main-strong)]" type="button" onClick={onShowInvite}>
               <strong>{t("invitePendingTitle")}</strong>{t("invitePendingBody")}
-            </button>
+            </StateButton>
           ) : null}
           <h1 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
@@ -134,14 +136,14 @@ export function AuthScreen({
 
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
             {mode === "login" ? t("noAccount") : t("hasAccount")}
-            <button className="min-h-11 font-medium text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
+            <StateButton className="min-h-11 font-medium text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
               {mode === "login" ? t("goRegister") : t("goLogin")}
-            </button>
+            </StateButton>
           </p>
           {onShowTemplates ? (
             <p className="mt-2 text-center text-sm text-[var(--muted)]">
               {t("browseFirst")}
-              <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>{t("showTemplates")}</button>
+              <StateButton className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>{t("showTemplates")}</StateButton>
             </p>
           ) : null}
         </div>

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { performancePlans, type ComparisonRule, type ProgressTracking } from "../../lib/progress-tracking";
 import type { ChallengeDetail, Entry } from "./types";
 import { storyFromChallenge, buildStory } from "./story/model";
-import { BoxSection, Field, inputClass, Select, Toggle } from "./ui";
+import { BoxSection, Disclosure, Field, inputClass, Select, Toggle } from "./ui";
 
 export function ProgressSettings({ challenge, entries, value, onChange, showPerformance = true, showCheckins = true, performanceBare = false }: {
   showPerformance?: boolean; showCheckins?: boolean; performanceBare?: boolean;
@@ -38,23 +38,23 @@ export function ProgressSettings({ challenge, entries, value, onChange, showPerf
           return <div key={id} className="space-y-2 rounded-xl border border-[var(--line)] p-3">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedIds.includes(id)} disabled={performance.mode === "separate" && selectedIds.length === 1 && selectedIds.includes(id)} onChange={(event) => onChange({ ...value, performance: { ...performance, fieldIds: event.target.checked ? [...selectedIds, id] : selectedIds.filter((candidate) => candidate !== id) } })} />{field.label}</label>
             {selectedIds.includes(id) ? <>
-              <Field label={t("direction", { field: field.label })}><Select ariaLabel={t("direction", { field: field.label })} value={rule?.direction ?? "higher"} onChange={(direction) => setRule(id, { direction })} options={(["higher", "lower", "target", "descriptive"] as const).map((direction) => ({ value: direction, label: t(`directions.${direction}`) }))} /></Field>
+              <Field label={t("direction", { field: field.label })}><Select ariaLabel={t("direction", { field: field.label })} value={rule?.direction ?? "higher"} onChange={(direction) => setRule(id, { direction })} options={(["higher", "lower", "descriptive", "target"] as const).map((direction) => ({ value: direction, label: t(`directions.${direction}`) }))} /></Field>
               {rule?.direction === "target" ? <Field label={t("targetValue")}><input type="number" step="any" required className={inputClass} value={rule.target ?? ""} onChange={(event) => setRule(id, { target: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field> : null}
               <Field label={t("compareAt")}><Select ariaLabel={t("compareAtField", { field: field.label })} value={rule?.contextFieldId ?? ""} onChange={(contextFieldId) => setRule(id, { contextFieldId: contextFieldId || undefined })} options={[{ value: "", label: t("anyContext") }, ...(source?.fields ?? []).filter((other) => other.type === "number" && other.id && other.id !== id && other.id !== performance.seriesFieldId).map((other) => ({ value: other.id!, label: other.label }))]} /></Field>
             </> : null}
           </div>;
         })}</fieldset>
-        <Field label={t("seriesField")}><Select ariaLabel={t("seriesField")} value={performance.seriesFieldId ?? ""} onChange={(seriesFieldId) => {
+        <Disclosure summary={t("seriesField")}><Field label={t("seriesField")}><Select ariaLabel={t("seriesField")} value={performance.seriesFieldId ?? ""} onChange={(seriesFieldId) => {
           const rules = Object.fromEntries(Object.entries(performance.rules ?? {}).filter(([id]) => id !== seriesFieldId).map(([id, rule]) => [id, { ...rule, contextFieldId: rule.contextFieldId === seriesFieldId ? undefined : rule.contextFieldId }]));
           onChange({ ...value, performance: { ...performance, rules, seriesFieldId: seriesFieldId || undefined, fieldIds: selectedIds.filter((id) => id !== seriesFieldId) } });
         }} options={[{ value: "", label: t("noSeries") }, ...fields.map((field) => ({ value: field.id!, label: field.label }))]} /></Field>
-        <p className="text-xs text-[var(--muted)]">{t("seriesHelp")}</p>
+        <p className="text-xs text-[var(--muted)]">{t("seriesHelp")}</p></Disclosure>
         <Field label={t("aggregation")}>
           <Select ariaLabel={t("aggregation")} value={performance.sessionAggregation ?? "best"} onChange={(sessionAggregation) => onChange({ ...value, performance: { ...performance, sessionAggregation } })} options={[{ value: "best", label: t("bestRecord") }, { value: "sum", label: t("sumRecords") }]} />
         </Field>
         <p className="text-xs text-[var(--muted)]">{t("performanceHelp")}</p>
         <p className="text-sm">{plans.map((plan) => plan.fields.map((field) => field.label).join(" × ")).join(" · ")}</p>
-        <ul className="space-y-1 text-xs text-[var(--muted)]">{samples.slice(0, 12).map((sample, index) => <li key={index}>{t("preview", { title: sample.item.title, first: sample.first, best: sample.best })} · {sample.label}{sample.seriesLabel ? ` · ${sample.seriesLabel} ${sample.seriesValue}` : ""}{sample.context ? ` · ${sample.context.label} ${sample.context.value} ${sample.context.unit}` : ""}</li>)}</ul>
+        <ul className="space-y-1 text-xs text-[var(--muted)]">{samples.map((sample, index) => <li key={index}>{t("preview", { title: sample.item.title, first: sample.first, latest: sample.series.at(-1)! })} · {sample.label}{sample.seriesLabel ? ` · ${sample.seriesLabel} ${sample.seriesValue}` : ""}{sample.context ? ` · ${sample.context.label} ${sample.context.value} ${sample.context.unit}` : ""}</li>)}</ul>
       </div>;
   return <>
       {showPerformance && fields.length ? performanceBare ? performanceControls : <BoxSection title={t("performanceTitle")}>{performanceControls}</BoxSection> : null}

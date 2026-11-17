@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
@@ -170,9 +172,9 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         {kicker ? <p className="min-w-0 text-xs text-[var(--muted)]">{kicker}</p> : null}
       </div>
       <h2 className="mt-2.5 min-w-0 text-2xl font-light leading-[1.1] tracking-[-0.05em] sm:mt-3 sm:text-5xl">
-        <button type="button" onClick={() => onOpen(template.id)} title={template.title} className="block w-full cursor-pointer truncate text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
+        <StateButton type="button" onClick={() => onOpen(template.id)} title={template.title} className="block w-full cursor-pointer truncate text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
           {template.title}
-        </button>
+        </StateButton>
       </h2>
       <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:mt-3 sm:line-clamp-none sm:text-base sm:leading-7">
         {drawn ? storyHeadline(drawn.story, drawn.input, ts) : template.summary}
@@ -229,9 +231,9 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       )}
 
       <div className="mt-auto pt-5 sm:pt-8">
-        <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] px-4 text-sm text-[var(--ink)] transition hover:bg-[var(--wash)] focus-visible:outline-none">
+        <StateButton type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] px-4 text-sm text-[var(--ink)] transition hover:bg-[var(--wash)] focus-visible:outline-none">
           {t("seeResult")} <ArrowRightIcon />
-        </button>
+        </StateButton>
       </div>
     </article>
   );

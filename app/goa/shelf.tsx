@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cx } from "./ui";
@@ -50,12 +52,12 @@ export function RailArrows({ nudge }: { nudge: (direction: -1 | 1) => void }) {
   const button = "grid h-8 w-8 cursor-pointer place-items-center rounded-full border border-[var(--line)] bg-[var(--paper)] text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)]";
   return (
     <div className="hidden gap-1.5 sm:flex">
-      <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => nudge(-1)} className={button}>
+      <StateButton type="button" aria-hidden="true" tabIndex={-1} onClick={() => nudge(-1)} className={button}>
         <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
-      <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => nudge(1)} className={button}>
+      </StateButton>
+      <StateButton type="button" aria-hidden="true" tabIndex={-1} onClick={() => nudge(1)} className={button}>
         <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5 10.5 8 6 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
+      </StateButton>
     </div>
   );
 }
@@ -64,14 +66,14 @@ export function RailArrows({ nudge }: { nudge: (direction: -1 | 1) => void }) {
 /** The small dashed pill beside a shelf's title that starts something new there: "+ Challenge", "+ Chat", "+ Group". */
 export function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onClick}
       className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]"
     >
       <span aria-hidden="true" className="text-sm leading-none">+</span>
       {label}
-    </button>
+    </StateButton>
   );
 }
 

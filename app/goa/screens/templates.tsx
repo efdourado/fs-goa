@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
@@ -193,23 +195,23 @@ export function TemplateDetailScreen({
   const outline = "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5";
   const headerActions = (
     <>
-      <button type="button" className={cx(pill, "bg-[var(--spotlight-ink)] font-medium hover:opacity-90")} onClick={() => (user ? setShowCopy(true) : onSignIn())}>
+      <StateButton type="button" className={cx(pill, "bg-[var(--spotlight-ink)] font-medium hover:opacity-90")} onClick={() => (user ? setShowCopy(true) : onSignIn())}>
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
           <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2" /><path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" /></svg>
           {user ? t("duplicateCta") : t("signInToDuplicate")}
         </span>
-      </button>
+      </StateButton>
       {canPublish ? (
-        <button type="button" className={cx(pill, outline)} disabled={featuring} onClick={() => void toggleFeatured()}>
+        <StateButton type="button" className={cx(pill, outline)} disabled={featuring} onClick={() => void toggleFeatured()}>
           <CirclePinIcon filled={Boolean(detail?.templateFeatured)} className="size-4 flex-none" />
           {detail?.templateFeatured ? t("unfeature") : t("feature")}
-        </button>
+        </StateButton>
       ) : null}
       {canPublish ? (
-        <button type="button" className={cx(pill, outline, "hover:border-[var(--main-2)] hover:text-[var(--main-2)]")} disabled={unpublishing} onClick={() => void unpublish()}>
+        <StateButton type="button" className={cx(pill, outline, "hover:border-[var(--main-2)] hover:text-[var(--main-2)]")} disabled={unpublishing} onClick={() => void unpublish()}>
           <CircleMinusIcon className="size-4 flex-none" />
           {t("unpublish")}
-        </button>
+        </StateButton>
       ) : null}
     </>
   );

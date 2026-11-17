@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -36,7 +38,7 @@ export function ExportModal({ challenge, entries, userId, onClose }: { challenge
   return createPortal(
     <div className="xd-modal fixed inset-0 z-[90] flex items-center justify-center p-2 sm:p-6">
       {/* The dimmed backdrop is itself a way out: a click on it closes (the window's button and Esc do too). */}
-      <button type="button" tabIndex={-1} aria-label={tc("close")} onClick={onClose} className="xd-modal-backdrop absolute inset-0 cursor-default bg-black/45 backdrop-blur-[2px]" />
+      <StateButton type="button" tabIndex={-1} aria-label={tc("close")} onClick={onClose} className="xd-modal-backdrop absolute inset-0 cursor-default bg-black/45 backdrop-blur-[2px]" />
       <div
         className="xd-modal-panel relative h-full max-h-[calc(100dvh-1rem)] w-full max-w-[1120px] overflow-hidden rounded-[24px] bg-[var(--canvas)] shadow-[0_30px_80px_-20px_rgb(0_0_0/0.5)] sm:max-h-[calc(100dvh-3rem)]"
         role="dialog"

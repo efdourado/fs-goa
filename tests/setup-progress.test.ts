@@ -15,19 +15,19 @@ test("o progresso da configuração agrupa os bloqueios por aba e aponta a prime
     warnings: [issue("no_metrics", "warning")],
   };
   const state = setupState(report, SETUP_STEPS);
-  assert.deepEqual(state.errors, { overview: 2, metrics: 1 }, "participantes e itens se resolvem em Geral; um código desconhecido conta no total, mas não aponta para aba nenhuma");
+  assert.deepEqual(state.errors, { overview: 1, checkpoints: 1, metrics: 1 }, "participantes ficam em Geral e itens em Itens e etapas; códigos desconhecidos contam sem apontar aba");
   assert.equal(state.errorCount, 4);
-  assert.equal(state.todoCount, 3, "uma coisa a fazer por aba com problema, mais o que não aponta para aba nenhuma");
+  assert.equal(state.todoCount, 4, "uma coisa a fazer por aba com problema, mais o que não aponta para aba nenhuma");
   assert.equal(state.firstTodo, "overview", "a primeira etapa, na ordem de trabalho");
 
   // Dois problemas na mesma aba são um serviço só, com um só motivo na tela.
-  const sameTab = setupState({ ready: false, errors: [issue("no_items"), issue("no_way_to_register")], warnings: [] }, SETUP_STEPS);
+  const sameTab = setupState({ ready: false, errors: [issue("no_items"), issue("no_checkpoints")], warnings: [] }, SETUP_STEPS);
   assert.equal(sameTab.errorCount, 2);
   assert.equal(sameTab.todoCount, 1);
   assert.deepEqual(sameTab.reasons.map((reason) => reason.code), ["no_items"]);
 
   const onlyLater = setupState({ ready: false, errors: [issue("no_items"), issue("no_checkpoints")], warnings: [] }, SETUP_STEPS);
-  assert.equal(onlyLater.firstTodo, "overview", "items are added from Manage › General (and Today) now");
+  assert.equal(onlyLater.firstTodo, "checkpoints", "items and stages are managed together");
   const noStages = setupState({ ready: false, errors: [issue("no_checkpoints")], warnings: [] }, ["overview", "fields"]);
   assert.equal(noStages.firstTodo, null, "uma aba que este desafio não tem nunca é a próxima");
 });
@@ -49,7 +49,7 @@ test("o resumo diz o que falta e leva à próxima coisa a fazer, sem oferecer ir
   assert.match(elsewhere, /Faltam 2 coisas para poder começar/);
   assert.doesNotMatch(elsewhere, /coisa para poder/, "no plural certo");
   assert.match(elsewhere, /O desafio não tem participantes/);
-  assert.match(elsewhere, />Ir para Geral<\/button>/);
+  assert.match(elsewhere, />Ir para Geral</);
   const there = renderWithIntl(createElement(SetupSummary, { state, activeTab: "overview", onGo: () => undefined }));
   assert.doesNotMatch(there, /<button/);
 });

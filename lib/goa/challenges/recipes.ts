@@ -1,3 +1,4 @@
+import { ITEM_GOAL_TRACKING_KEY } from "../../item-goal-tracking";
 import type { ClientField } from "../domain/fields";
 import { ApiError } from "../../http";
 import type {
@@ -124,7 +125,7 @@ const progressoDia: RecipeEntryType = {
 
 // The progress type Manage can add to an item challenge. Its goal property is replaced with the property selected
 // there; `page_count` remains the default only for old book-specific API calls and stored challenges.
-export const PAGE_COUNT_KEY = "paginas_livro";
+export const PAGE_COUNT_KEY = ITEM_GOAL_TRACKING_KEY;
 export const pageCountType: RecipeEntryType = {
   semanticKey: PAGE_COUNT_KEY,
   name: "Páginas",
@@ -373,11 +374,17 @@ export function withRecordingMode(recipe: Recipe, body: Record<string, unknown>)
   // The optional note on each check-in is named in the creator's language, like the check-in itself.
   const rawNote = typeof body.sessionNoteLabel === "string" ? body.sessionNoteLabel.trim() : "";
   const noteLabel = (rawNote || "Como foi?").slice(0, 100);
+  if (body.includeSessionNote !== undefined && typeof body.includeSessionNote !== "boolean") {
+    throw new ApiError(400, "invalid_request", "Escolha se o registro terá uma observação geral.");
+  }
+  const parent = sessionEntry(name, noteLabel);
+  if (body.includeSessionNote === false) parent.fields = [];
+  const responseName = typeof body.responseName === "string" ? body.responseName.trim().slice(0, 120) : "";
   return {
     mode: "session",
     recipe: {
       ...recipe,
-      entryTypes: [sessionEntry(name, noteLabel), recordEntry],
+      entryTypes: [parent, { ...recordEntry, ...(responseName ? { name: responseName } : {}) }],
       metrics: [],
     },
   };

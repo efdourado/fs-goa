@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 
 import { catalogCardHeight, CatalogTile, resolveCoverTop } from "./catalog-views";
@@ -100,7 +102,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
               />
             ))}
             {remaining > 0 ? (
-              <button
+              <StateButton
                 type="button"
                 onClick={onOpenCatalog}
                 className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--muted)]")}
@@ -108,7 +110,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
                 <span className="text-2xl font-light tracking-[-0.04em]">{remaining}</span>
                 <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: title })}</span>
                 <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
-              </button>
+              </StateButton>
             ) : null}
           </Rail>
         </>

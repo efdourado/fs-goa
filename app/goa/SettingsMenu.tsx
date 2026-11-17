@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -74,7 +76,7 @@ export function SettingsMenu({ className }: { className?: string }) {
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
+      <StateButton
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label={t("legend")}
@@ -90,7 +92,7 @@ export function SettingsMenu({ className }: { className?: string }) {
           <circle cx="11" cy="4.5" r="2" fill="currentColor" stroke="none" />
           <circle cx="5" cy="11.5" r="2" fill="currentColor" stroke="none" />
         </svg>
-      </button>
+      </StateButton>
       {open ? (
         <div
           className="absolute right-0 z-50 mt-2 w-[min(92vw,20rem)] space-y-4 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 shadow-[var(--elevate-2)]"

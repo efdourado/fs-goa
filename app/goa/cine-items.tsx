@@ -1,15 +1,17 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog, ModalActions } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
-import { type CatalogScope } from "./libraries";
+import { type CatalogScope, useCatalogShelf } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass } from "./ui";
+import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -251,7 +253,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
               </label>
               {topRight}
               {onRemove ? (
-                <button type="button" className={cx(rowIconClass, "mb-1.5 text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+                <StateButton type="button" className={cx(rowIconClass, "mb-1.5 text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
               ) : null}
             </div>
             {open ? (
@@ -263,9 +265,9 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
             ) : null}
             {/* The rest of the item's properties, folded at the foot of the card: "+3 mais". */}
             {hasDetails ? (
-              <button type="button" className="mt-2 min-h-9 cursor-pointer rounded-full px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
+              <StateButton type="button" className="mt-2 min-h-9 cursor-pointer rounded-full px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
                 {open ? t("hideDetails") : t("moreDetails", { count: hiddenCount })}
-              </button>
+              </StateButton>
             ) : null}
             <span className="sr-only">{index + 1}</span>
           </li>
@@ -310,6 +312,8 @@ export function ItemsAddBox({
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   useEffect(() => { if (target) onTargetChange?.(target); }, [target, onTargetChange]);
   const { scope } = shared;
+  const shelf = useCatalogShelf(scope);
+  const collectionCount = target ? shelf?.counts?.[target.kind] : undefined;
 
   useEffect(() => {
     if (!showCatalog || !target) return;
@@ -368,13 +372,13 @@ export function ItemsAddBox({
             aria-label={t("typeLabel")}
             maxLength={160}
           />
-          <button type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
+          <StateButton type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-          </button>
+          </StateButton>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
+        <StateButton
           type="button"
           aria-expanded={showCatalog}
           onClick={() => setShowCatalog((open) => !open)}
@@ -383,8 +387,8 @@ export function ItemsAddBox({
             showCatalog ? "border-transparent bg-[var(--wash)] text-[var(--ink)]" : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]",
           )}
         >
-          {showCatalog ? t("hideCatalog") : <><span aria-hidden="true">＋</span>{t("fromCatalog")}</>}
-        </button>
+          {showCatalog ? t("hideCatalog") : <><span aria-hidden="true">＋</span>{collectionCount ? t("fromCatalogCount", {count: collectionCount}) : t("fromCatalog")}</>}
+        </StateButton>
         {skipped ? <p className="text-xs text-[var(--muted)]" aria-live="polite">{t("skippedDuplicates", { count: skipped })}</p> : null}
       </div>
       {showCatalog ? (
@@ -428,14 +432,17 @@ function useRowSummary() {
  * "Add items" as a dialog: the same box as when the challenge was created (type, paste or pick from the
  * catalogue, each row with its library's details), saved in one go. Used by Manage › Items and by Today.
  */
-export function AddItemsDialog({ onAdd, onClose, note, ...shared }: EditorShared & {
+export function AddItemsDialog({ onAdd, onClose, note, checkpoints, ...shared }: EditorShared & {
   onAdd: (items: ChallengeItemInput[]) => Promise<void>;
   onClose: () => void;
   /** A line under the box — e.g. that new items open for entries straight away. */
   note?: string;
+  checkpoints?: Array<{id: Id; title: string}>;
 }) {
   const t = useTranslations("cineItems");
   const tc = useTranslations("common");
+  const tStages = useTranslations("checkpointPlanner");
+  const [stageId, setStageId] = useState("");
   const f = useGoaFormat();
   const [draft, setDraft] = useState<CineRow[]>([]);
   const [problem, setProblem] = useState<"author" | null>(null);
@@ -455,13 +462,14 @@ export function AddItemsDialog({ onAdd, onClose, note, ...shared }: EditorShared
         setBusy(true);
         setError(null);
         try {
-          await onAdd(cineRowsToInput(draft));
+          await onAdd(cineRowsToInput(draft).map((item) => checkpoints?.length ? {...item, checkpointId: stageId || null} : item));
         } catch (cause) {
           setError(f.error(cause));
           setBusy(false);
         }
       }}
     >
+      {checkpoints?.length ? <Field label={tStages("stageWord")}><Select ariaLabel={tStages("stageWord")} value={stageId} onChange={setStageId} options={[{value: "", label: tStages("unassigned")}, ...checkpoints.map((stage) => ({value: stage.id, label: stage.title}))]} /></Field> : null}
       <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={[]} onProblem={setProblem} />
       {note ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{note}</p> : null}
     </FormDialog>
@@ -523,15 +531,15 @@ export function CineItemsEditor({
                 {summary(row) ? <span className="block truncate text-xs text-[var(--muted)]">{summary(row)}</span> : null}
                 {flagged(row) ? <span className="block text-xs text-[var(--danger)]">{t("needsAttention")}</span> : null}
               </span>
-              <button type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setEditingKey(row.key)}>{t("edit")}</button>
-              <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+              <StateButton type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setEditingKey(row.key)}>{t("edit")}</StateButton>
+              <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
             </li>
           ))}
         </ol>
       ) : (
         <div className="grid justify-items-center pb-3">
           <FaceEmptyState title={t("emptyList")} compact />
-          {showEmptyAddButton ? <button
+          {showEmptyAddButton ? <StateButton
             type="button"
             onClick={() => { setDraft([]); setAdding(true); }}
             aria-label={t("addItems")}
@@ -539,7 +547,7 @@ export function CineItemsEditor({
             className="-mt-3 grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-          </button> : null}
+          </StateButton> : null}
         </div>
       )}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -77,9 +79,9 @@ export function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onRe
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-medium tracking-tight">{t("title")}</h3>
-        <button type="button" className="cursor-pointer text-xs font-light text-[var(--muted)] hover:text-[var(--ink)] hover:underline disabled:cursor-default disabled:opacity-60" onClick={load} disabled={loading}>
+        <StateButton type="button" className="cursor-pointer text-xs font-light text-[var(--muted)] hover:text-[var(--ink)] hover:underline disabled:cursor-default disabled:opacity-60" onClick={load} disabled={loading}>
           {loading ? t("checking") : t("recheck")}
-        </button>
+        </StateButton>
       </div>
       {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
       {report ? (

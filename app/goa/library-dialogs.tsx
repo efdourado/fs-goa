@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -122,7 +124,7 @@ export function TablesLibraryPrompt({ scope, onCreated }: { scope: CatalogScope;
 /** Delete a library. Its items go to the bin with it; a running challenge that still holds one stops it. */
 function ArrowButton({ dir, disabled, onClick, label }: { dir: "up" | "down"; disabled: boolean; onClick: () => void; label: string }) {
   return (
-    <button
+    <StateButton
       type="button"
       aria-label={label}
       disabled={disabled}
@@ -132,7 +134,7 @@ function ArrowButton({ dir, disabled, onClick, label }: { dir: "up" | "down"; di
       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
         <path d={dir === "up" ? "M4 10l4-4 4 4" : "M4 6l4 4 4-4"} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-    </button>
+    </StateButton>
   );
 }
 
@@ -422,23 +424,23 @@ export function LibraryPropertiesDialog({
               <li key={property.key} className="px-3 py-2.5 transition-colors hover:bg-[var(--wash)] focus-within:bg-[var(--wash)]">
                 <div className="flex items-center gap-2.5">
                   <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash)] text-[11px] font-medium text-[var(--muted)]" aria-hidden="true">{typeIcon(property.type)}</span>
-                  <button type="button" disabled={!canEdit || busyKey !== null} aria-expanded={editing?.key === property.key} onClick={() => {
+                  <StateButton type="button" disabled={!canEdit || busyKey !== null} aria-expanded={editing?.key === property.key} onClick={() => {
                     setAddOpen(false);
                     setEditing((current) => current?.key === property.key ? null : { key: property.key, label: nameOf(property), type: property.type });
                   }} className="min-h-10 min-w-0 flex-1 cursor-pointer rounded-lg px-1.5 text-left text-sm font-medium disabled:cursor-default">
                     <span className="block truncate">{nameOf(property)}</span>
-                  </button>
+                  </StateButton>
                   {canEdit ? (
                     <div className="flex flex-none items-center">
                       <ArrowButton dir="up" label={t("moveUp")} disabled={index === 0 || busyKey !== null} onClick={() => void move(index, -1)} />
                       <ArrowButton dir="down" label={t("moveDown")} disabled={index === (properties?.length ?? 0) - 1 || busyKey !== null} onClick={() => void move(index, 1)} />
-                      {property.canHide ? <button type="button" aria-label={t("removeProperty")} title={t("removeProperty")} disabled={busyKey !== null} onClick={() => askRemove(property)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-25"><CircleMinusIcon className="h-4 w-4" /></button> : null}
+                      {property.canHide ? <StateButton type="button" aria-label={t("removeProperty")} title={t("removeProperty")} disabled={busyKey !== null} onClick={() => askRemove(property)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-25"><CircleMinusIcon className="h-4 w-4" /></StateButton> : null}
                     </div>
                   ) : null}
                 </div>
                 {editing?.key === property.key ? (
                   <form className="space-y-3 pb-1 pt-3" onSubmit={(event) => { event.preventDefault(); void saveProperty(property); }}>
-                    <ArrowField save key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
+                    <ArrowField key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
                     {property.storage === "attribute" && !(property.filled ?? 0) ? (
                       <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={editing.type} disabled={busyKey !== null} onChange={(type) => setEditing({ ...editing, type: type as PropertyType })} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
                     ) : null}
@@ -449,9 +451,9 @@ export function LibraryPropertiesDialog({
             ))}
             {more > 0 || (showAll && (properties?.length ?? 0) > VISIBLE_PROPERTIES) ? (
               <li>
-                <button type="button" onClick={() => setShowAll((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                <StateButton type="button" onClick={() => setShowAll((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
                   {showAll ? t("showFewer") : t("showAll", { count: more })}
-                </button>
+                </StateButton>
               </li>
             ) : null}
             {canEdit ? (
@@ -464,10 +466,10 @@ export function LibraryPropertiesDialog({
                     </div>
                   </form>
                 ) : (
-                  <button type="button" onClick={() => { setEditing(null); setAddOpen(true); }} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                  <StateButton type="button" onClick={() => { setEditing(null); setAddOpen(true); }} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
                     <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-dashed border-[var(--line)]" aria-hidden="true">＋</span>
                     {t("addPropertyTitle")}
-                  </button>
+                  </StateButton>
                 )}
               </li>
             ) : null}

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { type CSSProperties, useEffect, useState } from "react";
 
@@ -74,7 +76,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
           <span className="text-xs text-[var(--muted)]">{t("basis", { count: taste.ratedCount })}</span>
         </div>
         {scored.length ? (
-          <button type="button" className="mt-1 flex-none cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setRun((value) => value + 1)}>↺ {t("replay")}</button>
+          <StateButton type="button" className="mt-1 flex-none cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setRun((value) => value + 1)}>↺ {t("replay")}</StateButton>
         ) : null}
       </div>
 
@@ -104,7 +106,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
             ))}
             <span className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--spotlight-ink)] text-[11px] font-bold text-[var(--spotlight)] shadow-lg">{youLabel}</span>
             {placed.map(({ person, index, x, y, dx, dy }) => (
-              <button
+              <StateButton
                 key={person.userId}
                 type="button"
                 onClick={() => setSelectedId(person.userId)}
@@ -120,7 +122,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
                   <AvatarMark />
                 </span>
                 <span className="whitespace-nowrap rounded-full bg-black/35 px-1.5 text-[10px] tabular-nums text-white/85">{person.agreement}%</span>
-              </button>
+              </StateButton>
             ))}
           </div>
         ) : (

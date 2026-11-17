@@ -28,8 +28,7 @@
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:studio": "drizzle-kit studio",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down",
-    "db:seed-progress": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-progress/index.ts"
+    "docker:down": "docker compose down"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

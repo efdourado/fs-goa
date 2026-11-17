@@ -24,6 +24,8 @@ export function challengeRequestBody(input: ChallengeCreationInput) {
     ...(input.recordingMode ? { recordingMode: input.recordingMode } : {}),
     ...(input.sessionName ? { sessionName: input.sessionName } : {}),
     ...(input.sessionNoteLabel ? { sessionNoteLabel: input.sessionNoteLabel } : {}),
+    ...(input.includeSessionNote !== undefined ? { includeSessionNote: input.includeSessionNote } : {}),
+    ...(input.responseName ? { responseName: input.responseName } : {}),
     ...(input.sharedEditPolicy ? { sharedEditPolicy: input.sharedEditPolicy } : {}),
     participantIds: input.participantIds,
   };

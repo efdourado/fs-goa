@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton, StateFieldset } from "./state-button";
+
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { parseProgressTracking } from "../../lib/progress-tracking";
@@ -13,7 +15,7 @@ import { useAlmanacPages } from "./story/almanac";
 import { useChallengeStory } from "./story/for-challenge";
 import { ThreadPanel } from "./story/view";
 import type { ChallengeDetail, ChallengeSummary, Entry, Id, Metric } from "./types";
-import { SaveButton, AddRow, ChevronIcon, Disclosure, Field, inputClass, PageHeading, Select, SlidersIcon, StatusMessage, Toggle } from "./ui";
+import { AddRow, Button, ChevronIcon, Disclosure, Field, inputClass, PageHeading, Select, SlidersIcon, StatusMessage, Toggle } from "./ui";
 
 const rowIcon = "grid h-8 w-8 flex-none cursor-pointer place-items-center text-[var(--muted)] transition hover:text-[var(--ink-strong)] disabled:cursor-default disabled:opacity-25";
 
@@ -43,7 +45,7 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
   const byId = new Map(pages.map((page) => [page.id, page]));
   const rated = story.kind === "rated" || (story.kind === "empty" && challenge.entryTypes.some((type) => type.purpose === "rating"));
   const automatic = (rated ? RATED_RESULT_PAGES : DATED_RESULT_PAGES)
-    .filter((id) => id !== "records" || challenge.entryTypes.some((type) => (type.parentTypeId || type.submissionMode === "daily" || type.purpose === "progress" || type.purpose === "checkin") && type.answerScope !== "shared" && type.fields.some((field) => field.type === "number")))
+    .filter((id) => id !== "records" || challenge.entryTypes.some((type) => type.answerScope !== "shared" && type.purpose !== "rating" && type.purpose !== "expectation" && (type.parentTypeId || type.submissionMode === "daily" || type.purpose === "checkin" || type.purpose === "progress") && type.fields.some((field) => field.type === "number")))
     .filter((id) => !["duo", "brought"].includes(id) || input.people.length === 2)
     .filter((id) => id !== "solo" || input.people.length === 1)
     .filter((id) => id !== "people" || input.people.length > 2);
@@ -91,11 +93,11 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
     <StatusMessage error={error} success={success} />
     {closed ? <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{ta("metricsClosedNote")}</p> : null}
     <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <fieldset disabled={busy} className="min-w-0 space-y-4">
+      <StateFieldset disabled={busy} className="min-w-0 space-y-4">
         <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
           <div className="mb-3 flex items-center gap-3 border-b border-[var(--line)] pb-4">
             <Toggle bare disabled={closed} checked={!hidden.includes("thread")} onChange={(value) => show("thread", value)} ariaLabel={t("showPage", { title: t("thread") })} />
-            <button type="button" onClick={() => setPreview("thread")} className="min-w-0 flex-1 cursor-pointer text-left"><strong className="block text-sm font-medium">{t("thread")}</strong><span className="text-xs text-[var(--muted)]">{t("threadHint")}</span></button>
+            <StateButton type="button" onClick={() => setPreview("thread")} className="min-w-0 flex-1 cursor-pointer text-left"><strong className="block text-sm font-medium">{t("thread")}</strong><span className="text-xs text-[var(--muted)]">{t("threadHint")}</span></StateButton>
           </div>
           <ol className="divide-y divide-[var(--line)]">
             {rows.map((row, index) => {
@@ -107,25 +109,25 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
                   if (row.metric) setVisibility({ ...visibility, [row.metric.id]: visible });
                   show(row.id, visible);
                 }} ariaLabel={t("showPage", { title: row.title })} />
-                <button type="button" onClick={() => setPreview(row.id)} className="min-w-0 flex-1 cursor-pointer px-1 text-left">
+                <StateButton type="button" onClick={() => setPreview(row.id)} className="min-w-0 flex-1 cursor-pointer px-1 text-left">
                   <strong className="block break-words text-sm font-medium">{row.title}</strong>
                   <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">{row.metric ? `${tm(`operationName.${row.metric.operation}`)} · ${tm(`groupBy.${row.metric.groupBy ?? "none"}`)}` : t("automatic")}{!included ? ` · ${t("hidden")}` : !ready ? ` · ${t("pending")}` : ""}</span>
-                </button>
+                </StateButton>
                 <span className="flex flex-none">
-                  <button type="button" className={rowIcon} aria-label={t("moveUp", { title: row.title })} disabled={closed || !index} onClick={() => move(index, -1)}><ChevronIcon dir="up" /></button>
-                  <button type="button" className={rowIcon} aria-label={t("moveDown", { title: row.title })} disabled={closed || index === rows.length - 1} onClick={() => move(index, 1)}><ChevronIcon dir="down" /></button>
-                  {row.id === "rankings" && ratingMetric ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(ratingMetric)}><SlidersIcon className="h-4 w-4" /></button> : null}
-                  {row.id === "records" ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setPerformanceOpen(true)}><SlidersIcon className="h-4 w-4" /></button> : null}
-                  {row.metric ? <button type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(row.metric!)}><SlidersIcon className="h-4 w-4" /></button> : null}
+                  <StateButton type="button" className={rowIcon} aria-label={t("moveUp", { title: row.title })} disabled={closed || !index} onClick={() => move(index, -1)}><ChevronIcon dir="up" /></StateButton>
+                  <StateButton type="button" className={rowIcon} aria-label={t("moveDown", { title: row.title })} disabled={closed || index === rows.length - 1} onClick={() => move(index, 1)}><ChevronIcon dir="down" /></StateButton>
+                  {row.id === "rankings" && ratingMetric ? <StateButton type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(ratingMetric)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
+                  {row.id === "records" ? <StateButton type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setPerformanceOpen(true)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
+                  {row.metric ? <StateButton type="button" disabled={closed} className={rowIcon} aria-label={t("edit", { title: row.title })} onClick={() => setEditing(row.metric!)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
                 </span>
               </li>;
             })}
           </ol>
           {!closed ? <AddRow label={ta("addMetric")} ariaLabel={ta("addMetric")} onClick={() => setEditing("new")} /> : null}
         </section>
-        <fieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></fieldset>
-        <SaveButton type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</SaveButton>
-      </fieldset>
+        <StateFieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></StateFieldset>
+        <Button type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</Button>
+      </StateFieldset>
     </form>
     {preview ? <Dialog title={preview === "thread" ? t("thread") : rows.find((row) => row.id === preview)?.title ?? t("preview")} wide onClose={() => setPreview(null)}>
       <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{previewMetric ? t("metricExplanation", { operation: tm(`operationName.${previewMetric.operation}`), group: tm(`groupBy.${previewMetric.groupBy ?? "none"}`) }) : t(`pages.${preview === "thread" ? "thread" : preview}.description`)}</p>
@@ -226,9 +228,7 @@ function PerformanceDialog({ challenge, entries, onCancel, onSave }: {
   const [value, setValue] = useState(challenge.trackingSettings ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  let valid = true;
-  try { parseProgressTracking(value); } catch { valid = false; }
-  return <FormDialog title={t("personalRecordsSettings")} submitDisabled={!valid} dirty={JSON.stringify(value) !== JSON.stringify(challenge.trackingSettings ?? {})} busy={busy} error={error} onCancel={onCancel} onSubmit={async () => {
+  return <FormDialog title={t("personalRecordsSettings")} dirty={JSON.stringify(value) !== JSON.stringify(challenge.trackingSettings ?? {})} busy={busy} error={error} onCancel={onCancel} onSubmit={async () => {
     setBusy(true); setError(null);
     try { const parsed = parseProgressTracking(value); await onSave(parsed.performance); }
     catch (cause) { setError(f.error(cause)); }

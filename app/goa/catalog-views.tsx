@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
 import type { GoaFormat } from "./format";
 import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
@@ -137,7 +139,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
       <span className="flex flex-col gap-2 rounded-[22px] peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--main)]/25">{body}</span>
     </label>
   ) : onOpen ? (
-    <button type="button" onClick={onOpen} title={title} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</button>
+    <StateButton type="button" onClick={onOpen} title={title} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</StateButton>
   ) : (
     // Not a "group": the hover lift belongs to tiles that open something.
     <div title={title} className={cx("flex min-w-0 flex-col gap-2 text-left", className)}>{body}</div>
@@ -185,5 +187,5 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
   const shared = "flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-4 sm:py-3.5";
   return selecting
     ? <label className={cx(shared, "cursor-pointer")}>{body}{rating}</label>
-    : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}{rating}</button>;
+    : <StateButton type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}{rating}</StateButton>;
 }

@@ -1,10 +1,12 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { coverColors, coverToneOf } from "../catalog-cover";
 import { comparisonScore, progressChange } from "../../../lib/progress-tracking";
+import { coverColors, coverToneOf } from "../catalog-cover";
 import { arrangeResultPages, isResultMetric } from "../../../lib/result-presentation";
 import { MetricBlock } from "../metrics-view";
 import { metricHasData } from "../utils";
@@ -100,18 +102,19 @@ function Progression({ row, tone, onOpen }: { row: RecordRow; tone: string; onOp
   const descriptive = row.rule?.direction === "descriptive";
   const newBest = !descriptive && row.series.length > 1 && row.series.slice(0, -1).every((value) => comparisonScore(latest, row.rule) > comparisonScore(value, row.rule));
   return <li>
-    <button type="button" onClick={onOpen} className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg py-3 text-left text-sm transition-opacity duration-150 hover:opacity-80 active:opacity-70 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 motion-reduce:transition-none">
-      <span className="min-w-0 flex-1"><span className="block font-medium">{row.label ?? row.item.title}</span>
+    <StateButton type="button" onClick={onOpen} className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg py-3 text-left text-sm transition-opacity duration-150 hover:opacity-80 active:opacity-70 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 motion-reduce:transition-none">
+      <span className="min-w-0 flex-1"><span className="block font-medium">{row.workload ? t("workload") : row.label ?? row.item.title}</span>
+        {row.workload ? <span className="mt-0.5 block text-xs text-[var(--muted)]">{row.label}</span> : null}
         <span className="mt-0.5 block text-xs text-[var(--muted)]">{row.context ? t("atContext", { field: row.context.label, value: nf.number(row.context.value), unit: row.context.unit }) : t("sessions", { count: row.sessions })}</span>
-        {row.rule?.direction === "target" ? <span className="mt-0.5 block text-xs text-[var(--muted)]">{t("direction.target")}: {fmt(row.rule.target!)}</span> : null}
+        {row.rule?.direction === "target" ? <span className="mt-0.5 block text-xs text-[var(--muted)]">{t("comparisonTarget")}: {fmt(row.rule.target!)}</span> : null}
         {newBest ? <span className="mt-1 block text-[11px] text-[var(--ok)]">{t("newBest")}</span> : null}
       </span>
       <span className="text-right"><span className="block tabular-nums">{fmt(row.first)} → <strong className="font-medium">{fmt(latest)}</strong></span>
         <span className="mt-0.5 block text-xs tabular-nums" style={{ color: descriptive || change === null || change === 0 ? "var(--muted)" : change > 0 ? tone : "var(--danger)" }}>
-          {row.sessions < 2 ? t(row.context ? "firstContext" : "noComparison") : change === null ? t("absoluteChange", { value: nf.number(latest - row.first, { signDisplay: "exceptZero" }) }) : t(descriptive ? "changeSinceStart" : "improvementSinceStart", { value: `${change > 0 ? "+" : ""}${change}%` })}
+          {row.sessions < 2 ? t(row.context ? "firstContext" : "noComparison") : change === null ? t("absoluteChange", { value: nf.number(latest - row.first, { signDisplay: "exceptZero" }) }) : t(descriptive || change === 0 ? "changeSinceStart" : change < 0 ? "declineSinceStart" : "improvementSinceStart", { value: change < 0 && !descriptive ? `${Math.abs(change)}%` : `${change > 0 ? "+" : ""}${change}%` })}
         </span>
       </span>
-    </button>
+    </StateButton>
   </li>;
 }
 
@@ -142,7 +145,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const x = (index: number) => (last <= 0 ? width / 2 : pad.left + (index * (width - pad.left - pad.right)) / last);
   const y = (value: number) => height - pad.bottom - ((value - low) / span) * (height - pad.top - pad.bottom);
   const line = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
-  const bestIndex = row.series.indexOf(row.best);
+  const bestIndex = row.rule?.direction === "descriptive" ? -1 : row.series.indexOf(row.best);
+  const markerIndex = bestIndex < 0 ? last : bestIndex;
   const crossesYears = row.days[0].slice(0, 4) !== row.days[last].slice(0, 4);
 
   const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
@@ -150,19 +154,18 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
     ...(row.series.length > 1 ? [{ label: t("records.previous"), value: withUnit(row.series.at(-2)!), note: day(row.days.at(-2)!) }] : []),
     ...(row.rule?.direction !== "descriptive" ? [{ label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay) }] : []),
     { label: t("records.first"), value: withUnit(row.first), note: day(row.days[0]) },
-    { label: t(row.rule?.direction === "target" ? "records.targetGain" : row.rule?.direction === "descriptive" ? "records.descriptiveChange" : "records.change"), value: gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%` },
+    { label: t("records.gain"), value: gain === null ? "—" : `${gain > 0 ? "+" : ""}${gain}%` },
     { label: t("records.sessionsLabel"), value: String(row.sessions) },
   ];
   return (
-    <Dialog title={row.item.title} onClose={onClose} wide>
+    <Dialog title={`${row.item.title} · ${row.label ?? ""}`} onClose={onClose} wide>
       <div>
-        {row.seriesLabel ? <p className="mb-2 text-sm">{row.seriesLabel} {row.seriesValue}</p> : null}
-        {row.context ? <p className="mb-2 text-sm">{t("records.atContext", { field: row.context.label, value: fmt(row.context.value), unit: row.context.unit })}</p> : null}
-        {row.rule ? <p className="mb-2 text-xs text-[var(--muted)]">{t(`records.direction.${row.rule.direction}`)}{row.rule.direction === "target" ? `: ${withUnit(row.rule.target!)}` : ""}</p> : null}
         {row.label ? <p className="mb-2 text-sm">{t(row.sessionAggregation === "sum" ? "records.sumPerSession" : row.rule?.direction === "descriptive" ? "records.latestPerSession" : "records.bestPerSession", { fields: row.label })}</p> : null}
+        {row.seriesLabel ? <p className="mb-2 text-sm">{row.seriesLabel} {nf.number(row.seriesValue!)}</p> : null}
+        {row.context ? <p className="mb-2 text-sm">{t("records.atContext", { field: row.context.label, value: nf.number(row.context.value), unit: row.context.unit })}</p> : null}
         <p className="text-xs text-[var(--muted)]">{[person, `${day(row.days[0], true)} – ${day(row.days[last], true)}`].filter(Boolean).join(" · ")}</p>
 
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
           {stats.map((stat) => (
             <div key={stat.label} className="min-w-0">
               <dt className="text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{stat.label}</dt>
@@ -182,7 +185,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
             {row.series.map((value, index) => (
               <circle key={`${row.days[index]}:${index}`} cx={x(index)} cy={y(value)} r={index === bestIndex ? 5 : 2.8} fill={index === bestIndex ? tone : "var(--paper)"} stroke={tone} strokeWidth={1.6} />
             ))}
-            <text x={Math.min(width - 60, Math.max(60, x(bestIndex)))} y={Math.max(13, y(row.best) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(row.best)}</text>
+            <text x={Math.min(width - 60, Math.max(60, x(markerIndex)))} y={Math.max(13, y(row.series[markerIndex]) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(row.series[markerIndex])}</text>
             <text x={pad.left} y={height - 7} fontSize={11} fill="var(--muted)">{day(row.days[0])}</text>
             <text x={width - pad.right} y={height - 7} textAnchor="end" fontSize={11} fill="var(--muted)">{day(row.days[last])}</text>
           </svg>
@@ -193,12 +196,13 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
           {/* The latest few are what matters day to day; the chart above holds the whole story. */}
           {row.series.map((value, index) => ({ value, index })).reverse().slice(0, RECENT_SESSIONS).map(({ value, index }) => {
             const change = index > 0 ? Number((value - row.series[index - 1]).toFixed(4)) : null;
+            const better = index > 0 && comparisonScore(value, row.rule) > comparisonScore(row.series[index - 1], row.rule);
             return (
               <li key={`${row.days[index]}:${index}`} className="flex items-center gap-3 py-2.5 text-sm">
                 <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], crossesYears)}</span>
                 <strong className="flex-1 font-medium tabular-nums">{withUnit(value)}</strong>
-                {index === bestIndex && row.rule?.direction !== "descriptive" ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
-                <span className={cx("w-16 flex-none text-right text-xs tabular-nums", change === null || change === 0 ? "text-[var(--muted)]" : row.rule?.direction === "descriptive" ? "text-[var(--muted)]" : comparisonScore(value, row.rule) > comparisonScore(row.series[index - 1], row.rule) ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
+                {index === bestIndex ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
+                <span className={cx("w-16 flex-none text-right text-xs tabular-nums", row.rule?.direction === "descriptive" || change === null || change === 0 ? "text-[var(--muted)]" : better ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
                   {/* Nothing to say (the first session, or no change): nothing shown. */}
                   {change === null || change === 0 ? "" : `${change > 0 ? "+" : "−"}${fmt(Math.abs(change))}`}
                 </span>
@@ -211,35 +215,23 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   );
 }
 
-/** One item/person card, with every field and explicitly numbered set retained. */
-export function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
+/** Group by participant, item and explicitly recorded set; every selected field remains visible. */
+function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
   const [open, setOpen] = useState<RecordRow | null>(null);
-  const t = useTranslations("story.records");
+  const nf = useFormatter();
   const groups = new Map<string, RecordRow[]>();
   for (const row of rows) {
-    const key = JSON.stringify([row.person.id, row.item.id]);
-    const group = groups.get(key) ?? [];
-    group.push(row);
-    groups.set(key, group);
+    const key = JSON.stringify([row.person.id, row.item.id, row.seriesValue]);
+    groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   return <>
-    <div className="space-y-5">
-      {[...groups.entries()].map(([key, group]) => {
-        const sets = new Map<string, RecordRow[]>();
-        for (const row of group) {
-          const label = row.seriesLabel ? `${row.seriesLabel} ${row.seriesValue}` : "";
-          sets.set(label, [...(sets.get(label) ?? []), row]);
-        }
-        return <section key={key} className="rounded-xl bg-[var(--surface-muted)] px-4 py-3">
-          <h3 className="text-base font-medium">{group[0].item.title}{showPerson ? <span className="ml-2 text-xs text-[var(--muted)]">{firstName(group[0].person.name)}</span> : null}</h3>
-          {[...sets.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([label, metrics]) => <div key={label}>
-            {label ? <h4 className="mt-4 text-xs font-medium text-[var(--muted)]">{label}</h4> : null}
-            <ul className="divide-y divide-[var(--line)]">{metrics.map((row) => <Progression key={`${row.metricKey ?? ""}:${row.context?.value ?? ""}`} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />)}</ul>
-          </div>)}
-        </section>;
-      })}
-    </div>
-    <p className="mt-3 text-xs text-[var(--muted)]">{t("openHistory")}</p>
+    <div className="space-y-4">{[...groups.entries()].map(([key, group]) => {
+      const first = group[0];
+      return <section key={key} className="rounded-xl bg-[var(--wash)] px-4 py-3">
+        <h5 className="mb-2 text-sm font-medium">{[first.item.title, showPerson ? first.person.name : null, first.seriesLabel ? `${first.seriesLabel} ${nf.number(first.seriesValue!)}` : null].filter(Boolean).join(" · ")}</h5>
+        <ul className="divide-y divide-[var(--line)]">{group.map((row) => <Progression key={`${row.metricKey ?? ""}:${row.context?.value ?? ""}`} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />)}</ul>
+      </section>;
+    })}</div>
     {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
   </>;
 }
@@ -329,9 +321,9 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, limit, scrolls = tr
       </div>
       {cut ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
       {folded ? (
-        <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={open} aria-label={open ? t("showLess") : t("showMore", { count: folded })} onClick={() => setOpen((value) => !value)}>
+        <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={open} aria-label={open ? t("showLess") : t("showMore", { count: folded })} onClick={() => setOpen((value) => !value)}>
           {open ? less(folded) : t("plusMore", { count: folded })}
-        </button>
+        </StateButton>
       ) : null}
     </section>
   );
@@ -396,11 +388,11 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
           // On a phone this wrapper takes a full line of its own, last; from `sm` it sits in the row.
           <div className="order-last flex w-full sm:order-none sm:w-auto">
             <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--line)] bg-[var(--paper)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
+              <StateButton type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</StateButton>
               {people.map((person) => (
-                <button key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
+                <StateButton key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
                   <span className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
-                </button>
+                </StateButton>
               ))}
             </div>
           </div>
@@ -421,9 +413,9 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
         ))}
       </Grid>
       {!filtering && found.length > PREVIEW_QUOTES ? (
-        <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={showAll} aria-label={showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })} onClick={() => setShowAll((value) => !value)}>
+        <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={showAll} aria-label={showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })} onClick={() => setShowAll((value) => !value)}>
           {showAll ? less(found.length - PREVIEW_QUOTES) : t("plusMore", { count: found.length - PREVIEW_QUOTES })}
-        </button>
+        </StateButton>
       ) : null}
     </div>
   );
@@ -468,7 +460,7 @@ function ExpandableComment({ text }: { text: string }) {
           expanded ? "mt-3" : "absolute inset-x-0 bottom-0 h-20 items-end bg-gradient-to-t from-[var(--card,var(--paper))] from-35% to-transparent",
         )}>
           {/* Just "…" on the right, folded or not (the words are read out); a full finger-sized target around it. */}
-          <button
+          <StateButton
             type="button"
             aria-controls={contentId}
             aria-expanded={expanded}
@@ -477,7 +469,7 @@ function ExpandableComment({ text }: { text: string }) {
             className="-my-2 -mr-3 grid min-h-11 min-w-11 cursor-pointer place-items-center rounded-full text-lg font-light leading-6 text-[var(--ink)] transition hover:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
           >
             …
-          </button>
+          </StateButton>
         </div>
       ) : null}
     </div>
@@ -615,9 +607,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         </ol>
         {/* Only on screen: a downloaded page never lists the rest. */}
         {rows.length > RANKING_PREVIEW_ROWS ? (
-          <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={rankingExpanded ? t("showLess") : t("showMore", { count: rows.length - RANKING_PREVIEW_ROWS })} onClick={() => setRankingExpanded((value) => !value)}>
+          <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={rankingExpanded ? t("showLess") : t("showMore", { count: rows.length - RANKING_PREVIEW_ROWS })} onClick={() => setRankingExpanded((value) => !value)}>
             {rankingExpanded ? less(rows.length - RANKING_PREVIEW_ROWS) : t("plusMore", { count: rows.length - RANKING_PREVIEW_ROWS })}
-          </button>
+          </StateButton>
         ) : null}
       </div>
     );
@@ -627,9 +619,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         {/* A downloaded image says only that there's more. */}
         {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
         {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
-          <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })} onClick={() => setGenresExpanded((value) => !value)}>
+          <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })} onClick={() => setGenresExpanded((value) => !value)}>
             {genresExpanded ? less(s.genres.length - CHART_PREVIEW_ROWS) : t("plusMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
-          </button>
+          </StateButton>
         ) : null}
       </div>
     ) : null;
@@ -1216,10 +1208,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "records",
         title: t("records.eyebrow"),
-        headline: t("records.tracked", { count: new Set(s.records.map((row) => row.item.id)).size }),
+        headline: t("records.headlineFlat", { count: new Set(s.records.map((row) => row.item.id)).size }),
         body: (
           <Grid>
-            <Block title={t("records.allFields")} wide>
+            <Block title={t("records.list")} wide>
               <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} />
             </Block>
           </Grid>

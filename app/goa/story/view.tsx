@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -78,7 +80,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true, bar
       <div className="flex flex-wrap items-center gap-2 px-5 pb-3 pt-3 sm:px-8">
         {/* Following one line only means something with more than one. */}
         {people.length > 1 && people.map((person) => (
-          <button
+          <StateButton
             key={person.id}
             type="button"
             disabled={!interactive}
@@ -88,10 +90,10 @@ export function ThreadPanel({ input, story, fit = false, interactive = true, bar
           >
             <span className="grid h-6 w-6 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, person.id) }}><AvatarMark /></span>
             {firstName(person.name)}
-          </button>
+          </StateButton>
         ))}
         <span className="flex-1" />
-        {interactive ? <button type="button" className="cursor-pointer text-xs text-white/60 hover:text-white" onClick={() => { setFocus(null); setRun((value) => value + 1); }}>↺ {t("redraw")}</button> : null}
+        {interactive ? <StateButton type="button" className="cursor-pointer text-xs text-white/60 hover:text-white" onClick={() => { setFocus(null); setRun((value) => value + 1); }}>↺ {t("redraw")}</StateButton> : null}
       </div>
 
       <div className="px-2 pb-5 sm:px-5">

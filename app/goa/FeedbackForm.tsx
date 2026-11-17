@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
@@ -84,7 +86,7 @@ export function FeedbackForm() {
         <legend className={labelClass}>{t("q3a")}</legend>
         <div className="flex flex-wrap gap-2">
           {(["yes", "no", ""] as const).map((value) => (
-            <button
+            <StateButton
               key={value || "skip"}
               type="button"
               aria-pressed={succeeded === value}
@@ -95,7 +97,7 @@ export function FeedbackForm() {
               )}
             >
               {value === "yes" ? t("yes") : value === "no" ? t("no") : t("partly")}
-            </button>
+            </StateButton>
           ))}
         </div>
       </fieldset>
@@ -104,7 +106,7 @@ export function FeedbackForm() {
         <legend className={labelClass}>{t("q3b")}</legend>
         <div className="flex gap-1.5">
           {[1, 2, 3, 4, 5].map((value) => (
-            <button
+            <StateButton
               key={value}
               type="button"
               aria-pressed={ease === value}
@@ -116,7 +118,7 @@ export function FeedbackForm() {
               )}
             >
               {value}
-            </button>
+            </StateButton>
           ))}
         </div>
         <p className="mt-1 text-xs text-[var(--muted)]">{t("q3bScale")}</p>
@@ -131,7 +133,7 @@ export function FeedbackForm() {
         <legend className={labelClass}>{t("q5")}</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {IMPACTS.map((value) => (
-            <button
+            <StateButton
               key={value}
               type="button"
               aria-pressed={impact === value}
@@ -142,7 +144,7 @@ export function FeedbackForm() {
               )}
             >
               {t(`impact.${value}`)}
-            </button>
+            </StateButton>
           ))}
         </div>
       </fieldset>

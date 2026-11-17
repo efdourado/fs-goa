@@ -53,6 +53,8 @@ export async function createChallenge(
   );
   const timeZone = timeZoneValue(body.timeZone, "America/Sao_Paulo");
   const { recipe, mode: recordingMode } = withRecordingMode(resolveRecipe(body), body);
+  const responseName = stringValue(body, "responseName", { min: 1, max: 120, optional: true });
+  if (body.responseName !== undefined && !responseName) throw new ApiError(400, "invalid_request", "Dê um nome à resposta.");
   // A personal challenge with no start/end is a living list ("films I've seen",
   // "books I've read") — it has no round to open or close, so it is born active
   // and can never be closed. See `transitionChallenge` and `isLivingList`.
@@ -174,7 +176,7 @@ export async function createChallenge(
       const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
       // A group's single answer has one name: the response is called what its value is called.
       const onlyLabel = typeFields.length === 1 && typeof typeFields[0].label === "string" ? typeFields[0].label.trim() : "";
-      const typeName = shared && onlyLabel ? onlyLabel.slice(0, 120) : type.name;
+      const typeName = shared && onlyLabel ? onlyLabel.slice(0, 120) : type.primary && responseName ? responseName : type.name;
       // clock_timestamp, not now(): every type here is made in one transaction, and the forms are listed by when
       // they were made, so they need distinct times to keep the order they were given in.
       await client.query(

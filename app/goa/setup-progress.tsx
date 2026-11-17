@@ -18,8 +18,8 @@ const ISSUE_TAB: Record<string, AdminTab> = {
   many_required_fields: "fields",
   no_comment_source: "fields",
   expectation_visible_early: "fields",
-  // Items are added in Manage › General (a draft) or on Today.
-  no_items: "overview",
+  // Item management lives with stages.
+  no_items: "checkpoints",
   no_way_to_register: "overview",
   no_checkpoints: "checkpoints",
   checkpoint_outside_period: "checkpoints",

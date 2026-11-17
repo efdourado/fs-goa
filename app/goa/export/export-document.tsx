@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { type CSSProperties, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -598,26 +600,26 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
           <div className="xd-toolbar-row">
             <div className="xd-chips" role="group" aria-label={doc.t("sectionsLabel")}>
               {shown("items") || shown("records") ? (
-                <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
+                <StateButton type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
                   {showWhen ? <CheckIcon /> : null}
                   {doc.t("showWhen")}
-                </button>
+                </StateButton>
               ) : null}
             </div>
             <div className="flex flex-none items-center gap-3">
               <span className="hidden max-w-[12.5rem] text-right text-xs leading-snug text-[var(--muted)] lg:block">{doc.t("printHint")}</span>
-              <button
+              <StateButton
                 type="button"
                 onClick={() => window.print()}
                 className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--main)] px-5 py-1.5 text-sm font-medium text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
               >
                 <DownloadIcon />
                 {doc.t("download")}
-              </button>
+              </StateButton>
               {onClose ? (
-                <button type="button" onClick={onClose} aria-label={tc("close")} title={tc("close")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+                <StateButton type="button" onClick={onClose} aria-label={tc("close")} title={tc("close")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
                   <CircleMinusIcon className="h-5 w-5" />
-                </button>
+                </StateButton>
               ) : null}
             </div>
           </div>

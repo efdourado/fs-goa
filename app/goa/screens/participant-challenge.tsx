@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
@@ -42,7 +44,7 @@ import { AddItemsDialog } from "../cine-items";
 import type { CatalogScope } from "../libraries";
 import { ItemEditorDialog } from "./admin";
 import {
-  SaveButton,
+  ArrowRightIcon,
   AvatarMark,
   BackButton,
   Button,
@@ -65,7 +67,6 @@ import {
   dateKeyInSaoPaulo,
   displayAnswer,
   entryRatingReader,
-  entryValuesReady,
   findMissingRequiredField,
   formatRuntime,
   isChallengeScheduled,
@@ -121,7 +122,7 @@ function RatingField({
           const picked = current === rating;
           const text = String(rating).replace(".", ",");
           return (
-            <button
+            <StateButton
               key={rating}
               type="button"
               aria-pressed={picked}
@@ -136,7 +137,7 @@ function RatingField({
               )}
             >
               {text}
-            </button>
+            </StateButton>
           );
         })}
       </div>
@@ -207,13 +208,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // icon that reopens it for editing. Omit it (leaving the icon row unlabeled)
   // for a type whose own required field's label already says what it is.
   heading?: string;
-  // Left border + lock-icon treatment. Defaults to whether `heading` is set;
-  // pass it explicitly to decouple the two — a required-field type keeps the
-  // border with no heading text, an all-optional type gets a heading with no
-  // border at all (nothing there to lock, see `alwaysEditable`).
-  sectioned?: boolean;
-  boxed?: boolean;
-  onReadinessChange?: (state: { ready: boolean; active: boolean }) => void;
   // A short note rendered under the heading, before the summary/form — e.g.
   // the visibility policy sentence for this entry type.
   note?: ReactNode;
@@ -223,8 +217,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // The challenge's own zone, for reading the item's due date the way its admin set it.
   timeZone?: string;
   // Present only when this form is editing a saved entry the viewer may
-  // remove. Clearing a required field (e.g. tapping an already-picked rating)
-  // offers the deletion action, while a new incomplete entry keeps Save locked.
+  // remove. There is no delete button: clearing a required field (e.g.
+  // tapping the already-picked rating again) and submitting calls this
+  // instead of blocking with a "fill this in" error.
   onDelete?: () => Promise<void>;
   // Admin correction always wants the live form, never the read-only summary —
   // that IS the point of that screen. The participant's Today tab leaves this
@@ -247,9 +242,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   unavailableMessage,
   readOnlyInline = false,
   heading,
-  sectioned: sectionedProp,
-  boxed = true,
-  onReadinessChange,
   note,
   timeZone,
   onSave,
@@ -270,11 +262,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // An already-answered checkpoint opens as a summary; editing is opt-in.
   const [editing, setEditing] = useState(alwaysEditable || !entry);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
-  const missingRequired = findMissingRequiredField(fields, values);
-  const emptySaveDeletes = isEmptySaveADelete(missingRequired, Boolean(entry), Boolean(onDelete));
-  const readyToSave = entryValuesReady(fields, values) || emptySaveDeletes;
-  const hasAnswer = Boolean(entry) || Object.values(values).some((value) => value !== null && value !== undefined && (typeof value !== "string" || Boolean(value.trim())));
-  useEffect(() => { onReadinessChange?.({ ready: readyToSave && !busy && !deleting, active: editing && canEdit && hasAnswer }); }, [readyToSave, busy, deleting, editing, canEdit, hasAnswer, onReadinessChange]);
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
@@ -347,7 +334,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   async function performSubmit(): Promise<boolean> {
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
-      // Clearing an existing required answer changes the primary action to deletion.
+      // No separate delete button: clearing the required answer (e.g. tapping
+      // the already-picked rating again) and saving removes the entry — the
+      // same intent, without an extra control sitting on screen at all times.
       if (isEmptySaveADelete(missing, Boolean(entry), Boolean(onDelete))) {
         setDeleting(true);
         setError(null);
@@ -407,7 +396,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const canReopen = Boolean(entry) && canEdit && !editing;
   const interactive = canEdit && editing;
   const showsButtons = editing && canEdit;
-  const sectioned = sectionedProp ?? Boolean(heading);
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
   // the heading keeps the name (and the required mark), the field's label stays only for screen readers.
   const namedFields = fields.filter((candidate) => candidate.id);
@@ -415,7 +403,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const labelIsHeading = Boolean(heading) && namedFields.length === 1 && sameName(heading ?? "", namedFields[0].label);
 
   return (
-    <div className={cx(boxed ? "rounded-[20px] border border-[var(--line)] p-5 sm:p-6" : sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
+    <div className={!heading && canReopen ? "relative" : undefined}>
       {heading ? (
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className={sectionLabelClass}>
@@ -423,14 +411,14 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             {labelIsHeading && namedFields[0].required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : null}
           </h3>
           {canReopen ? (
-            <button
+            <StateButton
               type="button"
               className="flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
               aria-label={t("editAnswer")}
               onClick={() => setEditing(true)}
             >
               <LockIcon />
-            </button>
+            </StateButton>
           ) : null}
         </div>
       ) : canReopen ? (
@@ -438,14 +426,14 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         // is) — a dedicated row for nothing but the icon would just be a gap
         // with a floating button, so it sits over the top-right corner
         // instead, taking no space of its own.
-        <button
+        <StateButton
           type="button"
-          className="absolute right-4 top-4 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
+          className="absolute -top-1 right-0 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
           aria-label={t("editAnswer")}
           onClick={() => setEditing(true)}
         >
           <LockIcon />
-        </button>
+        </StateButton>
       ) : null}
       {note}
       <form className="space-y-5" onSubmit={handleFormSubmit} noValidate>
@@ -476,14 +464,14 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
                     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                       <small className="text-[var(--muted)]">{t("quoteHint")}</small>
                       <div className="flex flex-none gap-1.5">
-                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertQuoteWrap(field)}>
+                        <StateButton type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertQuoteWrap(field)}>
                           <QuoteGlyph />
                           {t("insertQuote")}
-                        </button>
-                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertLineMarker(field, "---\n")}>
+                        </StateButton>
+                        <StateButton type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertLineMarker(field, "---\n")}>
                           <DividerGlyph />
                           {t("insertDivider")}
-                        </button>
+                        </StateButton>
                       </div>
                     </div>
                   </div>
@@ -497,21 +485,21 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
               {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
               {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
               {field.type === "select" ? <Select id={id} value={typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(next) => setValue(field, next)} options={[{ value: "", label: t("select") }, ...(field.config?.options ?? []).filter((option) => !option.archived || (option.id ?? option.value ?? option.label) === value).map((option) => ({ value: option.id ?? option.value ?? option.label, label: `${option.label}${option.archived ? ` ${t("optionArchived")}` : ""}` }))]} /> : null}
-              {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!interactive || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
+              {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <StateButton className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!interactive || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</StateButton>)}</div> : null}
               {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!interactive || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
             </div>
           );
         })}
         {overflowOptional.length > 0 && interactive ? (
-          <button type="button" className={cx(actionChipClass, ghostChipClass)} aria-expanded={showOptional} onClick={() => setShowOptional((open) => !open)}>
+          <StateButton type="button" className={cx(actionChipClass, ghostChipClass)} aria-expanded={showOptional} onClick={() => setShowOptional((open) => !open)}>
             <MoreFieldsGlyph />
             {showOptional ? t("showLess") : t("showMore", { count: overflowOptional.length })}
-          </button>
+          </StateButton>
         ) : null}
         <StatusMessage error={error} success={success} />
         {showsButtons ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            {!hideOwnSaveButton ? emptySaveDeletes ? <Button type="submit" variant="danger" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : tc("delete")}</Button> : <SaveButton type="submit" className="w-full sm:flex-1" disabled={busy || deleting || !readyToSave}>{busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}</SaveButton> : null}
+            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
             {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
@@ -587,7 +575,7 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
     // from `sm:` up each carries its label.
     <div className="mt-8 flex flex-wrap gap-2">
       {/* Opens the PDF over the challenge (a modal), not a page of its own. */}
-      <button
+      <StateButton
         type="button"
         onClick={onExport}
         aria-label={te("button")}
@@ -603,10 +591,10 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
           </svg>
           <span className="hidden sm:inline">{te("button")}</span>
         </span>
-      </button>
+      </StateButton>
       {extra}
       {shareToken ? (
-        <button
+        <StateButton
           type="button"
           onClick={() => void copyPublicLink()}
           aria-label={copied ? tr("shareCopied") : tr("shareCopy")}
@@ -640,7 +628,7 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
             <span aria-hidden={!copied} className={cx("col-start-1 row-start-1 font-medium transition duration-300", copied ? "translate-y-0 opacity-100" : "translate-y-full opacity-0")}>{tr("shareCopied")}</span>
           </span>
           <span role="status" aria-live="polite" className="sr-only">{copied ? tr("shareCopied") : ""}</span>
-        </button>
+        </StateButton>
       ) : null}
       {end}
     </div>
@@ -737,13 +725,12 @@ function SharedAnswerSection({
       {conflict ? (
         <div role="alert" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3 text-sm text-[var(--warn)]">
           <span className="flex-1 leading-6">{t("conflictBody", { name: who ?? t("someone") })}</span>
-          <button type="button" className="flex-none cursor-pointer text-xs underline underline-offset-2" onClick={() => setConflict(false)}>{t("dismiss")}</button>
+          <StateButton type="button" className="flex-none cursor-pointer text-xs underline underline-offset-2" onClick={() => setConflict(false)}>{t("dismiss")}</StateButton>
         </div>
       ) : null}
       <DynamicEntryForm
         key={`${type.id}-${item.id}-${entry?.id ?? "new"}-${entry?.updatedAt ?? ""}`}
         heading={type.name}
-        sectioned={false}
         alwaysEditable={!hasRequiredField}
         fields={type.fields}
         item={null}
@@ -873,12 +860,6 @@ function ItemEntryPanel({
     types.filter((type) => combinableTypeIds.includes(type.id) && !entryForType(type)).map((type) => type.id),
   ));
   const [savingAll, setSavingAll] = useState(false);
-  const [readiness, setReadiness] = useState<Record<Id, { ready: boolean; active: boolean }>>({});
-  const markReady = (id: Id, state: { ready: boolean; active: boolean }) => setReadiness((current) =>
-    current[id]?.ready === state.ready && current[id]?.active === state.active ? current : { ...current, [id]: state });
-  const activeStates = combinableTypeIds.filter((id) => openTypeIds.has(id)).map((id) => readiness[id]);
-  const sharedSaveReady = activeStates.some((state) => state?.active) && activeStates.every((state) => !state?.active || state.ready);
-
   const markOpen = (typeId: Id, open: boolean) => setOpenTypeIds((current) => {
     if (current.has(typeId) === open) return current;
     const next = new Set(current);
@@ -899,7 +880,7 @@ function ItemEntryPanel({
     }
   }
   return (
-    <div className={cx("rounded-[20px] border border-[var(--line)] p-5 sm:p-6", stacked || sharedTypes.length ? "space-y-8" : undefined)}>
+    <div className={stacked || sharedTypes.length ? "space-y-8" : undefined}>
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -913,7 +894,7 @@ function ItemEntryPanel({
         // A type with a required field (Expectativa, Avaliação, Progresso do
         // dia) is a fact you answer once and then lock away — its required
         // field's own label already says what it is, so the section name on
-        // top would just be noise; it keeps the bordered/lockable treatment
+        // top would just be noise; it keeps the lockable treatment
         // instead. A type with only optional fields (Terminei: nota and
         // comentário both come later, "the entry existing means done") has
         // nothing to lock — it stays always open, and needs its own heading
@@ -943,9 +924,6 @@ function ItemEntryPanel({
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
               heading={heading}
-              sectioned={stacked && hasRequiredField}
-              boxed={false}
-              onReadinessChange={combinable ? (state) => markReady(type.id, state) : undefined}
               alwaysEditable={!hasRequiredField && !combinable}
               hideOwnSaveButton={combinable}
               onEditingChange={combinable ? (open) => markOpen(type.id, open) : undefined}
@@ -971,9 +949,9 @@ function ItemEntryPanel({
         );
       })}
       {useSharedButton && anyOpenToSave ? (
-        <SaveButton type="button" className="w-full" disabled={savingAll || !sharedSaveReady} onClick={saveAll}>
-          {savingAll ? tc("saving") : t("saveAllButton")}
-        </SaveButton>
+        <Button type="button" className="w-full" disabled={savingAll} onClick={saveAll}>
+          {savingAll ? tc("saving") : t("saveAllButton")}<ArrowRightIcon />
+        </Button>
       ) : null}
       {sharedTypes.map((type) => (
         <SharedAnswerSection
@@ -1173,7 +1151,7 @@ function EntryPicker({
                 if (start && touch && start.x - touch.clientX > 70 && Math.abs(touch.clientY - start.y) < 30) onEdit(option.id);
               } : undefined}
             >
-              <button
+              <StateButton
                 type="button"
                 disabled={option.soon}
                 aria-pressed={active}
@@ -1210,11 +1188,11 @@ function EntryPicker({
                 {rating !== null ? (
                   <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
                 ) : null}
-              </button>
+              </StateButton>
               {onEdit && active ? (
-                <button type="button" onClick={() => onEdit(option.id)} aria-label={tAdmin("editItem")} title={tAdmin("editItem")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
+                <StateButton type="button" onClick={() => onEdit(option.id)} aria-label={tAdmin("editItem")} title={tAdmin("editItem")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
                   <SlidersIcon className="h-[18px] w-[18px]" />
-                </button>
+                </StateButton>
               ) : null}
             </li>
           );
@@ -1224,10 +1202,10 @@ function EntryPicker({
           // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
           <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "-mt-1.5 grid-rows-[0fr] opacity-0")}>
             <div className="min-h-0 overflow-hidden">
-              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]">
+              <StateButton type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]">
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--wash)]" aria-hidden="true">＋</span>
                 {tCine("addItemRow")}
-              </button>
+              </StateButton>
             </div>
           </li>
         ) : null}
@@ -1319,14 +1297,14 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
             ))}
           </ul>
           {items.length > STAGE_PREVIEW ? (
-            <button
+            <StateButton
               type="button"
               aria-expanded={open}
               onClick={() => setOpen((value) => !value)}
               className="mt-2 min-h-9 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
             >
               {open ? tp("showLess") : tp("showMore", { count: items.length - STAGE_PREVIEW })}
-            </button>
+            </StateButton>
           ) : null}
         </>
       ) : (
@@ -1784,10 +1762,10 @@ export function ParticipantChallengeScreen({
                   extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
                   // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
                   end={onAdmin ? (
-                    <button type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
+                    <StateButton type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
                       <SlidersIcon className="h-[18px] w-[18px] flex-none sm:h-4 sm:w-4" />
                       <span className="hidden sm:inline">{t("manage")}</span>
-                    </button>
+                    </StateButton>
                   ) : undefined}
                 />
               )
@@ -1819,7 +1797,7 @@ export function ParticipantChallengeScreen({
 
       {tabs.length > 1 ? (
         <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
-          {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--muted)] transition hover:text-[var(--ink-strong)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
+          {tabs.map((item) => <StateButton className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--muted)] transition hover:text-[var(--ink-strong)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</StateButton>)}
         </nav>
       ) : null}
 
@@ -1829,7 +1807,6 @@ export function ParticipantChallengeScreen({
             <EmptyState title={t("closedTitle")} />
           ) : sessionSpec ? (
             <SessionLog
-              key={`${challenge.id}:${user?.id ?? ""}`}
               challenge={challenge}
               spec={sessionSpec}
               entries={entries}
@@ -1880,7 +1857,7 @@ export function ParticipantChallengeScreen({
                     {logItem ? (
                       <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                     ) : (
-                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                     )}
                   </CheckinLog>
                 ) : null}
@@ -1902,7 +1879,7 @@ export function ParticipantChallengeScreen({
                 {useItemPanel && selectedItem ? (
                   <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                 ) : (
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}
                 </>}
               </section>

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
@@ -67,7 +69,7 @@ const tabClass = (on: boolean) => cx(
 /** The dock's way up — the ‹ at its left, the same in both docks. */
 function DockBackButton({ onBack, label }: { onBack: () => void; label: string }) {
   return (
-    <button
+    <StateButton
       type="button"
       onClick={onBack}
       aria-label={label}
@@ -75,7 +77,7 @@ function DockBackButton({ onBack, label }: { onBack: () => void; label: string }
       className="my-3.5 mr-1.5 grid cursor-pointer place-items-center border-r border-[var(--line)] text-[var(--muted)] transition hover:text-[var(--ink)]"
     >
       <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5" /></svg>
-    </button>
+    </StateButton>
   );
 }
 
@@ -101,7 +103,7 @@ export function BottomDock({ active, notificationCount, onSelect, onBack, backLa
       {(["home", "catalog", "activity", "you"] as const).map((tab) => {
         const on = tab === active;
         return (
-          <button
+          <StateButton
             key={tab}
             type="button"
             onClick={() => onSelect(tab)}
@@ -116,7 +118,7 @@ export function BottomDock({ active, notificationCount, onSelect, onBack, backLa
               </span>
             ) : null}
             {labels[tab]}
-          </button>
+          </StateButton>
         );
       })}
     </nav>
@@ -147,10 +149,10 @@ export function ChallengeDock({ tabs, active, onTab, onBack, backLabel, label, t
     <nav aria-label={label} className={dockClass} style={{ gridTemplateColumns: `3.25rem repeat(${tabs.length}, minmax(0, 1fr))` }}>
       <DockBackButton onBack={onBack} label={backLabel} />
       {tabs.map((tab) => (
-        <button key={tab} type="button" onClick={() => onTab(tab)} aria-current={tab === active ? "page" : undefined} className={tabClass(tab === active)}>
+        <StateButton key={tab} type="button" onClick={() => onTab(tab)} aria-current={tab === active ? "page" : undefined} className={tabClass(tab === active)}>
           {TAB_ICONS[tab]}
           {tabLabel(tab)}
-        </button>
+        </StateButton>
       ))}
     </nav>
   );

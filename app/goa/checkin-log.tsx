@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
@@ -20,7 +22,7 @@ import {
 import { useGoaFormat } from "./format";
 import { Segmented } from "./Segmented";
 import type { ChallengeField, Entry, Id } from "./types";
-import { SaveButton, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
+import { ArrowRightIcon, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
 import { valuesAsRecord } from "./utils";
 
 /** One logged day: the entry behind it and, for a counter, the number it holds. */
@@ -215,9 +217,9 @@ export function CheckinLog({
       )}
 
       {counter && counterFinished && !correcting ? (
-        <button type="button" onClick={() => setCorrecting(true)} className="cursor-pointer text-xs text-[var(--muted)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
+        <StateButton type="button" onClick={() => setCorrecting(true)} className="cursor-pointer text-xs text-[var(--muted)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
           {t("correct")}
-        </button>
+        </StateButton>
       ) : counter ? (
         <CounterEditor
           key={`${selectedDay}-${records.get(selectedDay)?.entry.id ?? "new"}-${records.get(selectedDay)?.entry.updatedAt ?? ""}`}
@@ -325,7 +327,7 @@ function DayStrip({
           return (
             <div key={day} className="flex flex-none">
               {index > 0 && isWeekStart(day) ? <span className="w-1.5 flex-none" aria-hidden="true" /> : null}
-              <button
+              <StateButton
                 type="button"
                 data-day={day}
                 disabled={future}
@@ -352,7 +354,7 @@ function DayStrip({
                 >
                   {record ? (record.value !== null ? chipNumber(record.value) : <CheckMark />) : future ? (isDeadline ? <FlagMark /> : "") : "+"}
                 </span>
-              </button>
+              </StateButton>
             </div>
           );
         })}
@@ -412,7 +414,7 @@ function MonthGrid({
               const heat = record ? (value !== null ? 40 + Math.round((value / max) * 60) : 70) : 0;
               const label = dayLabel(day, today);
               return (
-                <button
+                <StateButton
                   key={day}
                   type="button"
                   disabled={!inRange || future}
@@ -434,7 +436,7 @@ function MonthGrid({
                 >
                   <span className="tabular-nums">{Number(day.slice(8))}</span>
                   {value !== null ? <span className="text-[10px] tabular-nums opacity-90">{chipNumber(value)}</span> : null}
-                </button>
+                </StateButton>
               );
             })}
           </div>
@@ -523,7 +525,7 @@ function BookProgress({
             {segments.map(([day, value], index) => {
               const ghost = draft !== null && day === selectedDay && draft !== values.get(day);
               return (
-                <button
+                <StateButton
                   key={day}
                   type="button"
                   tabIndex={-1}
@@ -719,7 +721,7 @@ function CounterEditor({
   const disabled = !canEdit || busy;
 
   return (
-    <form className="space-y-4 rounded-[20px] border border-[var(--line)] p-5 sm:p-6" onSubmit={submit} noValidate>
+    <form className="space-y-4 border-t border-[var(--line)] pt-6" onSubmit={submit} noValidate>
       {compact ? null : (
         <DayHeading
           day={day}
@@ -736,7 +738,7 @@ function CounterEditor({
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="inline-flex overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18">
-          <button type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("decrease", { step: format(step) })} onClick={() => nudge(-step)}>−</button>
+          <StateButton type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("decrease", { step: format(step) })} onClick={() => nudge(-step)}>−</StateButton>
           <label className="sr-only" htmlFor="checkin-amount">{mode === "amount" ? field.label : isBook ? t("modePositionBook") : t("modePosition")}</label>
           <input
             id="checkin-amount"
@@ -749,14 +751,14 @@ function CounterEditor({
             disabled={disabled}
             onChange={(event) => { setRaw(event.target.value); setError(null); }}
           />
-          <button type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("increase", { step: format(step) })} onClick={() => nudge(step)}>+</button>
+          <StateButton type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("increase", { step: format(step) })} onClick={() => nudge(step)}>+</StateButton>
         </div>
         {mode === "amount" ? (
           <div className="flex flex-wrap gap-1.5">
             {quick.map((value) => (
-              <button key={value} type="button" disabled={disabled} onClick={() => nudge(value)} className="min-h-8 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[13px] tabular-nums hover:border-[var(--main-line)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
+              <StateButton key={value} type="button" disabled={disabled} onClick={() => nudge(value)} className="min-h-8 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[13px] tabular-nums hover:border-[var(--main-line)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
                 +{format(value)}
-              </button>
+              </StateButton>
             ))}
           </div>
         ) : null}
@@ -801,7 +803,7 @@ function CounterEditor({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2.5">
-          <SaveButton type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}</SaveButton>
+          <Button type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}<ArrowRightIcon /></Button>
           {record && counter.onDelete ? <Button variant="ghost" disabled={busy} onClick={() => setConfirming(true)}>{t("remove")}</Button> : null}
         </div>
       )}

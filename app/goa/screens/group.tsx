@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "../state-button";
+
 import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
@@ -13,7 +15,7 @@ import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import { NewChallengeButton } from "../welcome";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { SaveButton, ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -298,18 +300,18 @@ export function GroupScreen({
           {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
           {/* An empty seat at the end of the faces: the quiet way in to inviting someone. */}
           {canManage(group.role) ? (
-            <button type="button" onClick={openInvite} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--ink-strong)] hover:outline-[var(--main-line)]">
+            <StateButton type="button" onClick={openInvite} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--ink-strong)] hover:outline-[var(--main-line)]">
               <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-            </button>
+            </StateButton>
           ) : null}
         </div>
         <span className="text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })} · {tr(group.role)}</span>
         <span className="flex-1" />
         {canManage(group.role) ? (
           <div className="flex items-center gap-2">
-            <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+            <StateButton type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
               <SlidersIcon className="h-[18px] w-[18px]" />
-            </button>
+            </StateButton>
           </div>
         ) : null}
       </div>
@@ -323,7 +325,7 @@ export function GroupScreen({
             {/* Footer actions share the full available width equally. */}
             <ModalActions className="border-t border-[var(--line)] pt-4">
               {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : null}
-              <SaveButton type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</SaveButton>
+              <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
             </ModalActions>
             {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
           </form>
@@ -350,9 +352,9 @@ export function GroupScreen({
           <form onSubmit={inviteMember} className="mt-6">
             <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
               <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
-              <button type="submit" disabled={memberBusy} aria-label={t("sendInvite")} title={t("sendInvite")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:opacity-55">
+              <StateButton type="submit" disabled={memberBusy} aria-label={t("sendInvite")} title={t("sendInvite")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:opacity-55">
                 <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-              </button>
+              </StateButton>
             </div>
             <StatusMessage error={memberError} success={memberSuccess} />
           </form>
@@ -381,13 +383,13 @@ export function GroupScreen({
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-baseline gap-2.5">
-                <button
+                <StateButton
                   type="button"
                   onClick={onOpenCatalog}
                   className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline"
                 >
                   {t("catalogTitle")}
-                </button>
+                </StateButton>
 
                 <span className="text-xs text-[var(--muted)]">
                   {totalCatalogItems}
@@ -405,7 +407,7 @@ export function GroupScreen({
                       {catalogLibraries.map((library) => {
                         const active = library.kind === activeCatalogKind;
                         return (
-                          <button
+                          <StateButton
                             key={library.id}
                             type="button"
                             aria-pressed={active}
@@ -418,7 +420,7 @@ export function GroupScreen({
                             <LibraryGlyph source={library.source} className="h-4 w-4" />
                             {libraryName(library)}
                             <span className="text-[11px] opacity-70">{catalogCounts[library.kind] ?? 0}</span>
-                          </button>
+                          </StateButton>
                         );
                       })}
                     </div>
@@ -439,7 +441,7 @@ export function GroupScreen({
                     />
                   ))}
                   {remainingCatalog > 0 ? (
-                    <button
+                    <StateButton
                       type="button"
                       onClick={onOpenCatalog}
                       className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--muted)]")}
@@ -447,7 +449,7 @@ export function GroupScreen({
                       <span className="text-2xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
                       <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
                       <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
-                    </button>
+                    </StateButton>
                   ) : null}
                 </Rail>
             </>
@@ -477,25 +479,25 @@ export function GroupScreen({
                   {/* What can be done with this person sits together at the row's right: their role, then banning. */}
                   <div className="flex flex-none items-center justify-end gap-2">
                     {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
-                      <button
+                      <StateButton
                         type="button"
                         className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--line)] px-3 text-[11px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:opacity-50"
                         disabled={roleBusyId === member.id}
                         onClick={() => void toggleRole(member)}
                       >
                         {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
-                      </button>
+                      </StateButton>
                     ) : (
                       <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
                     )}
                     {canBan(member) ? (
-                      <button
+                      <StateButton
                         type="button"
                         className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--danger-line)] px-3 text-[11px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
                         onClick={() => setBanning(member)}
                       >
                         {t("ban")}
-                      </button>
+                      </StateButton>
                     ) : null}
                   </div>
                 </li>
@@ -541,7 +543,7 @@ export function GroupScreen({
 
           {onLeaveGroup ? (
             <div className="mt-6 border-t border-[var(--line)] pt-5">
-              <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setLeaving(true)}>{t("leaveToggle")}</button>
+              <StateButton type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setLeaving(true)}>{t("leaveToggle")}</StateButton>
             </div>
           ) : null}
 

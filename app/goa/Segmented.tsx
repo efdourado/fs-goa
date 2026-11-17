@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { cx } from "./ui";
 
 interface SegmentedOption<T extends string> {
@@ -41,7 +43,7 @@ export function Segmented<T extends string>({
         }}
       />
       {options.map((option) => (
-        <button
+        <StateButton
           key={option.value}
           type="button"
           aria-pressed={option.value === value}
@@ -52,7 +54,7 @@ export function Segmented<T extends string>({
           )}
         >
           {option.label}
-        </button>
+        </StateButton>
       ))}
     </div>
   );

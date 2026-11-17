@@ -1,5 +1,7 @@
 "use client";
 
+import { StateButton } from "./state-button";
+
 import { useTranslations } from "next-intl";
 
 import { cx } from "./ui";
@@ -35,7 +37,7 @@ export function DraftResume({ title, aboveDock, onOpen, onDiscard }: {
   const label = t("resumeDraft", { title });
   return (
     <>
-      <button
+      <StateButton
         type="button"
         onClick={onOpen}
         aria-label={label}
@@ -46,14 +48,14 @@ export function DraftResume({ title, aboveDock, onOpen, onDiscard }: {
           <ContinueIcon className="h-6 w-6" />
         </span>
         <span aria-hidden="true" className="text-[10px] font-medium text-[var(--muted)]">{t("draftLabel")}</span>
-      </button>
+      </StateButton>
       <div
         className={cx(
           "fixed inset-x-3 z-[80] flex items-center gap-1 rounded-full bg-[var(--main)] p-1.5 text-white shadow-[var(--elevate-2)] sm:hidden",
           aboveDock ? "bottom-[calc(env(safe-area-inset-bottom)+5.25rem)]" : "bottom-[calc(env(safe-area-inset-bottom)+0.75rem)]",
         )}
       >
-        <button
+        <StateButton
           type="button"
           onClick={onDiscard}
           aria-label={t("discardDraft")}
@@ -62,14 +64,14 @@ export function DraftResume({ title, aboveDock, onOpen, onDiscard }: {
         >
           {/* The circled minus every close and discard wears, the arrow's size, quieter. */}
           <svg viewBox="0 0 20 20" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" /></svg>
-        </button>
-        <button type="button" onClick={onOpen} className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-full pr-2 text-left text-sm font-medium">
+        </StateButton>
+        <StateButton type="button" onClick={onOpen} className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-full pr-2 text-left text-sm font-medium">
           {/* Always ends in "…"; a long title keeps its first whole words ("Continuar “Os melhores bares”…"). */}
           <span className="min-w-0 flex-1 truncate">
             {t("resumeDraft", { title: shortTitle(title) })}
           </span>
           <ContinueIcon className="h-[22px] w-[22px] flex-none" />
-        </button>
+        </StateButton>
       </div>
     </>
   );

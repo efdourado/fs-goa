@@ -101,7 +101,9 @@ export function ResponseSettingsDialog({
   onCancel,
   onRename,
   onRemove,
+  hideName = false,
 }: {
+  hideName?: boolean;
   type: EntryTypeView;
   onCancel: () => void;
   onRename: (name: string) => Promise<void>;
@@ -135,13 +137,13 @@ export function ResponseSettingsDialog({
 
   return (
     <FormDialog
-      title={type.name}
+      title={hideName ? t("settingsTitle") : type.name}
       dirty={name.trim() !== type.name}
       busy={busy}
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
-      submitDisabled={!name.trim()}
+      submitDisabled={hideName || !name.trim()}
       onDelete={onRemove ? {
         body: warning ? (
           <>
@@ -173,9 +175,7 @@ export function ResponseSettingsDialog({
         },
       } : undefined}
     >
-      <Field label={t("nameLabel")}>
-        <input className={inputClass} value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} />
-      </Field>
+      {hideName ? <p className="text-sm text-[var(--muted)]">{t("settingsBody")}</p> : <Field label={t("nameLabel")}><input className={inputClass} value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} /></Field>}
     </FormDialog>
   );
 }

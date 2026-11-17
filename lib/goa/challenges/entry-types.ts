@@ -9,6 +9,7 @@ import { writeAudit } from "../domain/audit";
 import { publicId, semanticKey } from "../domain/shared";
 import { insertField } from "../domain/fields";
 import { ApiError } from "../../http";
+import { isItemGoalTrackingType } from "../../item-goal-tracking";
 import { PAGE_COUNT_KEY, pageCountType } from "./recipes";
 import { deleteEntryTypesHard } from "../hard-delete";
 
@@ -374,7 +375,7 @@ export async function addSharedResponseType(
       throw new ApiError(409, "challenge_locked", "Um desafio encerrado fica congelado.");
     }
     const types = await entryTypesForChallenge(client, challengeId);
-    if (!usesRoundItems(types)) {
+    if (!usesRoundItems(types) || types.some((type) => type.parent_type_id)) {
       throw new ApiError(409, "shared_unsupported", "Uma resposta compartilhada precisa de um desafio com itens.");
     }
     const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : "Resposta compartilhada";
@@ -518,6 +519,18 @@ async function countsPages(client: PoolClient, challengeId: string, exceptTypeId
   return row?.found === true;
 }
 
+/** Native pages are eligible only while the linked book library exposes that property. */
+async function visiblePageCount(client: PoolClient, groupId: string, kind: string): Promise<boolean> {
+  if (kind !== "book") return false;
+  const result = await oneOrNull<{ visible: boolean }>(client,
+    `SELECT EXISTS (
+       SELECT 1 FROM catalog_libraries l
+       LEFT JOIN catalog_native_property_configs p ON p.library_id = l.id AND p.property_key = 'page_count'
+       WHERE l.group_id = $1 AND l.kind = 'book' AND l.archived_at IS NULL AND NOT coalesce(p.hidden, false)
+     ) AS visible`, [groupId]);
+  return result?.visible === true;
+}
+
 /**
  * Per-challenge progress tracking. The selected numeric library property is
  * the endpoint for every item (pages, kilometres, lessons, etc.). Switching
@@ -545,9 +558,13 @@ export async function setPageCountEnabled(
       throw new ApiError(409, "challenge_locked", "Reabra o desafio para mudar o acompanhamento de progresso.");
     }
     const types = await entryTypesForChallenge(client, challengeId);
-    const active = propertyKey !== null || body.enabled === false
-      ? types.find((type) => purposeOf(type) === "progress")
-      : types.find((type) => type.semantic_key === PAGE_COUNT_KEY);
+    const active = types.find((type) => isItemGoalTrackingType({
+      semanticKey: type.semantic_key, purpose: purposeOf(type),
+      parentTypeId: type.parent_type_id, isPrimary: type.is_primary,
+    }));
+    if (body.enabled !== false && types.some((type) => type.parent_type_id)) {
+      throw new ApiError(409, "tracking_unsupported", "Os campos por exercício são separados de uma meta de conclusão.");
+    }
 
     if (propertyKey !== null) {
       if (!usesRoundItems(types)) {
@@ -559,7 +576,7 @@ export async function setPageCountEnabled(
         [challengeId],
       );
       if (!library) throw new ApiError(409, "tracking_unsupported", "Escolha uma biblioteca para acompanhar progresso.");
-      const nativeNumber = propertyKey === "page_count" && library.kind === "book";
+      const nativeNumber = propertyKey === "page_count" && await visiblePageCount(client, library.group_id, library.kind);
       const customNumber = nativeNumber ? null : await oneOrNull<{ label: string }>(
         client,
         `SELECT label FROM catalog_attribute_defs
@@ -617,10 +634,15 @@ export async function setPageCountEnabled(
     }
 
     if (body.enabled) {
-      if (active) return { enabled: true, entryTypeId: active.id };
       if (recipeCatalogKind(access.challenge.recipe_key) !== "book" || !usesRoundItems(types)) {
         throw new ApiError(409, "page_count_unsupported", "A contagem de páginas existe nos desafios de livros.");
       }
+      const library = await oneOrNull<{ group_id: string; kind: string }>(client,
+        "SELECT group_id, kind FROM challenge_libraries WHERE challenge_id = $1 LIMIT 1", [challengeId]);
+      if (!library || !await visiblePageCount(client, library.group_id, library.kind)) {
+        throw new ApiError(409, "tracking_property_invalid", "A propriedade precisa ser um número visível desta biblioteca.");
+      }
+      if (active) return { enabled: true, entryTypeId: active.id };
       if (await countsPages(client, challengeId)) {
         throw new ApiError(409, "page_count_exists", "Este desafio já conta páginas.");
       }

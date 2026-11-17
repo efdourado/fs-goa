@@ -26,7 +26,7 @@ test("um check-in com vários itens chega ao servidor com o modo, o nome e o ró
 
 test("o que o formulário não escolheu não vai no pedido, para o servidor usar o padrão da receita", () => {
   const body = challengeRequestBody(base);
-  for (const key of ["recordingMode", "sessionName", "sessionNoteLabel", "answerScope", "sharedEditPolicy", "itemDates", "libraries", "revealTogether", "additionalResponses"]) {
+  for (const key of ["recordingMode", "sessionName", "sessionNoteLabel", "includeSessionNote", "responseName", "answerScope", "sharedEditPolicy", "itemDates", "libraries", "revealTogether", "additionalResponses"]) {
     assert.ok(!(key in body), `${key} ficou de fora`);
   }
   assert.equal(body.expectation, false);
@@ -43,6 +43,8 @@ test("toda configuração do formulário é repassada — uma nova que ficar de 
     recordingMode: "session",
     sessionName: "Treino",
     sessionNoteLabel: "Como foi?",
+    includeSessionNote: false,
+    responseName: "Your response",
     sharedEditPolicy: "members_can_edit",
     additionalResponses: [{
       name: "Resultado do grupo",
