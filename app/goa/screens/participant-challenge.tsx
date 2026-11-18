@@ -225,7 +225,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   onDelete?: () => Promise<void>;
   // Admin correction always wants the live form, never the read-only summary —
   // that IS the point of that screen. Participant answers lock after saving;
-  // their Save button stays visible and disabled until editing changes them.
+  // their Save button appears only while editing.
   alwaysEditable?: boolean;
   // When several required-field sections are stacked, a single button below
   // the whole group saves all of them — each section's own Save button would
@@ -412,11 +412,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
-  // Only a saved, nonempty response has a header lock. Save stays visible,
-  // but becomes available only while editing a changed, valid response.
+  // Only a saved, nonempty response has a header lock. Save appears while
+  // editing and becomes available for a changed, valid response.
   const canReopen = !hideEditLock && canEdit && hasAnswer(baseline);
   const interactive = canEdit && editing;
-  const showsButtons = canEdit;
+  const showsButtons = canEdit && editing;
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
   // the heading keeps the name (and the required mark), the field's label stays only for screen readers.
   const namedFields = fields.filter((candidate) => candidate.id);
@@ -937,7 +937,7 @@ function ItemEntryPanel({
           </div>
         );
       })}
-      {types.length && canEdit ? <div className="flex gap-2 [&>*]:flex-1">
+      {types.length && canEdit && editingAll ? <div className="flex gap-2 [&>*]:flex-1">
         <Button disabled={!editingAll || savingAll || dirtyTypeIds.size === 0 || [...dirtyTypeIds].some((id) => unreadyTypes.has(id))} onClick={saveAll}>{savingAll ? tc("saving") : tc("save")}</Button>
       </div> : null}
       {sharedTypes.map((type) => (

@@ -102,7 +102,7 @@ test("unlocking a saved expectation shows only Save with a lock and blocks uncha
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
     assert.equal(save.disabled,false);
     await act(async () => ui.button("Cancelar").click());
-    assert.equal(ui.button("Salvar").disabled,true,"Save stays visible while locked");
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false,"Save is hidden while locked");
     await act(async () => ui.button("Editar resposta").click());
     assert.equal(ui.button("Salvar").disabled,true,"closing the lock restores saved answers");
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
@@ -150,7 +150,7 @@ test("a saved answer gains a header lock and clearing it removes the lock while 
   const entry={id:"guess-entry",userId:"me",itemId:"film",entryTypeId:"expectation",values:{guess:3}} as Entry;
   try {
     await act(async()=>ui.root.render(withIntl(<ParticipantChallengeScreen challenge={value} entries={[entry]} user={{id:"me"} as never} tab="today" onTab={()=>undefined} onBack={()=>undefined} onSaveEntry={async()=>undefined} onDeleteEntry={async()=>{deletes++;}} />)));
-    assert.equal(ui.button("Salvar").disabled,true);
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false);
     await act(async()=>ui.button("Editar resposta").click());
     await act(async()=>document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 3"]')!.click());
     await act(async()=>ui.button("Salvar").click());

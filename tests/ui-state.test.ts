@@ -299,7 +299,7 @@ test("optional fields show six initially and preserve saved answers beyond the p
   assert.match(saved, /aria-expanded="true"/);
 });
 
-test("uma resposta já salva mantém os campos e Salvar desabilitados, com cadeado para editar", () => {
+test("uma resposta já salva mantém os campos desabilitados e oculta Salvar até editar", () => {
   const answered = renderWithIntl(createElement(DynamicEntryForm, {
     fields: [{ id: "f1", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }],
     item: null,
@@ -310,7 +310,7 @@ test("uma resposta já salva mantém os campos e Salvar desabilitados, com cadea
   }));
   assert.match(answered, /aria-label="Editar resposta"/, "um ícone de cadeado reabre a resposta para edição");
   assert.match(answered, /aria-pressed="true" aria-label="Nota 4,5" disabled/, "o campo continua com o mesmo controle, só que desabilitado");
-  assert.match(answered, /type="submit" disabled=""[^>]*>Salvar/, "Salvar permanece visível e bloqueado");
+  assert.doesNotMatch(answered, /type="submit"[^>]*>Salvar/, "Salvar fica oculto enquanto a resposta está bloqueada");
   assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
 });
 
