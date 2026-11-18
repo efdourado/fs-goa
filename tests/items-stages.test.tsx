@@ -118,8 +118,16 @@ test('one confirmation adds checked collection items and the title still in the 
   const picks = [...document.querySelectorAll<HTMLInputElement>('dialog input[type="checkbox"]')];
   assert.equal(picks.length, 3, 'select all plus two items from the current library');
   await act(async () => picks[0].click());
+  const catalogCards = document.querySelectorAll('dialog ol:last-of-type > li');
+  assert.equal(catalogCards.length, 2);
+  for (const card of catalogCards) assert.equal(card.querySelector('h3, button[aria-label="remover"]'), null);
   await act(async () => picks[2].click());
-  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!, 'Brand new');
+  assert.equal(document.querySelectorAll('dialog ol:last-of-type > li').length, 1);
+  const title = () => document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!;
+  await ui.fill(title(), 'Temporary manual title');
+  await act(async () => ui.button('Digitar outro título').click());
+  await act(async () => ui.button('remover').click());
+  await ui.fill(title(), 'Brand new');
   assert.equal(saved.length, 0);
   assert.equal(document.querySelectorAll('dialog button[type="submit"]').length, 1);
   await act(async () => ui.button('Adicionar 2 itens').click());

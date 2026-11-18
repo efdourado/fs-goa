@@ -223,7 +223,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
   if (!target || !rows.length) return null;
   return (
     <ol className="space-y-2">
-      {rows.map((row, index) => {
+      {rows.map((row) => {
         const open = openByDefault || expanded.has(row.key);
         const properties = propertiesFor({ id: row.libraryId, kind: row.libraryKind || target.kind });
         const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
@@ -235,23 +235,25 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
           const property = properties?.find((entry) => entry.key === key);
           return property ? propertyName(property) : fallback;
         };
-        const topRight = authorInline ? (
-          <label className="block">
+        const authorField = authorInline ? (
+          <label className="block min-w-0">
             <span className={labelClass}>{nameOf("author", t("author"))}</span>
             <input className={cx(inputClass, authorMissing(row, properties) ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row, { author: event.target.value })} />
           </label>
         ) : null;
         return (
           <li className={unboxed ? undefined : "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3"} key={row.key}>
-            <div className={cx("grid items-end gap-2", topRight ? (onRemove ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]") : onRemove ? "grid-cols-[1fr_auto]" : "")}>
+            {onRemove && !row.catalogItemId ? (
+              <div className="mb-2 flex justify-end">
+                <StateButton type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
+              </div>
+            ) : null}
+            <div className={cx("grid items-end gap-x-4 gap-y-2", authorInline && "sm:grid-cols-2")}>
               <label className="block min-w-0">
                 <span className={labelClass}>{titleInput?.label ?? nameOf("title", t("nameLabel"))}</span>
                 <input className={inputClass} value={row.title} maxLength={titleInput?.maxLength ?? 200} placeholder={titleInput?.placeholder ?? t("titlePlaceholder")} ref={titleInput?.ref} onPaste={titleInput?.onPaste} aria-invalid={titleInput?.["aria-invalid"]} onChange={(event) => update(row, { title: event.target.value, catalogItemId: undefined })} />
               </label>
-              {topRight}
-              {onRemove ? (
-                <StateButton type="button" className={cx(rowIconClass, "mb-1.5 text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></StateButton>
-              ) : null}
+              {authorField}
             </div>
             {open ? (
               <div className="mt-2 space-y-3">
@@ -266,7 +268,6 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
                 {open ? t("hideDetails") : t("moreDetails", { count: hiddenCount })}
               </StateButton>
             ) : null}
-            <span className="sr-only">{index + 1}</span>
           </li>
         );
       })}
