@@ -273,8 +273,7 @@ const EXPECTATION_SEMANTIC_KEY = "expectativa";
 
 /**
  * The optional Cinema/Estante "Expectativa" type (V1 §3.1): a pre-watch 0–5
- * rating, one per item, that stops being editable once the participant sends
- * their real rating (`expectation_locked`). Its default visibility is
+ * rating, one per item, editable independently of the actual rating. Its default visibility is
  * "after_own" so nobody's number is coloured by seeing everyone else's guess
  * before they commit their own.
  */

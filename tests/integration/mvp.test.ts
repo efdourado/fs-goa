@@ -2941,7 +2941,7 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   );
 });
 
-test("expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
+test("expectativa e avaliação coexistem, podem ser editadas independentemente", async () => {
   const owner = await register("Théo", "theo_cur");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Curadoria" } })).body as { id: string }).id;
 
@@ -2979,12 +2979,11 @@ test("expectativa e avaliação coexistem, e a expectativa trava ao avaliar", as
   );
   assert.deepEqual(coexist.rows.map((row) => row.purpose), ["expectation", "rating"]);
 
-  // a expectativa não pode mais mudar depois da avaliação
+  // Expectation remains editable after rating.
   const locked = await call("POST", `/api/challenges/${challengeId}/entries`, {
     session: owner, body: { itemId: film.id, entryTypeId: expectation.id, values: { expectativa: 1 } },
   });
-  assert.equal(locked.response.status, 409);
-  assert.equal((locked.body as { error: string }).error, "expectation_locked");
+  assert.equal(locked.response.status, 201);
 
   const expEntry = await adminPool.query<{ id: string }>(
     `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
@@ -2994,7 +2993,7 @@ test("expectativa e avaliação coexistem, e a expectativa trava ao avaliar", as
   const patchLocked = await call("PATCH", `/api/entries/${expEntry.rows[0].id}`, {
     session: owner, body: { values: { expectativa: 2 } },
   });
-  assert.equal(patchLocked.response.status, 409);
+  assert.equal(patchLocked.response.status, 200);
 });
 
 test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", async () => {
@@ -4621,7 +4620,7 @@ test("checkpoints genéricos: semanas com pausa, atribuição de itens, total de
   assert.equal((blocked.body as { error: string }).error, "checkpoint_has_entries");
 });
 
-test("expectativa opcional: liga/desliga no rascunho, trava ao avaliar, e a visibilidade after_own esconde a alheia", async () => {
+test("expectativa opcional: liga/desliga no rascunho, permite editar após avaliar, e a visibilidade after_own esconde a alheia", async () => {
   const owner = await register("Dona Expect", "dona_expect_v1");
   const b = await register("Bea Expect", "bea_expect_v1");
   const c = await register("Cau Expect", "cau_expect_v1");
@@ -4677,17 +4676,16 @@ test("expectativa opcional: liga/desliga no rascunho, trava ao avaliar, e a visi
     session: b, body: { itemId: filmX, entryTypeId: ratingType.id, values: { [notaField]: 3 } },
   })).response.status, 201);
 
-  // Bloqueio posterior — a expectativa não muda depois da avaliação.
+  // Expectation and rating remain independent after either is saved.
   const reExpect = await call("POST", `/api/challenges/${challengeId}/entries`, {
     session: b, body: { itemId: filmX, entryTypeId: expId, values: { [expField]: 1 } },
   });
-  assert.equal(reExpect.response.status, 409);
-  assert.equal((reExpect.body as { error: string }).error, "expectation_locked");
+  assert.equal(reExpect.response.status, 201);
   const expEntryId = await adminPool.query<{ id: string }>(
     "SELECT id FROM entries WHERE entry_type_id=$1 AND participant_user_id=$2 AND deleted_at IS NULL",
     [expId, b.user.id],
   );
-  assert.equal((await call("PATCH", `/api/entries/${expEntryId.rows[0].id}`, { session: b, body: { values: { [expField]: 2 } } })).response.status, 409);
+  assert.equal((await call("PATCH", `/api/entries/${expEntryId.rows[0].id}`, { session: b, body: { values: { [expField]: 2 } } })).response.status, 200);
 
   // Visibilidade after_own: C não vê a expectativa de B enquanto não registra a sua.
   const entriesFor = async (session: ClientSession) =>
@@ -5772,7 +5770,7 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   assert.equal((preflight.body as { ready: boolean }).ready, true, "o preflight passa antes de ativar");
   assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
 
-  // 13 + 14 + 15. Registrar expectativas e avaliações; expectativa trava após a avaliação; progresso sem status manual.
+  // 13 + 14 + 15. Registrar expectativas e avaliações; expectativa e avaliação independentes; progresso sem status manual.
   // "Aceite F" (índice 5) só avalia 4 filmes → sem amostra suficiente para afinidade.
   const commonFilms = ["Filme 01", "Filme 02", "Filme 03", "Filme 04", "Filme 05", "Filme 06"];
   for (let personIndex = 0; personIndex < everyone.length; personIndex += 1) {
@@ -5785,11 +5783,9 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
       assert.equal(rated.response.status, 201, JSON.stringify(rated.body));
     }
   }
-  const relock = await call("POST", `/api/challenges/${challengeId}/entries`, {
-    session: owner, body: { itemId: itemId("Filme 01"), entryTypeId: expType.id, values: { [expField]: 5 } },
-  });
-  assert.equal(relock.response.status, 409, "expectativa não muda depois da avaliação");
-  assert.equal((relock.body as { error: string }).error, "expectation_locked");
+  const priorExpectation = ((await call("GET", `/api/challenges/${challengeId}/entries`, {session:owner})).body as {entries: import("../../app/goa/types").Entry[]}).entries.find((entry) => entry.entryTypeId === expType.id && entry.itemId === itemId("Filme 01") && entry.userId === owner.user.id)!;
+  const relock = await call("PATCH", `/api/entries/${priorExpectation.id}`, {session:owner,body:{values:priorExpectation.values}});
+  assert.equal(relock.response.status, 200, "expectation remains editable after rating");
   // 15. Progresso sem status manual redundante: a receita Cinema não tem um tipo
   // "assisti/pulei" — a existência da avaliação é a participação.
   assert.equal(detail.entryTypes.some((t) => t.purpose === "checkin" || t.purpose === "progress"), false, "sem status manual redundante");
@@ -9434,4 +9430,24 @@ test("unsupported library properties cannot enable progress through current or l
     assert.equal((await call("PATCH", `/api/challenges/${bid}/page-count`, {session:owner,body:{enabled}})).response.status,409,"hidden pages cannot be enabled even when an older goal exists");
   }
   assert.deepEqual((await get(bid)).entryTypes,withGoal.entryTypes,"rejected requests preserve existing fields instead of deleting an old goal");
+});
+
+test('book page totals block cumulative overflow, concurrent writes and invalid edits', async () => {
+ const owner=await register('Page Limit','page_limit');
+ const gid=((await call('POST','/api/groups',{session:owner,body:{name:'Page limits'}})).body as {id:string}).id;
+ const created=await call('POST',`/api/groups/${gid}/challenges`,{session:owner,body:{recipe:'library',title:'Reading',startsOn:'2026-01-01',endsOn:'2026-12-31',participantIds:[owner.user.id],items:[{title:'Book',author:'Author',pageCount:256}]}});
+ assert.equal(created.response.status,201,JSON.stringify(created.body));
+ const cid=(created.body as {id:string}).id;
+ assert.equal((await call('POST',`/api/challenges/${cid}/transition`,{session:owner,body:{status:'active'}})).response.status,200);
+ const d=(await call('GET',`/api/challenges/${cid}`,{session:owner})).body as import('../../app/goa/types').ChallengeDetail;
+ const type=d.entryTypes.find((type) => type.isPrimary)!; const field=type.fields[0].id!; const item=d.items[0].id;
+ const save=(occurredOn:string,amount:number)=>call('POST',`/api/challenges/${cid}/entries`,{session:owner,body:{entryTypeId:type.id,itemId:item,occurredOn,values:{[field]:amount}}});
+ const first=await save('2026-11-14',200); assert.equal(first.response.status,201);
+ assert.equal((await save('2026-11-15',57)).response.status,400);
+ const concurrent=await Promise.all([save('2026-11-15',56),save('2026-11-16',56)]);
+ assert.deepEqual(concurrent.map((result)=>result.response.status).sort(),[201,400]);
+ const edit=await call('PATCH',`/api/entries/${(first.body as {id:string}).id}`,{session:owner,body:{values:{[field]:201}}});
+ assert.equal(edit.response.status,400);
+ const entries=((await call('GET',`/api/challenges/${cid}/entries`,{session:owner})).body as {entries:Array<{entryTypeId:string;values:Record<string,number>}>}).entries.filter((entry)=>entry.entryTypeId===type.id);
+ assert.equal(entries.length,2); assert.equal(entries.reduce((sum,entry)=>sum+entry.values[field],0),256);
 });

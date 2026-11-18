@@ -81,13 +81,37 @@ test("expectation and optional rating share one Save; a guess can be saved befor
     await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={[]} user={{ id: "me" } as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item, _values, _entry, _date, type) => { types.push(type!); }} />)));
     assert.equal([...document.querySelectorAll("button")].filter((button) => /Salvar/.test(button.textContent ?? "")).length, 1);
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
-    await act(async () => ui.button("Salvar respostas").click());
+    await act(async () => ui.button("Salvar").click());
     assert.deepEqual(types, ["expectation"], "blank actual rating is neither required nor created");
   } finally { await ui.cleanup(); }
 });
 
+test("unlocking a saved expectation shows only Save with a lock and blocks unchanged answers", async () => {
+  const ui = setup();
+  try {
+    const saved: Array<{type: string | undefined; values: Record<string, unknown>}> = [];
+    const entries = [{id:"guess-entry",userId:"me",itemId:"film",entryTypeId:"expectation",values:{guess:3}}] as Entry[];
+    await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={entries} user={{id:"me"} as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item,values,_entry,_date,type) => {saved.push({type,values});}} />)));
+    await act(async () => ui.button("Editar resposta").click());
+    assert.equal([...document.querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Cancelar").length,0);
+    assert.equal(ui.button("Salvar").disabled,true);
+    const save = ui.button("Salvar");
+    assert.equal(save.querySelectorAll('[data-lock-state]').length,1);
+    assert.equal(document.querySelector('#entry-type-expectation button[aria-label="Editar resposta"]'),null);
+    await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
+    assert.equal(save.disabled,false);
+    await act(async () => ui.button("Cancelar").click());
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false);
+    await act(async () => ui.button("Editar resposta").click());
+    assert.equal(ui.button("Salvar").disabled,true,"closing the lock restores saved answers");
+    await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
+    await act(async () => ui.button("Salvar").click());
+    assert.deepEqual(saved,[{type:"expectation",values:{guess:4}}]);
+  } finally {await ui.cleanup();}
+});
+
 for (const required of [true, false]) {
-  test(`combined Save commits expectation before ${required ? "required" : "optional"} rating`, async () => {
+  test(`Save independently commits expectation and ${required ? "required" : "optional"} rating`, async () => {
     const ui = setup();
     try {
       const challenge = { ...cinema, entryTypes: cinema.entryTypes.map((type) => type.id === "rating" ? { ...type, fields: type.fields.map((field) => ({ ...field, required })) } : type) };
@@ -100,10 +124,21 @@ for (const required of [true, false]) {
       }} />)));
       await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
       await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-rating button[aria-label="Nota 3"]')!.click());
-      await act(async () => ui.button("Salvar respostas").click());
-      assert.deepEqual(types, ["expectation"], "rating waits for expectation to commit");
+      await act(async () => ui.button("Salvar").click());
+      assert.deepEqual(types, ["expectation", "rating"], "rating saves independently while expectation is pending");
       await act(async () => finish());
       assert.deepEqual(types, ["expectation", "rating"]);
     } finally { await ui.cleanup(); }
   });
 }
+
+test("rating can be saved first without filling expectation", async () => {
+  const ui=setup(); const saved:string[]=[];
+  try {
+    await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={[]} user={{id:"me"} as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item,_values,_entry,_date,type) => {saved.push(type!);}} />)));
+    assert.equal(ui.button("Salvar").disabled,true);
+    await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-rating button[aria-label="Nota 3"]')!.click());
+    await act(async () => ui.button("Salvar").click());
+    assert.deepEqual(saved,["rating"]);
+  } finally {await ui.cleanup();}
+});

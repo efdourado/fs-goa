@@ -20,7 +20,6 @@ import {
   entryTypeById,
   entryTypesForChallenge,
   primaryEntryType,
-  purposeOf,
   schedulePolicyOf,
   sessionPairOf,
   targetPolicyOf,
@@ -139,6 +138,28 @@ async function writeEntryValues(
   // out of `fields` since the last save) loses its row. Its Vitrine reference,
   // if any, is removed first — a comment being genuinely dropped means its
   // curated card goes with it, rather than blocking the whole save.
+  // Book page totals are a library constraint, including edits and concurrent daily writes.
+  for (const field of fields) {
+    const settings = asRecord(field.settings);
+    const count = asRecord(settings.count);
+    const pages = asRecord(count.goal).from === "page_count" || (!Object.hasOwn(settings, "count") && field.semantic_key === "paginas");
+    if (!pages || typeof normalized[field.id] !== "number") continue;
+    const book = await oneOrNull<{item_id:string;participant_user_id:string|null;page_count:number|null}>(client,
+      `SELECT e.item_id,e.participant_user_id,ci.page_count FROM entries e
+       JOIN challenge_items i ON i.id=e.item_id JOIN catalog_items ci ON ci.id=i.catalog_item_id
+       WHERE e.id=$1 AND ci.kind='book' FOR UPDATE OF i`, [entryId]);
+    if (!book?.page_count || book.page_count <= 0) continue;
+    const previous = await oneOrNull<{amount:number}>(client,
+      `SELECT COALESCE(SUM(v.number_scaled),0)::float8 / $5 AS amount FROM entries e
+       JOIN entry_values v ON v.entry_id=e.id AND v.field_id=$1
+       WHERE e.item_id=$2 AND e.participant_user_id IS NOT DISTINCT FROM $3
+         AND e.id<>$4 AND e.deleted_at IS NULL`,
+      [field.id,book.item_id,book.participant_user_id,entryId,10 ** (field.number_scale ?? 0)]);
+    if (Number(previous?.amount ?? 0) + Number(normalized[field.id]) > book.page_count) {
+      throw new ApiError(400,"invalid_field_value","Valor inválido.",{fieldId:field.id});
+    }
+  }
+
   const stale = await client.query<{ field_id: string }>(
     "SELECT field_id FROM entry_values WHERE entry_id=$1 AND field_id <> ALL($2::text[])",
     [entryId, presentFieldIds],
@@ -507,18 +528,6 @@ export async function saveEntry(
       }
     }
 
-    // Expectation is a pre-watch note; once the film is rated it stops moving.
-    if (purposeOf(entryType) === "expectation" && itemId) {
-      const rated = await oneOrNull<{ id: string }>(client,
-        `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
-          WHERE e.item_id=$1 AND e.participant_user_id=$2 AND e.deleted_at IS NULL
-            AND t.purpose = 'rating' LIMIT 1`,
-        [itemId, participantId]);
-      if (rated) {
-        throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
-      }
-    }
-
     const fields = await storageFields(client, challengeId, entryType.id);
     const answerScope = entryType.answer_scope;
     if (answerScope === "shared" && !access.canManage) {
@@ -643,16 +652,6 @@ export async function updateEntry(
       }
       await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
       return { id: entryId, values: visitValues, ...(savedChildren ? { children: savedChildren } : {}) };
-    }
-    if (entry.purpose === "expectation" && entry.item_id && entry.participant_user_id) {
-      const rated = await oneOrNull<{ id: string }>(client,
-        `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
-          WHERE e.item_id=$1 AND e.participant_user_id=$2 AND e.deleted_at IS NULL
-            AND t.purpose = 'rating' LIMIT 1`,
-        [entry.item_id, entry.participant_user_id]);
-      if (rated) {
-        throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
-      }
     }
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
     const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values, entry.created_at);

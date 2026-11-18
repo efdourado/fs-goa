@@ -718,8 +718,8 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
   assert.match(html, /2019 · Drama · 2h12 · Bong Joon-ho · 0 · Não/);
   assert.equal(html.match(/2019 · Drama/g)?.length, 1, "item properties appear beside the rating form, not in the picker");
   assert.ok(html.indexOf("2019 · Drama") > html.indexOf(">Parasita</h2>"));
-  assert.ok(html.indexOf("Bong Joon-ho") < html.indexOf("Salvar respostas"));
-  assert.match(html, /Salvar respostas/, "um único botão salva as duas seções obrigatórias de uma vez");
+  assert.ok(html.indexOf("Bong Joon-ho") < html.indexOf("Salvar"));
+  assert.match(html, /Salvar/, "um único botão salva as duas seções obrigatórias de uma vez");
   assert.doesNotMatch(html, /border-l/, "expectation and rating fields have no decorative left border");
   assert.doesNotMatch(html, /Salvar registro/, "cada seção não carrega mais o próprio botão de salvar");
 });

@@ -1055,7 +1055,10 @@
     "bookDone": "Finished",
     "searchItems": "Search items",
     "searchItemsNone": "No item matches.",
-    "countProgress": "{page, number} of {total, number} · {left, number} to go"
+    "countProgress": "{page, number} of {total, number} · {left, number} to go",
+    "yourResponseToday": "Your response for today",
+    "yourResponseOnDate": "Your response for {date}",
+    "yourResponseYesterday": "Your response for yesterday"
   },
   "sessionLog": {
     "composerTitle": "Your answers",
@@ -1176,7 +1179,8 @@
     "aheadCount": "{count} ahead of pace",
     "behindCount": "{count} behind pace",
     "leftPerDayCount": "<b>{left}</b>{unit} to go · <b>{perDay}</b> a day until {date}",
-    "leftCount": "<b>{left}</b>{unit} to go"
+    "leftCount": "<b>{left}</b>{unit} to go",
+    "pageOverflow": "Page limit exceeded."
   },
   "entryForm": {
     "fillField": "Fill in the “{label}” field.",
@@ -1560,7 +1564,8 @@
     "itemsForStage": "Items in {title}",
     "chooseItemsHint": "Select the items in this stage. Selecting an item from another stage moves it here; deselecting it keeps it in the challenge without a stage.",
     "removeStageBody": "Remove this stage? Its items stay in the challenge without a stage. Stages with saved records remain protected.",
-    "searchItems": "Search items"
+    "searchItems": "Search items",
+    "scheduleTitle": "Stages"
   },
   "listImport": {
     "title": "Import a list (JSON)",

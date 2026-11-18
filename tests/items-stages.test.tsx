@@ -6,7 +6,8 @@ import {CheckpointPlanner} from "../app/goa/checkpoint-planner";
 import {Toaster} from "../app/goa/ui";
 import {AdminScreen} from "../app/goa/screens/admin";
 import {SessionLog, sessionSpecOf} from "../app/goa/session-log";
-import type {ChallengeDetail, ChallengeField, ChallengeItemInput, CheckpointInput} from "../app/goa/types";
+import {CheckinLog} from "../app/goa/checkin-log";
+import type {ChallengeDetail, ChallengeField, ChallengeItemInput, CheckpointInput, Entry} from "../app/goa/types";
 import {withIntl} from "./helpers/intl";
 const library = {id: "lib", kind: "custom_test", label: "Things", source: "custom"};
 const field = {id: "answer", key: "answer", label: "Amount", type: "number", required: true};
@@ -267,5 +268,61 @@ test('an eligible numeric library property exposes progress off by default and r
   assert.deepEqual(toggles,[]);
   await act(async () => toggle.click());
   assert.deepEqual(toggles,['distance']);
+ } finally {await ui.cleanup();}
+});
+
+for (const fails of [false,true]) {
+ test(`completed count correction uses a modal and ${fails ? 'preserves failed edits' : 'closes after saving'}`, async () => {
+  const ui=await setup(); const saved: unknown[]=[]; const day='2026-09-20'; const today='2026-09-28';
+  const entry={id:'done',values:{answer:10}} as Entry;
+  try {
+   await ui.render(<CheckinLog from={day} to={today} today={today} selectedDay={today} onSelectDay={() => {}} canEdit compact records={new Map([[day,{entry,value:10}]])} counter={{field:field as ChallengeField,notes:[],total:10,book:false,entry:'position',paceFrom:day,paceTo:null,onSave:async (...args) => {if(fails) throw new Error('Correction failed');saved.push(args);}}} />);
+   assert.equal(document.querySelector('form'),null);
+   await act(async () => ui.button('Corrigir').click());
+   assert.ok(document.querySelector('dialog'));
+   assert.equal(document.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.disabled,true);
+   await ui.fill(document.querySelector<HTMLInputElement>('dialog input[type=number]')!,'8');
+   await act(async () => document.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.click());
+   if(fails) {
+    assert.match(document.body.textContent!,/Correction failed/);
+    assert.equal(document.querySelector<HTMLInputElement>('dialog input[type=number]')!.value,'8');
+   } else {
+    assert.equal(document.querySelector('dialog'),null);
+    assert.equal(ui.button('Corrigir').disabled,false);
+    assert.equal((saved[0] as [string,Record<string,unknown>])[0],day,"correct the saved date rather than create a new entry today");
+    assert.equal((saved[0] as [string,Record<string,unknown>])[1].answer,8);
+    assert.equal((entry.values as Record<string,unknown>).answer,10,'the provided entry is not mutated');
+   }
+  } finally {await ui.cleanup();}
+ });
+}
+
+
+test('long item lists render twelve rows at a time without losing remaining items', async () => {
+ const ui=await setup();
+ const value={...challenge,checkpoints:[],items:Array.from({length:25},(_,i)=>({id:`item-${i}`,title:`Item ${i}`,position:i}))} as ChallengeDetail;
+ try {
+  await ui.render(<CheckpointPlanner challenge={value} onSaveCheckpoints={noop} onAssign={noop} />);
+  assert.equal(document.querySelectorAll('section ul li').length,12);
+  await act(async()=>ui.button('Ver mais 12').click());
+  assert.equal(document.querySelectorAll('section ul li').length,24);
+  await act(async()=>ui.button('Ver mais 1').click());
+  assert.equal(document.querySelectorAll('section ul li').length,25);
+ } finally {await ui.cleanup();}
+});
+
+test('book totals block overflow without an editions warning and yesterday gets its own response heading', async () => {
+ const ui=await setup();let saves=0;const day='2026-09-27';
+ try {
+  await ui.render(<CheckinLog from={day} to="2026-09-28" today="2026-09-28" selectedDay={day} onSelectDay={()=>{}} canEdit records={new Map([[day,{entry:{id:'read',values:{answer:8}} as Entry,value:8}]])} counter={{field:field as ChallengeField,notes:[],total:10,book:true,entry:'position',paceFrom:day,paceTo:null,onSave:async()=>{saves++;}}} />);
+  assert.match(document.body.textContent!,/Sua resposta para ontem/);
+  await ui.fill(document.querySelector<HTMLInputElement>('#checkin-amount')!,'11');
+  assert.equal(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled,true);
+  assert.doesNotMatch(document.body.textContent!,/edições|salvar mesmo assim|110%|São 11 páginas/i);
+  assert.match(document.body.textContent!,/Limite de páginas excedido/);
+  await act(async()=>{document.querySelector('form')!.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));});
+  assert.equal(saves,0);
+  await ui.fill(document.querySelector<HTMLInputElement>('#checkin-amount')!,'10');
+  assert.equal(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled,false);
  } finally {await ui.cleanup();}
 });

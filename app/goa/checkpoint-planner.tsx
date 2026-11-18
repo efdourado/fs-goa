@@ -37,6 +37,7 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const autoDays = challenge.checkpoints.some((stage) => stage.kind === "day");
   const stages = [...challenge.checkpoints].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const items = [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const [visibleItems, setVisibleItems] = useState<Record<string, number>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [editingStage, setEditingStage] = useState<Stage | "new" | null>(null);
   const [assigning, setAssigning] = useState<Stage | null>(null);
@@ -58,14 +59,15 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     const next = applyOrder(items.map((item, position) => ({key: item.id, checkpointId: item.checkpointId ?? null, position})), strategy);
     void run(() => onAssign(next.map((item, position) => ({itemId: item.key, checkpointId: item.checkpointId, position}))));
   }
-  function itemRows(list: ChallengeItem[]) {
-    return <ul className="divide-y divide-[var(--line)]">{list.map((item) => <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
+  function itemRows(list: ChallengeItem[], key = "unassigned") {
+    const limit = visibleItems[key] ?? 12;
+    return <><ul className="divide-y divide-[var(--line)]">{list.slice(0, limit).map((item) => <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
       <StateButton type="button" className="min-w-0 flex-1 cursor-pointer py-1 text-left transition-opacity hover:opacity-75" onClick={() => setEditingItem(item)}>
         <span className="block text-sm font-medium">{item.title}</span>
         <span className="block text-xs text-[var(--muted)]">{[item.catalogItem?.author, item.catalogItem?.year, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</span>
       </StateButton>
       {!locked && !autoDays && stages.length ? <StateButton type="button" className={rowIconClass} aria-label={t("moveItem", {title: item.title})} onClick={() => setMovingItem(item)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
-    </li>)}</ul>;
+    </li>)}</ul>{list.length > limit ? <Button variant="secondary" className="mt-3 w-full" onClick={() => setVisibleItems((current) => ({...current, [key]:limit + 12}))}>{ta("showMoreItems", {count:Math.min(12,list.length-limit)})}</Button> : null}</>;
   }
   const stageIds = new Set(stages.map((stage) => stage.id));
   const loose = items.filter((item) => !item.checkpointId || !stageIds.has(item.checkpointId));
@@ -99,7 +101,7 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
           </div>
           {expanded ? <div className="border-t border-[var(--line)] pb-4">
             {stage.description ? <p className="my-3 text-sm text-[var(--muted)]">{stage.description}</p> : null}
-            {list.length ? itemRows(list) : <p className="py-3 text-sm text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
+            {list.length ? itemRows(list, stage.id) : <p className="py-3 text-sm text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
             {!locked && !autoDays ? <Button variant="secondary" className="mt-2 w-full" onClick={() => setAssigning(stage)}>{t("chooseItems")}</Button> : null}
           </div> : null}
         </section>;

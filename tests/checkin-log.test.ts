@@ -177,7 +177,7 @@ test("ao chegar ao fim, a estrada fica com 'livro terminado' e o dia; o editor s
   assert.match(html, /Livro terminado/);
   assert.match(html, /em 20 de setembro de 2026/, "o dia em que a contagem cruzou o total");
   assert.match(html, /role="img"/, "a estrada continua");
-  assert.match(html, />Corrigir</);
+  assert.match(html, /aria-label="Corrigir"/);
   assert.doesNotMatch(html, /Parei na página/, "sem o editor");
 });
 
@@ -204,5 +204,5 @@ test("um livro já terminado de outro jeito (com nota) mostra a estrada cheia, s
   assert.match(html, /p\. 352/, "a estrada cheia");
   assert.match(html, /100% lido/);
   assert.doesNotMatch(html, /em \d+ de/, "sem data, porque não sabemos quando terminou");
-  assert.match(html, />Corrigir</);
+  assert.match(html, /aria-label="Corrigir"/);
 });

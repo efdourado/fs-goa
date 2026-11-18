@@ -3,7 +3,7 @@
 import { StateButton } from "./state-button";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type FormEvent, type ReactNode, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   addDays,
@@ -19,10 +19,11 @@ import {
   sumBefore,
   weekStreak,
 } from "./checkin-days";
+import { Dialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { Segmented } from "./Segmented";
 import type { ChallengeField, Entry, Id } from "./types";
-import { ArrowRightIcon, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
+import { ArrowRightIcon, Button, cx, InModal, inputClass, labelClass, sectionLabelClass, SlidersIcon, StatusMessage } from "./ui";
 import { valuesAsRecord } from "./utils";
 
 /** One logged day: the entry behind it and, for a counter, the number it holds. */
@@ -105,6 +106,7 @@ export function CheckinLog({
   compact = false,
   streakBy = "day",
   children,
+  hideDayHeading = false,
 }: {
   from: string;
   to: string;
@@ -127,6 +129,7 @@ export function CheckinLog({
   streakBy?: "day" | "week";
   unavailableMessage?: string | null;
   children?: ReactNode;
+  hideDayHeading?: boolean;
 }) {
   const t = useTranslations("checkinLog");
   const storedView = useSyncExternalStore(subscribeView, () => readStoredView() ?? "strip", () => "strip" as const);
@@ -136,6 +139,8 @@ export function CheckinLog({
   const [mode, setMode] = useState<EntryMode>(counter?.entry ?? "amount");
   // A finished road keeps its bar; the editor folds away behind "Corrigir".
   const [correcting, setCorrecting] = useState(false);
+  const [correctionDay, setCorrectionDay] = useState(selectedDay);
+  const [correctionBusy, setCorrectionBusy] = useState(false);
   // What the editor would save right now — drawn as a striped segment on the bar before it's saved.
   const [draft, setDraft] = useState<number | null>(null);
   // Survives the reload a save triggers (the editor remounts with the new entry), cleared on another day.
@@ -154,6 +159,11 @@ export function CheckinLog({
   const counterFinished = Boolean(counter?.total) && (Boolean(counter?.done) || sumAll(values) >= (counter?.total ?? Infinity));
   const formatDate = useGoaFormat();
   const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
+
+  function openCorrection() {
+    setCorrectionDay(records.has(selectedDay) ? selectedDay : [...records.keys()].filter((day) => day <= today).sort().at(-1) ?? selectedDay);
+    setCorrecting(true);
+  }
 
   function select(day: string) {
     if (day > today || compact) return;
@@ -174,9 +184,10 @@ export function CheckinLog({
       {counter?.total ? (
         <BookProgress
           counter={counter}
+          onCorrect={counterFinished && canEdit ? openCorrection : undefined}
           values={values}
           today={today}
-          selectedDay={selectedDay}
+          selectedDay={correcting ? correctionDay : selectedDay}
           draft={draft}
           onSelect={select}
         />
@@ -216,11 +227,7 @@ export function CheckinLog({
         </div>
       )}
 
-      {counter && counterFinished && !correcting ? (
-        <StateButton type="button" onClick={() => setCorrecting(true)} className="cursor-pointer text-xs text-[var(--muted)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
-          {t("correct")}
-        </StateButton>
-      ) : counter ? (
+      {counter && !counterFinished && !correcting ? (
         <CounterEditor
           key={`${selectedDay}-${records.get(selectedDay)?.entry.id ?? "new"}-${records.get(selectedDay)?.entry.updatedAt ?? ""}`}
           counter={counter}
@@ -237,12 +244,22 @@ export function CheckinLog({
           onNotice={setNotice}
           compact={compact}
         />
-      ) : (
+      ) : !counter ? (
         <div className="border-t border-[var(--line)] pt-6">
-          <DayHeading day={selectedDay} today={today} state={logged.has(selectedDay) ? t("stateDone") : selectedDay === today ? t("stateEmptyToday") : t("stateEmpty")} />
+          {!hideDayHeading ? <DayHeading day={selectedDay} today={today} state={logged.has(selectedDay) ? t("stateDone") : selectedDay === today ? t("stateEmptyToday") : t("stateEmpty")} /> : null}
           {children}
         </div>
-      )}
+      ) : null}
+      {counter && correcting ? <Dialog wide title={t("correct")} busy={correctionBusy} onClose={() => {if (!correctionBusy) {setCorrecting(false); setDraft(null);}}}>
+        <CounterEditor
+          key={`${correctionDay}-${records.get(correctionDay)?.entry.id ?? "new"}`}
+          counter={counter} day={correctionDay} today={today} record={records.get(correctionDay)} values={values}
+          mode={mode} onMode={setMode} onDraft={setDraft} canEdit={canEdit} unavailableMessage={unavailableMessage}
+          notice={notice} onNotice={setNotice} compact={compact} onBusyChange={setCorrectionBusy}
+          onSaved={() => {setCorrectionBusy(false); setCorrecting(false); setDraft(null);}}
+        />
+      </Dialog> : null}
+      {counterFinished && !correcting && notice ? <StatusMessage success={notice} /> : null}
     </div>
   );
 }
@@ -267,10 +284,11 @@ function useDayLabel() {
 }
 
 function DayHeading({ day, today, state }: { day: string; today: string; state: string }) {
-  const dayLabel = useDayLabel();
+  const tp = useTranslations("participant");
+  const f = useGoaFormat();
   return (
     <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h3 className="text-xl font-light tracking-[-0.03em]">{dayLabel(day, today)}</h3>
+      <h3 className={sectionLabelClass}>{day === today ? tp("yourResponseToday") : day === addDays(today, -1) ? tp("yourResponseYesterday") : tp("yourResponseOnDate", {date:f.date(day,{day:"numeric",month:"long"})})}</h3>
       <span className="text-xs text-[var(--muted)]">{state}</span>
     </div>
   );
@@ -453,6 +471,7 @@ function MonthGrid({
  */
 function BookProgress({
   counter,
+  onCorrect,
   values,
   today,
   selectedDay,
@@ -460,6 +479,7 @@ function BookProgress({
   onSelect,
 }: {
   counter: LogCounter;
+  onCorrect?: () => void;
   values: ReadonlyMap<string, number>;
   today: string;
   selectedDay: string;
@@ -512,10 +532,11 @@ function BookProgress({
           <p className="text-xs text-[var(--muted)]">{t(key("bookLabel", "countLabel"))}</p>
         )}
         <div className="text-right">
-          <p className="text-3xl font-light leading-none tracking-[-0.04em] tabular-nums">
+          <p className="flex items-center justify-end gap-2 text-3xl font-light leading-none tracking-[-0.04em] tabular-nums">
+            {onCorrect ? <StateButton type="button" aria-label={t("correct")} title={t("correct")} onClick={onCorrect} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"><SlidersIcon className="h-4 w-4" /></StateButton> : null}
             {value(markedDone ? total : done)} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: counter.book ? page(total) : `${page(total)}${unit}` })}</small>
           </p>
-          <p className="mt-1 text-xs text-[var(--main-strong)]">{t(key("percentRead", "percentGoal"), { percent })}</p>
+          <p className="mt-1 text-xs text-[var(--ink)]">{t(key("percentRead", "percentGoal"), { percent })}</p>
         </div>
       </div>
       <div>
@@ -604,7 +625,11 @@ function CounterEditor({
   notice,
   onNotice,
   compact = false,
+  onSaved,
+  onBusyChange,
 }: {
+  onSaved?: () => void;
+  onBusyChange?: (busy: boolean) => void;
   counter: LogCounter;
   day: string;
   today: string;
@@ -621,6 +646,7 @@ function CounterEditor({
   compact?: boolean;
 }) {
   const t = useTranslations("checkinLog");
+  const inModal = useContext(InModal);
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const nf = useFormatter();
@@ -635,13 +661,14 @@ function CounterEditor({
     return Object.fromEntries(notes.map((note) => [note.id as Id, typeof stored[note.id as Id] === "string" ? String(stored[note.id as Id]) : ""]));
   });
   const [busy, setBusy] = useState(false);
+  useEffect(() => {onBusyChange?.(busy);}, [busy, onBusyChange]);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const typed = raw.trim() === "" ? null : Number(raw.replace(",", "."));
   const amount = typed === null || !Number.isFinite(typed) ? null : mode === "amount" ? typed : amountFromPosition(typed, before);
   const problem = checkAmount({ amount, mode, before, field });
-  const exceeds = !problem && amount !== null && overTotal(values, day, amount, total);
+  const exceeds = isBook && !problem && amount !== null && overTotal(values, day, amount, total);
   const storedNotes = record ? valuesAsRecord(record.entry.values) : {};
   const notesChanged = notes.some((note) => (noteValues[note.id as Id] ?? "") !== String(storedNotes[note.id as Id] ?? ""));
   const unchanged = saved !== null && amount === saved && !notesChanged;
@@ -653,8 +680,8 @@ function CounterEditor({
   const shown = (value: number) => (isBook ? t("pagesCount", { count: value, formatted: format(value) }) : format(value));
 
   useEffect(() => {
-    onDraft(!problem && amount !== null ? amount : null);
-  }, [amount, problem, onDraft]);
+    onDraft(!problem && !exceeds && amount !== null ? amount : null);
+  }, [amount, problem, exceeds, onDraft]);
 
   function switchMode(next: EntryMode) {
     if (next === mode) return;
@@ -671,7 +698,7 @@ function CounterEditor({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (problem || amount === null || unchanged || !canEdit) return;
+    if (problem || exceeds || amount === null || unchanged || !canEdit) return;
     setBusy(true);
     setError(null);
     try {
@@ -680,6 +707,7 @@ function CounterEditor({
       onNotice(compact
         ? t(record ? "savedChangeUndated" : "savedNewUndated", { value: shown(amount) })
         : t(record ? "savedChange" : "savedNew", { value: shown(amount), date: f.date(day) }));
+      onSaved?.();
     } catch (cause) {
       setError(f.error(cause));
     } finally {
@@ -694,6 +722,7 @@ function CounterEditor({
     try {
       await counter.onDelete(record.entry);
       onNotice(t("removed", { date: f.date(day) }));
+      onSaved?.();
     } catch (cause) {
       setError(f.error(cause));
       setBusy(false);
@@ -721,7 +750,7 @@ function CounterEditor({
   const disabled = !canEdit || busy;
 
   return (
-    <form className="space-y-4 border-t border-[var(--line)] pt-6" onSubmit={submit} noValidate>
+    <form className={cx("space-y-4", !inModal && "border-t border-[var(--line)] pt-6")} onSubmit={submit} noValidate>
       {compact ? null : (
         <DayHeading
           day={day}
@@ -730,19 +759,19 @@ function CounterEditor({
         />
       )}
       <Segmented
-        className="max-w-xs"
+        className="w-full"
         ariaLabel={t("modeAria")}
         value={mode}
         onChange={switchMode}
         options={[{ value: "amount", label: field.label }, { value: "position", label: isBook ? t("modePositionBook") : t("modePosition") }]}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div className="inline-flex overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18">
+        <div className={cx(inModal ? "inline-flex" : "flex w-full", "overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18")}>
           <StateButton type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("decrease", { step: format(step) })} onClick={() => nudge(-step)}>−</StateButton>
           <label className="sr-only" htmlFor="checkin-amount">{mode === "amount" ? field.label : isBook ? t("modePositionBook") : t("modePosition")}</label>
           <input
             id="checkin-amount"
-            className="w-24 bg-transparent px-1 py-2 text-center text-2xl tabular-nums outline-none [appearance:textfield] disabled:text-[var(--muted)] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className={cx(inModal ? "w-24" : "min-w-0 flex-1", "bg-transparent px-1 py-2 text-center text-2xl tabular-nums outline-none [appearance:textfield] disabled:text-[var(--muted)] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
             type="number"
             inputMode={Number.isInteger(step) ? "numeric" : "decimal"}
             min={0}
@@ -764,7 +793,7 @@ function CounterEditor({
         ) : null}
       </div>
       <p className="min-h-5 text-[13px] text-[var(--muted)]" aria-live="polite">
-        {problemText ? (
+        {exceeds ? t("pageOverflow") : problemText ? (
           <span className="text-[var(--danger)]">{problemText}</span>
         ) : after !== null && amount !== null ? (
           <>
@@ -778,7 +807,6 @@ function CounterEditor({
             : isBook ? t("positionHintBook", { before: format(before) }) : t("positionHint", { before: format(before) })
         ) : null}
       </p>
-      {exceeds ? <p className="rounded-xl bg-[var(--warn-soft)] px-3.5 py-2.5 text-[13px] text-[var(--warn)]">{t("overTotal", { total: format(total ?? 0) })}</p> : null}
       {notes.map((note) => (
         <div key={note.id}>
           <label className={labelClass} htmlFor={`checkin-note-${note.id}`}>{note.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
@@ -802,9 +830,9 @@ function CounterEditor({
           <Button variant="ghost" className="min-h-9" disabled={busy} onClick={() => setConfirming(false)}>{tc("cancel")}</Button>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}<ArrowRightIcon /></Button>
-          {record && counter.onDelete ? <Button variant="ghost" disabled={busy} onClick={() => setConfirming(true)}>{t("remove")}</Button> : null}
+        <div className="flex w-full items-center gap-2.5 [&>*]:min-w-0 [&>*]:flex-1">
+          {record && counter.onDelete ? <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>{t("remove")}</Button> : null}
+          <Button type="submit" className="w-full" disabled={disabled || exceeds || amount === null || Boolean(problem) || unchanged}>{saveLabel}<ArrowRightIcon /></Button>
         </div>
       )}
       <StatusMessage error={error} success={error ? null : notice} />

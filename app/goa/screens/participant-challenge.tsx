@@ -1,6 +1,6 @@
 "use client";
 
-import { StateButton } from "../state-button";
+import { StateButton, LockStateIcon } from "../state-button";
 
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
@@ -64,6 +64,7 @@ import {
 } from "../ui";
 import {
   canManage,
+  shiftDateKey,
   dateKeyInSaoPaulo,
   displayAnswer,
   entryRatingReader,
@@ -192,6 +193,7 @@ function LockIcon() {
 interface DynamicEntryFormHandle {
   /** Saves this section if it's currently open for editing; a no-op (resolves `ok: true`) when it's collapsed/locked, since there's nothing to save. */
   submitIfEditing: () => Promise<{ ok: boolean }>;
+  reset: () => void;
 }
 
 export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
@@ -228,9 +230,12 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   alwaysEditable?: boolean;
   // When several required-field sections are stacked, a single button below
   // the whole group saves all of them — each section's own Save button would
-  // just be redundant then (Cancel, and the section's own validation/error
-  // message, still show normally).
+  // just be redundant then. Validation and errors remain next to their fields.
   hideOwnSaveButton?: boolean;
+  // A parent response panel can own editing and the bottom actions.
+  editingOverride?: boolean;
+  hideEditLock?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
   // Reports every change of the open/collapsed state — the combined button
   // above uses this to know whether any section actually needs saving.
   onEditingChange?: (editing: boolean) => void;
@@ -248,6 +253,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   onDelete,
   alwaysEditable = false,
   hideOwnSaveButton = false,
+  editingOverride,
+  hideEditLock = false,
+  onDirtyChange,
   onEditingChange,
 }, ref) {
   const t = useTranslations("entryForm");
@@ -260,7 +268,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   // An already-answered checkpoint opens as a summary; editing is opt-in.
-  const [editing, setEditing] = useState(alwaysEditable || !entry);
+  const [localEditing, setEditing] = useState(alwaysEditable || !entry);
+  const editing = editingOverride ?? localEditing;
+  const [baseline, setBaseline] = useState(values);
+  const dirty = JSON.stringify(fields.map((field) => values[field.id ?? ""] ?? "")) !== JSON.stringify(fields.map((field) => baseline[field.id ?? ""] ?? ""));
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
@@ -332,6 +344,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // several stacked sections, which calls every open section's version of
   // this in one go instead of each showing its own Save button.
   async function performSubmit(): Promise<boolean> {
+    if (!dirty) return true;
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
       // No separate delete button: clearing the required answer (e.g. tapping
@@ -358,6 +371,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     setSuccess(null);
     try {
       await onSave(values, entry);
+      setBaseline(values);
       setSuccess(entry ? t("entryUpdated") : t("entrySaved"));
       if (!alwaysEditable) setEditing(false);
       return true;
@@ -374,12 +388,14 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     await performSubmit();
   }
 
+  function reset() { setValues(baseline); setError(null); setSuccess(null); setEditing(false); }
   useImperativeHandle(ref, () => ({
+    reset,
     submitIfEditing: async () => {
       // An untouched section is not an answer. In particular, saving a guess
       // before watching must not require (or create) the actual rating.
       const answered = Object.values(values).some((value) => value !== null && value !== undefined && value !== "");
-      return editing && canEdit && (entry || answered) ? { ok: await performSubmit() } : { ok: true };
+      return editing && canEdit && dirty && (entry || answered) ? { ok: await performSubmit() } : { ok: true };
     },
   }));
 
@@ -393,7 +409,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // effect on interactivity below, so a lock that engages AFTER the answer
   // was given (e.g. an expectation once the rating comes in) still reads as
   // a normal locked field, not a disabled-but-still-open-looking form.
-  const canReopen = Boolean(entry) && canEdit && !editing;
+  const canReopen = !hideEditLock && canEdit;
   const interactive = canEdit && editing;
   const showsButtons = editing && canEdit;
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
@@ -414,10 +430,10 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             <StateButton
               type="button"
               className="flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
-              aria-label={t("editAnswer")}
-              onClick={() => setEditing(true)}
+              aria-label={editing ? tc("cancel") : t("editAnswer")}
+              onClick={() => editing ? reset() : setEditing(true)}
             >
-              <LockIcon />
+              {editing ? <LockStateIcon locked={false} /> : <LockIcon />}
             </StateButton>
           ) : null}
         </div>
@@ -429,10 +445,10 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         <StateButton
           type="button"
           className="absolute -top-1 right-0 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
-          aria-label={t("editAnswer")}
-          onClick={() => setEditing(true)}
+          aria-label={editing ? tc("cancel") : t("editAnswer")}
+          onClick={() => editing ? reset() : setEditing(true)}
         >
-          <LockIcon />
+          {editing ? <LockStateIcon locked={false} /> : <LockIcon />}
         </StateButton>
       ) : null}
       {note}
@@ -497,10 +513,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
           </StateButton>
         ) : null}
         <StatusMessage error={error} success={success} />
-        {showsButtons ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
-            {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+        {showsButtons && !hideOwnSaveButton ? (
+          <div className="flex gap-2">
+            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting || !dirty}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
         {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: timeZone ? f.itemDeadline(item, timeZone) ?? "" : f.dateTime(item.dueAt) })}</p> : null}
@@ -826,18 +841,14 @@ function ItemEntryPanel({
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
+  const f = useGoaFormat();
   const tv = useTranslations("visibility");
+  const tEntry = useTranslations("entryForm");
   // Individual answers first, each person's own; the group's shared ones follow.
   const allTypes = itemEntryTypes(challenge);
   const ownTypes = allTypes.filter((type) => type.answerScope !== "shared");
   const types = skipTypeId ? ownTypes.filter((type) => type.id !== skipTypeId) : ownTypes;
   const sharedTypes = allTypes.filter((type) => type.answerScope === "shared");
-  const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
-  // Counted before the skip: "Terminei" keeps its own heading when the pages moved up into the log.
-  const stacked = ownTypes.length > 1;
-  // Looked up once (both to build the JSX below and to seed the shared
-  // button's initial open/closed state) — a type is unanswered exactly when
-  // it has no matching entry yet.
   const entryForType = (type: EntryTypeView) => {
     const perDay = type.cardinality === "once_per_item_day";
     return ownEntries.find((candidate) =>
@@ -845,71 +856,31 @@ function ItemEntryPanel({
       && (candidate.entryTypeId ?? "") === type.id
       && (!perDay || candidate.occurredOn === (occurredOn || today)));
   };
-  // Stack answer sections behind one Save, including an optional rating paired
-  // with a guess. Standalone completion actions still keep their own button.
-  const combinableTypeIds = stacked
-    ? types.filter((type) => type.fields.some((field) => field.required) || (types.some((candidate) => candidate.purpose === "expectation") && type.purpose === "rating")).map((type) => type.id)
-    : [];
-  const useSharedButton = combinableTypeIds.length > 1;
+  const [editingAll, setEditingAll] = useState(() => !types.some((type) => entryForType(type)));
   const formRefs = useRef(new Map<Id, DynamicEntryFormHandle | null>());
-  // Seeded from each combinable type's OWN initial `editing` rule
-  // (`!entry` for every combined section)
-  // so the button is correctly visible/hidden on the very first render, not
-  // only after a section's effect reports in.
-  const [openTypeIds, setOpenTypeIds] = useState<Set<Id>>(() => new Set(
-    types.filter((type) => combinableTypeIds.includes(type.id) && !entryForType(type)).map((type) => type.id),
-  ));
+  const [dirtyTypeIds, setDirtyTypeIds] = useState<Set<Id>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
-  const markOpen = (typeId: Id, open: boolean) => setOpenTypeIds((current) => {
-    if (current.has(typeId) === open) return current;
-    const next = new Set(current);
-    if (open) next.add(typeId); else next.delete(typeId);
-    return next;
+  const markDirty = (id: Id, dirty: boolean) => setDirtyTypeIds((current) => {
+    if (current.has(id) === dirty) return current;
+    const next = new Set(current); if (dirty) next.add(id); else next.delete(id); return next;
   });
-  const anyOpenToSave = combinableTypeIds.some((typeId) => openTypeIds.has(typeId));
   async function saveAll() {
     setSavingAll(true);
     try {
-      // Expectation must commit before the rating locks it on the server.
-      for (const typeId of combinableTypeIds) {
-        const result = await formRefs.current.get(typeId)?.submitIfEditing();
-        if (result && !result.ok) break;
-      }
-    } finally {
-      setSavingAll(false);
-    }
+      const results = await Promise.all([...dirtyTypeIds].map((id) => formRefs.current.get(id)?.submitIfEditing()));
+      if (results.every((result) => result?.ok)) setEditingAll(false);
+    } finally {setSavingAll(false);}
+  }
+  function cancelAll() {
+    formRefs.current.forEach((form) => form?.reset());
+    setDirtyTypeIds(new Set()); setEditingAll(false);
   }
   return (
-    <div className={stacked || sharedTypes.length ? "space-y-8" : undefined}>
+    <div className="space-y-6">
+      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]">{editingAll ? <LockStateIcon locked={false} /> : <LockIcon />}</StateButton> : null}</div> : null}
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
-        const rated = ratingTypeId
-          ? ownEntries.some((candidate) => itemIdForEntry(candidate) === item.id && candidate.entryTypeId === ratingTypeId)
-          : false;
-        const locked = type.purpose === "expectation" && rated;
-        // A first plain-round entry may carry a date; day-keyed forms take it
-        // from the picker above, an expectation is pre-watch, and once an entry
-        // exists the date is fixed.
-        // A type with a required field (Expectativa, Avaliação, Progresso do
-        // dia) is a fact you answer once and then lock away — its required
-        // field's own label already says what it is, so the section name on
-        // top would just be noise; it keeps the lockable treatment
-        // instead. A type with only optional fields (Terminei: nota and
-        // comentário both come later, "the entry existing means done") has
-        // nothing to lock — it stays always open, and needs its own heading
-        // since there's no required-field label to lean on.
-        const hasRequiredField = type.fields.some((field) => field.required);
-        // Solo (not stacked) always takes "Sua resposta" as its heading —
-        // there's only one form, so the icon shares its row instead of
-        // floating alone below the label with a visible gap between them.
-        const heading = !stacked
-          ? t("yourResponseTitle")
-          : hasRequiredField
-            ? undefined
-            : type.purpose === "completion"
-              ? t("completionHeading")
-              : type.name;
         // Spell out who will see this answer before the first submit (V1 §8) — except
         // the two "the group sees it soon enough" cases, which don't need a sentence
         // of their own. The two that actually withhold the answer (only after close,
@@ -917,23 +888,21 @@ function ItemEntryPanel({
         const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only" || (type.visibilityPolicy === "until_reveal" && isSealed(challenge, item))
           ? <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
           : undefined;
-        const combinable = useSharedButton && combinableTypeIds.includes(type.id);
         return (
           <div key={type.id || "registro"} id={type.id ? `entry-type-${type.id}` : undefined}>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
-              heading={heading}
-              alwaysEditable={!hasRequiredField && !combinable}
-              hideOwnSaveButton={combinable}
-              onEditingChange={combinable ? (open) => markOpen(type.id, open) : undefined}
+              hideOwnSaveButton
+              hideEditLock
+              editingOverride={editingAll}
+              onDirtyChange={(dirty) => markDirty(type.id, dirty)}
               note={note}
               fields={type.fields}
               item={item}
               entry={entry}
-              canEdit={canEdit && !locked}
+              canEdit={canEdit && !savingAll}
               unavailableMessage={unavailableMessage}
-              readOnlyInline={locked}
               timeZone={timeZone}
               onSave={(values, saved) => onSaveEntry(
                 item.id,
@@ -948,11 +917,9 @@ function ItemEntryPanel({
           </div>
         );
       })}
-      {useSharedButton && anyOpenToSave ? (
-        <Button type="button" className="w-full" disabled={savingAll} onClick={saveAll}>
-          {savingAll ? tc("saving") : t("saveAllButton")}<ArrowRightIcon />
-        </Button>
-      ) : null}
+      {types.length && canEdit && editingAll ? <div className="flex gap-2 [&>*]:flex-1">
+        <Button disabled={savingAll || dirtyTypeIds.size === 0} onClick={saveAll}>{savingAll ? tc("saving") : tc("save")}</Button>
+      </div> : null}
       {sharedTypes.map((type) => (
         <SharedAnswerSection
           key={type.id}
@@ -1241,16 +1208,18 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
     itemsByCheckpoint.set(item.checkpointId, list);
   }
 
+  const columns = planned.length === 1 ? 1 : planned.length >= 6 && planned.length % 3 === 0 ? 3 : 2;
   return (
-    <section className="mt-5">
-      <h2 className={cx("mb-3", sectionLabelClass)}>{tp("title")}</h2>
-      <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {planned.map((cp) => (
+    <section className="mt-5 w-full">
+      <h2 className={cx("mb-3", sectionLabelClass)}>{tp("scheduleTitle")}</h2>
+      <div className={cx("grid w-full grid-cols-1 items-start gap-3", columns === 3 ? "sm:grid-cols-3" : columns === 2 ? "sm:grid-cols-2" : undefined)}>
+        {planned.map((cp, index) => (
+          <div key={cp.id} className={columns === 2 && planned.length % 2 === 1 && index === planned.length - 1 ? "sm:col-span-2" : undefined}>
           <StageCard
-            key={cp.id}
             stage={cp}
             items={[...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))}
           />
+          </div>
         ))}
       </div>
     </section>
@@ -1266,13 +1235,7 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
   const shown = open ? items : items.slice(0, STAGE_PREVIEW);
   return (
     <article
-      className={cx(
-        "rounded-2xl border p-4",
-        stage.timeframe === "current"
-          ? "border-[var(--main)] bg-[var(--main-soft)]/40"
-          : "border-[var(--line)] bg-[var(--paper)]",
-        stage.timeframe === "past" && "opacity-70",
-      )}
+      className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 opacity-70"
     >
       <div className="flex items-center justify-between gap-2">
         <strong className="text-sm">{stage.title}
@@ -1280,9 +1243,6 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
             {runtime ? ` | ${runtime}` : ""}
           </span>
         </strong>
-        <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
-          {tp(`timeframe.${stage.timeframe ?? "current"}`)}
-        </span>
       </div>
       {items.length ? (
         <>
@@ -1583,7 +1543,6 @@ export function ParticipantChallengeScreen({
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
-  const individualFormCount = itemForms.filter((type) => type.answerScope !== "shared").length;
   // Whether this challenge has any rating-purpose form at all.
   const hasRatingType = itemForms.some((type) => type.purpose === "rating" && type.answerScope !== "shared");
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
@@ -1804,7 +1763,7 @@ export function ParticipantChallengeScreen({
       <div className="mt-5">
         {activeTab === "today" ? (
           challenge.status === "closed" ? (
-            <EmptyState title={t("closedTitle")} />
+            <FaceEmptyState title={t("closedTitle")} />
           ) : sessionSpec ? (
             <SessionLog
               challenge={challenge}
@@ -1841,6 +1800,7 @@ export function ParticipantChallengeScreen({
                 </div>}
                 {showLog ? (
                   <CheckinLog
+                    hideDayHeading
                     from={logBounds.from}
                     to={logBounds.to}
                     today={today}
@@ -1857,7 +1817,7 @@ export function ParticipantChallengeScreen({
                     {logItem ? (
                       <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                     ) : (
-                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={effectiveOccurredOn === today ? t("yourResponseToday") : effectiveOccurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(effectiveOccurredOn,{day:"numeric",month:"long"})})} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                     )}
                   </CheckinLog>
                 ) : null}
@@ -1874,7 +1834,7 @@ export function ParticipantChallengeScreen({
                     label itself, in the same row as its own lock icon —
                     otherwise the icon sits in its own row with nothing next
                     to it, an orphaned control with a visible gap above it. */}
-                {useItemPanel && individualFormCount > 1 ? <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p> : null}
+
                 {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                 {useItemPanel && selectedItem ? (
                   <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />

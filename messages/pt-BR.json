@@ -1055,7 +1055,10 @@
     "bookDone": "Terminado",
     "searchItems": "Buscar itens",
     "searchItemsNone": "Nenhum item encontrado.",
-    "countProgress": "{page, number} de {total, number} · faltam {left, number}"
+    "countProgress": "{page, number} de {total, number} · faltam {left, number}",
+    "yourResponseToday": "Sua resposta para hoje",
+    "yourResponseOnDate": "Sua resposta para {date}",
+    "yourResponseYesterday": "Sua resposta para ontem"
   },
   "sessionLog": {
     "composerTitle": "Suas respostas",
@@ -1176,7 +1179,8 @@
     "aheadCount": "{count} à frente do ritmo",
     "behindCount": "{count} atrás do ritmo",
     "leftPerDayCount": "Faltam <b>{left}</b>{unit} · <b>{perDay}</b> por dia até {date}",
-    "leftCount": "Faltam <b>{left}</b>{unit}"
+    "leftCount": "Faltam <b>{left}</b>{unit}",
+    "pageOverflow": "Limite de páginas excedido."
   },
   "entryForm": {
     "fillField": "Preencha o campo “{label}”.",
@@ -1560,7 +1564,8 @@
     "itemsForStage": "Itens de {title}",
     "chooseItemsHint": "Selecione os itens desta etapa. Selecionar um item de outra etapa o move para cá; desmarcá-lo o mantém no desafio, sem etapa.",
     "removeStageBody": "Remover esta etapa? Os itens continuam no desafio, sem etapa. Etapas com registros salvos continuam protegidas.",
-    "searchItems": "Buscar itens"
+    "searchItems": "Buscar itens",
+    "scheduleTitle": "Etapas"
   },
   "listImport": {
     "title": "Importar uma lista (JSON)",
