@@ -2,13 +2,11 @@
 
 import { Children, isValidElement, type ComponentPropsWithRef } from "react";
 
-/** CSS follows the real :disabled state, including an enclosing disabled fieldset. */
 export function LockStateIcon({ locked }: { locked: boolean }) {
   return <svg viewBox="0 0 24 24" className="goa-readiness-icon h-4 w-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-lock-state={locked ? "locked" : "unlocked"}>
-    <rect x="5" y="10" width="14" height="11" rx="2" />
-    <path className="goa-lock-closed" d="M8 10V7a4 4 0 0 1 8 0v3" />
-    <path className="goa-lock-open" d="M8 10V7a4 4 0 0 1 7.5-2" />
-    <path d="M12 15v2" />
+    <path className="goa-lock-shackle" d="M5.5 11V7a4.25 4.25 0 0 1 8.5 0v4" />
+    <rect x="3" y="11" width="13.5" height="10.5" rx="2" />
+    <path d="M9.75 15.5v2" />
   </svg>;
 }
 

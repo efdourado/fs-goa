@@ -179,16 +179,6 @@ function DividerGlyph() {
   );
 }
 
-/** A closed padlock — the affordance next to an already-answered section's name that reopens it for editing. */
-function LockIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-      <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-    </svg>
-  );
-}
-
 /** Imperative handle for a combined "save everything" button above several stacked sections. */
 interface DynamicEntryFormHandle {
   /** Saves this section if it's currently open for editing; a no-op (resolves `ok: true`) when it's collapsed/locked, since there's nothing to save. */
@@ -438,7 +428,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
               aria-label={editing ? tc("cancel") : t("editAnswer")}
               onClick={() => editing ? reset() : setEditing(true)}
             >
-              {editing ? <LockStateIcon locked={false} /> : <LockIcon />}
+              <LockStateIcon locked={!editing} />
             </StateButton>
           ) : null}
         </div>
@@ -453,7 +443,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
           aria-label={editing ? tc("cancel") : t("editAnswer")}
           onClick={() => editing ? reset() : setEditing(true)}
         >
-          {editing ? <LockStateIcon locked={false} /> : <LockIcon />}
+          <LockStateIcon locked={!editing} />
         </StateButton>
       ) : null}
       {note}
@@ -897,7 +887,7 @@ function ItemEntryPanel({
   }
   return (
     <div className="space-y-6">
-      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit && savedTypes.size > 0 ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]">{editingAll ? <LockStateIcon locked={false} /> : <LockIcon />}</StateButton> : null}</div> : null}
+      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit && savedTypes.size > 0 ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]"><LockStateIcon locked={!editingAll} /></StateButton> : null}</div> : null}
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -1776,7 +1766,7 @@ export function ParticipantChallengeScreen({
 
       {tabs.length > 1 ? (
         <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
-          {tabs.map((item) => <StateButton className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--muted)] transition hover:text-[var(--ink-strong)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</StateButton>)}
+          {tabs.map((item) => <StateButton className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--ink-strong)] shadow-[var(--elevate-1)]" : "text-[var(--muted)] transition hover:text-[var(--ink-strong)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</StateButton>)}
         </nav>
       ) : null}
 

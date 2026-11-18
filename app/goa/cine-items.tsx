@@ -3,7 +3,7 @@
 import { StateButton } from "./state-button";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog, ModalActions } from "./dialog";
@@ -11,7 +11,7 @@ import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel"
 import { type CatalogScope, useCatalogShelf } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select, SlidersIcon } from "./ui";
+import { Button, ChevronIcon, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select, SlidersIcon } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -108,55 +108,52 @@ function rowFromCatalog(item: CatalogItem): CineRow {
 }
 
 /**
- * The catalogue as a checklist: search, tick a few — or every match at once — and add them in one go.
- * Items already in the challenge stay listed but can't be ticked again.
+ * Checking an item places it directly in the dialog's draft.
  */
-function CatalogPicker({ items, used, onAdd }: { items: CatalogItem[] | null; used: ReadonlySet<Id | undefined>; onAdd: (picked: CatalogItem[]) => void }) {
+function CatalogPicker({ items, used, selected, onSelect }: {
+  items: CatalogItem[] | null;
+  used: ReadonlySet<Id | undefined>;
+  selected: ReadonlySet<Id | undefined>;
+  onSelect: (items: CatalogItem[], checked: boolean) => void;
+}) {
   const t = useTranslations("cineItems");
   const [query, setQuery] = useState("");
-  const [ticked, setTicked] = useState<ReadonlySet<Id>>(new Set());
-  if (items === null) return <p className="mt-3 p-2 text-xs text-[var(--muted)]">{t("loadingCatalog")}</p>;
-  if (!items.length) return <p className="mt-3 p-2 text-xs text-[var(--muted)]">{t("emptyCatalog")}</p>;
+  if (items === null) return <p role="status" className="px-3 py-2 text-sm text-[var(--muted)]">{t("loadingCatalog")}</p>;
+  if (!items.length) return <p className="px-3 py-2 text-sm text-[var(--muted)]">{t("emptyCatalog")}</p>;
 
   const needle = query.trim().toLowerCase();
   const visible = needle
     ? items.filter((item) => [item.title, item.author, item.mainGenre].some((text) => text?.toLowerCase().includes(needle)))
     : items;
   const selectable = visible.filter((item) => !used.has(item.id));
-  const chosen = items.filter((item) => ticked.has(item.id) && !used.has(item.id));
-  const allTicked = selectable.length > 0 && selectable.every((item) => ticked.has(item.id));
-
-  function toggle(id: Id) {
-    setTicked((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
+  const allSelected = selectable.length > 0 && selectable.every((item) => selected.has(item.id));
 
   return (
-    <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--paper)]">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] p-2">
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--paper)]">
+      <div className="space-y-2 border-b border-[var(--line)] p-2">
         <input
-          className={cx(inputClass, "min-h-10 flex-1 basis-40")}
+          className={cx(inputClass, "min-h-10")}
           type="search"
           value={query}
           placeholder={t("catalogSearch")}
           aria-label={t("catalogSearch")}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) event.preventDefault(); }}
         />
-        <Button variant="secondary" disabled={!selectable.length || allTicked} onClick={() => setTicked((current) => new Set([...current, ...selectable.map((item) => item.id)]))}>
-          {t("selectAll", { count: selectable.length })}
-        </Button>
-        {chosen.length ? <Button variant="ghost" onClick={() => setTicked(new Set())}>{t("clearSelection")}</Button> : null}
+        {selectable.length > 1 ? (
+          <label className="flex min-h-9 cursor-pointer items-center gap-3 px-2 text-sm text-[var(--muted)]">
+            <input type="checkbox" className="h-4 w-4 flex-none" checked={allSelected} onChange={(event) => onSelect(selectable, event.target.checked)} />
+            {t("selectAll", { count: selectable.length })}
+          </label>
+        ) : null}
       </div>
-      <ul className="max-h-72 overflow-y-auto p-1">
+      <ul className="max-h-52 overflow-y-auto p-1">
         {visible.length ? visible.map((item) => {
           const taken = used.has(item.id);
           return (
             <li key={item.id}>
-              <label className={cx("flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--wash)]", taken && "cursor-not-allowed opacity-40")}>
-                <input type="checkbox" className="h-4 w-4 flex-none" checked={taken || ticked.has(item.id)} disabled={taken} onChange={() => toggle(item.id)} />
+              <label className={cx("flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--wash)]", taken && "cursor-not-allowed opacity-40")}>
+                <input type="checkbox" className="h-4 w-4 flex-none" checked={taken || selected.has(item.id)} disabled={taken} onChange={(event) => onSelect([item], event.target.checked)} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{item.title}</span>
                   <span className="block truncate text-xs text-[var(--muted)]">{[item.year, item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span>
@@ -167,10 +164,6 @@ function CatalogPicker({ items, used, onAdd }: { items: CatalogItem[] | null; us
           );
         }) : <li className="p-2 text-xs text-[var(--muted)]">{t("catalogNoMatch")}</li>}
       </ul>
-      <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] p-2">
-        <span className="text-xs text-[var(--muted)]">{t("catalogTally", { picked: chosen.length, total: items.length })}</span>
-        <Button disabled={!chosen.length} onClick={() => { onAdd(chosen); setTicked(new Set()); }}>{t("addSelected", { count: chosen.length })}</Button>
-      </div>
     </div>
   );
 }
@@ -199,7 +192,7 @@ function useEditorProperties({ libraries, refreshKey = 0 }: Pick<EditorShared, "
  * Every property of the given rows, one card each: the name and the library properties (each with its
  * label), and the rest folded under "+N more" at the bottom of the card.
  */
-function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unboxed = false }: {
+function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unboxed = false, titleInput }: {
   rows: CineRow[];
   onChange: (row: CineRow) => void;
   onRemove?: (key: string) => void;
@@ -208,6 +201,8 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
   openByDefault?: boolean;
   /** A single-item editing modal already provides its own container. */
   unboxed?: boolean;
+  /** The blank row in the add dialog also accepts a pasted list of titles. */
+  titleInput?: Pick<ComponentProps<"input">, "ref" | "onPaste" | "maxLength" | "placeholder" | "aria-invalid"> & { label: string };
 }) {
   const t = useTranslations("cineItems");
   const { propertiesFor } = useEditorProperties(shared);
@@ -234,7 +229,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
         const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
         const detailProperties = editableProperties(properties ?? []).filter((property) => !(authorInline && property.key === "author"));
         const hiddenCount = detailProperties.length;
-        const hasDetails = !openByDefault && hiddenCount > 0;
+        const hasDetails = !openByDefault && hiddenCount > 0 && (!titleInput || row.title.trim());
         // A property's name as the library calls it (it may have been renamed), or the usual one.
         const nameOf = (key: string, fallback: string) => {
           const property = properties?.find((entry) => entry.key === key);
@@ -250,8 +245,8 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
           <li className={unboxed ? undefined : "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3"} key={row.key}>
             <div className={cx("grid items-end gap-2", topRight ? (onRemove ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]") : onRemove ? "grid-cols-[1fr_auto]" : "")}>
               <label className="block min-w-0">
-                <span className={labelClass}>{nameOf("title", t("nameLabel"))}</span>
-                <input className={inputClass} value={row.title} maxLength={200} placeholder={t("titlePlaceholder")} onChange={(event) => update(row, { title: event.target.value, catalogItemId: undefined })} />
+                <span className={labelClass}>{titleInput?.label ?? nameOf("title", t("nameLabel"))}</span>
+                <input className={inputClass} value={row.title} maxLength={titleInput?.maxLength ?? 200} placeholder={titleInput?.placeholder ?? t("titlePlaceholder")} ref={titleInput?.ref} onPaste={titleInput?.onPaste} aria-invalid={titleInput?.["aria-invalid"]} onChange={(event) => update(row, { title: event.target.value, catalogItemId: undefined })} />
               </label>
               {topRight}
               {onRemove ? (
@@ -279,138 +274,6 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
   );
 }
 
-/**
- * The "add items" box: one round field (type a title and press Enter or the arrow; paste a list, one per line,
- * and every line comes in), the catalogue one tap below, then each new item's library properties right under.
- * Works on a draft; the caller decides when it joins the list.
- */
-export function ItemsAddBox({
-  draft,
-  onDraftChange,
-  existing = [],
-  onProblem,
-  onTargetChange,
-  ...shared
-}: EditorShared & {
-  draft: CineRow[];
-  onDraftChange: (rows: CineRow[]) => void;
-  /** Items already in the list — a typed title or a catalogue pick that's already there is skipped. */
-  existing?: CineRow[];
-  /** Reports what would block saving the draft: a missing book author, or an event date that can't be saved. */
-  onProblem?: (problem: "author" | null) => void;
-  /** Reports which library new rows are going to (for a caller that shows it, e.g. the list import). */
-  onTargetChange?: (library: EditorLibrary) => void;
-}) {
-  const t = useTranslations("cineItems");
-  // A challenge has one library: every item added here goes to it.
-  const target = shared.libraries[0];
-  const [typed, setTyped] = useState("");
-  // How many of the last titles were already on the list (and so skipped), said once under the field.
-  const [skipped, setSkipped] = useState(0);
-  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
-  const [showCatalog, setShowCatalog] = useState(false);
-  const { problemOf } = useEditorProperties(shared);
-  const problem = problemOf(draft);
-  useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
-  useEffect(() => { if (target) onTargetChange?.(target); }, [target, onTargetChange]);
-  const { scope } = shared;
-  const shelf = useCatalogShelf(scope);
-  const collectionCount = target ? shelf?.counts?.[target.kind] : undefined;
-
-  useEffect(() => {
-    if (!showCatalog || !target) return;
-    const controller = new AbortController();
-    apiRequest<{ items: CatalogItem[] }>(API_PATHS.catalogWorkspace(scope).list, { signal: controller.signal })
-      .then((response) => setCatalog(response.items))
-      .catch(() => setCatalog([]));
-    return () => controller.abort();
-  }, [showCatalog, target, scope]);
-  const catalogInTarget = useMemo(() => (catalog ?? []).filter((item) => item.kind === target?.kind), [catalog, target?.kind]);
-  const everyRow = [...existing, ...draft];
-  const usedCatalogIds = new Set(everyRow.map((row) => row.catalogItemId).filter(Boolean));
-  const stamp = (rows: CineRow[]): CineRow[] => rows.map((row) => ({ ...row, libraryKind: target?.kind ?? "", libraryId: target?.id ?? null }));
-
-  /** Adds these titles to the draft, skipping any already on the list (or repeated among them). */
-  function addTitles(titles: string[]) {
-    const known = new Set(everyRow.map((row) => row.title.trim().toLowerCase()));
-    const fresh = titles.map((title) => title.trim()).filter(Boolean).filter((title) => {
-      if (known.has(title.toLowerCase())) return false;
-      known.add(title.toLowerCase());
-      return true;
-    });
-    setSkipped(titles.filter((title) => title.trim()).length - fresh.length);
-    if (fresh.length) onDraftChange([...draft, ...stamp(fresh.map((title) => newCineRow(title)))]);
-  }
-
-  function addTyped() {
-    if (!typed.trim()) return;
-    addTitles([typed]);
-    setTyped("");
-  }
-
-  if (!target) return null;
-  return (
-    <div className="space-y-4">
-      {/* Not a form of its own: it sits inside the dialog's form, so Enter is handled here instead. */}
-      <div>
-        <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
-          <input
-            className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              addTyped();
-            }}
-            // A pasted list (one title per line) comes in whole, each line an item.
-            onPaste={(event) => {
-              const lines = event.clipboardData.getData("text").split(/\r?\n/).filter((line) => line.trim());
-              if (lines.length < 2) return;
-              event.preventDefault();
-              addTitles(lines);
-            }}
-            placeholder={t("typePlaceholder")}
-            aria-label={t("typeLabel")}
-            maxLength={160}
-          />
-          <StateButton readiness type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-          </StateButton>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <StateButton
-          type="button"
-          aria-expanded={showCatalog}
-          onClick={() => setShowCatalog((open) => !open)}
-          className={cx(
-            "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition",
-            showCatalog ? "border-transparent bg-[var(--wash)] text-[var(--ink)]" : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]",
-          )}
-        >
-          {showCatalog ? t("hideCatalog") : <><span aria-hidden="true">＋</span>{collectionCount ? t("fromCatalogCount", {count: collectionCount}) : t("fromCatalog")}</>}
-        </StateButton>
-        {skipped ? <p className="text-xs text-[var(--muted)]" aria-live="polite">{t("skippedDuplicates", { count: skipped })}</p> : null}
-      </div>
-      {showCatalog ? (
-        <CatalogPicker
-          items={catalog === null ? null : catalogInTarget}
-          used={usedCatalogIds}
-          onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item)))])}
-        />
-      ) : null}
-      {draft.length ? <p className="pt-2 text-[13px] font-medium">{t("draftTitle", { count: draft.length })}</p> : null}
-      <RowCards
-        rows={draft}
-        shared={shared}
-        onChange={(row) => onDraftChange(draft.map((candidate) => (candidate.key === row.key ? row : candidate)))}
-        onRemove={(key) => onDraftChange(draft.filter((row) => row.key !== key))}
-      />
-    </div>
-  );
-}
-
 /** One line about an item under its title in the list: author, year, length, genre. */
 function useRowSummary() {
   const t = useTranslations("cineItems");
@@ -426,56 +289,161 @@ function useRowSummary() {
   };
 }
 
-/**
- * The items of a challenge being created: the list itself first (one line per item, edit or remove), and
- * adding in its own box — paste, the detailed list or the catalogue, with each new item's properties.
- */
-/**
- * "Add items" as a dialog: the same box as when the challenge was created (type, paste or pick from the
- * catalogue, each row with its library's details), saved in one go. Used by Manage › Items and by Today.
- */
-export function AddItemsDialog({ onAdd, onClose, note, checkpoints, ...shared }: EditorShared & {
-  onAdd: (items: ChallengeItemInput[]) => Promise<void>;
+/** The add dialog used while creating a challenge and when adding to a saved challenge. */
+function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, ...shared }: EditorShared & {
+  existing?: CineRow[];
+  onSave: (rows: CineRow[], stageId: Id | null) => void | Promise<void>;
   onClose: () => void;
-  /** A line under the box — e.g. that new items open for entries straight away. */
   note?: string;
-  checkpoints?: Array<{id: Id; title: string}>;
+  checkpoints?: Array<{ id: Id; title: string }>;
 }) {
   const t = useTranslations("cineItems");
-  const tc = useTranslations("common");
   const tStages = useTranslations("checkpointPlanner");
-  const [stageId, setStageId] = useState("");
   const f = useGoaFormat();
+  const target = shared.libraries[0];
+  const library = { libraryId: target?.id ?? null, libraryKind: target?.kind ?? "" };
+  const [pending, setPending] = useState(() => newCineRow("", library));
   const [draft, setDraft] = useState<CineRow[]>([]);
-  const [problem, setProblem] = useState<"author" | null>(null);
+  const [stageId, setStageId] = useState("");
+  const [skipped, setSkipped] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogItem[] | "error" | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const { problemOf } = useEditorProperties(shared);
+  const shelf = useCatalogShelf(shared.scope);
+  const collectionCount = target ? shelf?.counts?.[target.kind] : undefined;
+  const catalogPath = API_PATHS.catalogWorkspace(shared.scope).list;
+
+  useEffect(() => {
+    if (!showCatalog) return;
+    const controller = new AbortController();
+    apiRequest<{ items: CatalogItem[] }>(catalogPath, { signal: controller.signal })
+      .then(({ items }) => { if (!controller.signal.aborted) setCatalog(items); })
+      .catch(() => { if (!controller.signal.aborted) setCatalog("error"); });
+    return () => controller.abort();
+  }, [showCatalog, catalogPath]);
+
+  const hasTitle = Boolean(pending.title.trim());
+  const titleKey = (title: string) => title.trim().toLowerCase();
+  const knownTitles = new Set([...existing, ...draft].map((row) => titleKey(row.title)));
+  const duplicate = hasTitle && knownTitles.has(titleKey(pending.title));
+  const used = new Set(existing.map((row) => row.catalogItemId));
+  const selected = new Set(draft.map((row) => row.catalogItemId));
+  const rows = (hasTitle ? [...draft, pending] : draft).filter((row) => row.title.trim());
+  const problem = problemOf(rows);
+  const canSave = Boolean(target && rows.length && !problem && !duplicate);
+
+  function pasteTitles(titles: string[]) {
+    const seen = new Set(knownTitles);
+    if (hasTitle) seen.add(titleKey(pending.title));
+    const fresh = titles.filter((title) => {
+      const key = titleKey(title);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setSkipped(titles.length - fresh.length);
+    setDraft((current) => [...current, ...fresh.map((title) => newCineRow(title, library))]);
+  }
+
+  function selectCatalog(items: CatalogItem[], checked: boolean) {
+    const ids = new Set(items.map((item) => item.id));
+    setDraft((current) => {
+      if (!checked) return current.filter((row) => !row.catalogItemId || !ids.has(row.catalogItemId));
+      const currentIds = new Set(current.map((row) => row.catalogItemId));
+      return [...current, ...items.filter((item) => !currentIds.has(item.id)).map((item) => ({ ...rowFromCatalog(item), ...library }))];
+    });
+  }
+
   return (
     <FormDialog
       title={t("addItems")}
-      dirty={draft.length > 0}
+      stickyActions
+      dirty={draft.length > 0 || hasTitle || Boolean(pending.author.trim())}
       busy={busy}
-      error={error ?? (problem === "author" ? t("authorRequired") : null)}
+      error={error ?? (duplicate ? t("duplicateTitle") : problem === "author" ? t("authorRequired") : null)}
       onCancel={onClose}
-      submitDisabled={!draft.length || problem !== null}
-      submitLabel={t("addCount", { count: draft.length })}
-      busyLabel={tc("saving")}
+      submitDisabled={!canSave}
+      submitLabel={t("addCount", { count: rows.length })}
       onSubmit={async () => {
+        if (!canSave || busy) return;
         setBusy(true);
         setError(null);
         try {
-          await onAdd(cineRowsToInput(draft).map((item) => checkpoints?.length ? {...item, checkpointId: stageId || null} : item));
+          await onSave(rows, stageId || null);
         } catch (cause) {
           setError(f.error(cause));
           setBusy(false);
         }
       }}
     >
-      {checkpoints?.length ? <Field label={tStages("stageWord")}><Select ariaLabel={tStages("stageWord")} value={stageId} onChange={setStageId} options={[{value: "", label: tStages("unassigned")}, ...checkpoints.map((stage) => ({value: stage.id, label: stage.title}))]} /></Field> : null}
-      <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={[]} onProblem={setProblem} />
-      {note ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{note}</p> : null}
+      {target ? <>
+        <RowCards
+          rows={[pending]}
+          shared={shared}
+          unboxed
+          onChange={setPending}
+          titleInput={{
+            label: t("typeLabel"),
+            placeholder: t("typePlaceholder"),
+            maxLength: 160,
+            ref: titleRef,
+            "aria-invalid": duplicate || undefined,
+            onPaste: (event) => {
+              const titles = event.clipboardData.getData("text").split(/\r?\n/).map((title) => title.trim()).filter(Boolean);
+              if (titles.length < 2) return;
+              event.preventDefault();
+              pasteTitles(titles);
+            },
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <StateButton
+            type="button"
+            aria-expanded={showCatalog}
+            onClick={() => { if (!showCatalog) setCatalog(null); setShowCatalog(!showCatalog); }}
+            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg text-sm font-medium text-[var(--main-strong)] hover:underline"
+          >
+            {collectionCount ? t("fromCatalogCount", { count: collectionCount }) : t("fromCatalog")}
+            <ChevronIcon dir={showCatalog ? "up" : "down"} />
+          </StateButton>
+          {hasTitle ? <StateButton type="button" disabled={duplicate} className="min-h-9 cursor-pointer rounded-lg text-sm text-[var(--muted)] hover:text-[var(--ink)] hover:underline disabled:cursor-not-allowed disabled:opacity-60" onClick={() => {
+            setDraft((current) => [...current, pending]);
+            setPending(newCineRow("", library));
+            titleRef.current?.focus();
+          }}>{t("addAnotherTitle")}</StateButton> : null}
+        </div>
+        {showCatalog ? catalog === "error" ? <p role="alert" className="text-sm text-[var(--danger)]">{t("catalogLoadError")}</p> : (
+          <CatalogPicker items={catalog?.filter((item) => item.kind === target.kind) ?? null} used={used} selected={selected} onSelect={selectCatalog} />
+        ) : null}
+        {skipped ? <p className="text-xs text-[var(--muted)]" aria-live="polite">{t("skippedDuplicates", { count: skipped })}</p> : null}
+        {draft.length ? (
+          <RowCards
+            rows={draft}
+            shared={shared}
+            onChange={(row) => setDraft((current) => current.map((candidate) => candidate.key === row.key ? row : candidate))}
+            onRemove={(key) => setDraft((current) => current.filter((row) => row.key !== key))}
+          />
+        ) : null}
+      </> : null}
+      {checkpoints?.length ? <Field label={tStages("stageWord")}><Select ariaLabel={tStages("stageWord")} value={stageId} onChange={setStageId} options={[{ value: "", label: tStages("unassigned") }, ...checkpoints.map((stage) => ({ value: stage.id, label: stage.title }))]} /></Field> : null}
+      {note ? <p className="text-xs leading-5 text-[var(--muted)]">{note}</p> : null}
     </FormDialog>
   );
+}
+
+export function AddItemsDialog({ onAdd, checkpoints, ...props }: EditorShared & {
+  onAdd: (items: ChallengeItemInput[]) => Promise<void>;
+  onClose: () => void;
+  note?: string;
+  checkpoints?: Array<{ id: Id; title: string }>;
+}) {
+  return <ItemsDraftDialog {...props} checkpoints={checkpoints} onSave={(rows, stageId) => {
+    const items = cineRowsToInput(rows);
+    return onAdd(checkpoints?.length ? items.map((item) => ({ ...item, checkpointId: stageId })) : items);
+  }} />;
 }
 
 export function CineItemsEditor({
@@ -508,8 +476,6 @@ export function CineItemsEditor({
   const [localAdding, setLocalAdding] = useState(false);
   const adding = addDialogOpen ?? localAdding;
   const setAdding = onAddDialogOpenChange ?? setLocalAdding;
-  const [draft, setDraft] = useState<CineRow[]>([]);
-  const [draftProblem, setDraftProblem] = useState<"author" | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const editing = value.find((row) => row.key === editingKey) ?? null;
   const flagged = (row: CineRow) => problemOf([row]) !== null;
@@ -524,7 +490,7 @@ export function CineItemsEditor({
             {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
             {showAddButton ? <StateButton
               type="button"
-              onClick={() => { setDraft([]); setDraftProblem(null); setAdding(true); }}
+              onClick={() => setAdding(true)}
               aria-label={t("addItems")}
               title={t("addItems")}
               className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
@@ -556,18 +522,12 @@ export function CineItemsEditor({
       )}
 
       {adding ? (
-        <FormDialog
-          title={t("addItems")}
-          dirty={draft.length > 0}
-          busy={false}
-          error={draftProblem === "author" ? t("authorRequired") : null}
-          onCancel={() => { setDraft([]); setDraftProblem(null); setAdding(false); }}
-          submitDisabled={!draft.length || draftProblem !== null}
-          submitLabel={t("addCount", { count: draft.length })}
-          onSubmit={() => { onChange([...value, ...draft]); setDraft([]); setDraftProblem(null); setAdding(false); }}
-        >
-          <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={value} onProblem={setDraftProblem} />
-        </FormDialog>
+        <ItemsDraftDialog
+          {...shared}
+          existing={value}
+          onClose={() => setAdding(false)}
+          onSave={(rows) => { onChange([...value, ...rows]); setAdding(false); }}
+        />
       ) : null}
 
       {organising ? (

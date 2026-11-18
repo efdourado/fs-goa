@@ -104,7 +104,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
             {RINGS.map((ring) => (
               <span key={ring} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[var(--spotlight)] px-0.5 text-[9px] tabular-nums text-white/40" style={{ left: `${50 + Math.cos(labelAngle) * radiusFor(ring)}%`, top: `${50 + Math.sin(labelAngle) * radiusFor(ring)}%` }}>{ring}%</span>
             ))}
-            <span className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--spotlight-ink)] text-[11px] font-bold text-[var(--spotlight)] shadow-lg">{youLabel}</span>
+            <span className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--spotlight-ink)] text-[11px] font-bold text-[var(--spotlight)] shadow-[var(--elevate-card)]">{youLabel}</span>
             {placed.map(({ person, index, x, y, dx, dy }) => (
               <StateButton
                 key={person.userId}
@@ -116,7 +116,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
                 aria-pressed={selected?.userId === person.userId}
               >
                 <span
-                  className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-lg transition", selected?.userId === person.userId && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
+                  className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-[var(--elevate-card)] transition", selected?.userId === person.userId && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
                   style={{ background: toneFor(person.agreement) }}
                 >
                   <AvatarMark />

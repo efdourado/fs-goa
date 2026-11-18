@@ -143,7 +143,7 @@ export function RevealPanel({
         {sealed ? (
           iRated || !challenge.isParticipant ? (
             <Button
-              className="min-h-12 bg-[var(--main-2)] px-6 text-base text-white"
+              className="min-h-12 bg-[var(--main-2-fill)] px-6 text-base text-white"
               disabled={busy || !onReveal || answered.size === 0}
               onClick={() => (missing.length ? setConfirming(true) : void reveal())}
             >

@@ -79,7 +79,7 @@ interface FeedbackItem {
   username: string | null;
 }
 
-const card = "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
+const card = "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 const muted = "text-[var(--muted)]";
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -251,7 +251,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
             onClick={() => setTab(item.id)}
             className={cx(
               "min-h-10 flex-none rounded-xl px-4 text-sm font-light transition",
-              tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : cx(muted, "hover:text-[var(--ink)]"),
+              tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : cx(muted, "hover:text-[var(--ink)]"),
             )}
           >
             {item.label}

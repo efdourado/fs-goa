@@ -45,9 +45,7 @@ function assertLock(button: HTMLButtonElement, locked: boolean) {
 }
 async function addItem(ui: Awaited<ReturnType<typeof setup>>) {
   await act(async () => ui.button('Adicionar itens').click());
-  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[aria-label="Adicionar um título"]')!, 'Any item');
-  const add = document.querySelector<HTMLButtonElement>('dialog button[aria-label="Adicionar"]')!;
-  await act(async () => add.click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!, 'Any item');
   await act(async () => ui.button('Adicionar 1 item').click());
 }
 for (const [linked, dated] of [[false, true], [true, true], [true, false]]) {

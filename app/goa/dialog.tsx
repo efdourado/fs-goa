@@ -9,8 +9,8 @@ import { useGoaFormat } from "./format";
 import { Button, cx, InModal, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
-export function Dialog({ title, children, onClose, busy = false, wide = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean;
+export function Dialog({ title, children, onClose, busy = false, wide = false, stickyActions = false }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean; stickyActions?: boolean;
 }) {
   const tc = useTranslations("common");
   const ref = useRef<HTMLDialogElement>(null);
@@ -34,7 +34,7 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
       onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
       onMouseDown={(event) => { downOnBackdrop.current = event.target === ref.current; }}
       onClick={(event) => { if (!busy && downOnBackdrop.current && event.target === ref.current) onClose(); }}
-      className={`fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45`}
+      className={cx("fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-[var(--elevate-2)] [scrollbar-color:var(--control-line)_var(--paper)] [scrollbar-width:thin] backdrop:bg-[var(--scrim)]", wide ? "max-w-3xl" : "max-w-xl", stickyActions && "scroll-pb-20")}
     >
       <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
         <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
@@ -79,6 +79,7 @@ export function FormDialog({
   busyLabel,
   danger = false,
   submitDisabled = false,
+  stickyActions = false,
   footerStart,
   onDelete,
   children,
@@ -94,6 +95,7 @@ export function FormDialog({
   busyLabel?: string;
   danger?: boolean;
   submitDisabled?: boolean;
+  stickyActions?: boolean;
   /** Extra footer actions; each shares the row equally with Save. */
   footerStart?: ReactNode;
   /** A Delete action sharing the footer with Save, confirmed in a panel below (see `DeleteConfirm`). */
@@ -105,7 +107,7 @@ export function FormDialog({
   const [deleting, setDeleting] = useState(false);
   const close = () => { if (dirty) setDiscard(true); else onCancel(); };
   return (
-    <Dialog title={title} busy={busy} onClose={close}>
+    <Dialog title={title} busy={busy} onClose={close} stickyActions={stickyActions}>
       {discard ? (
         <div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3.5">
           <p className="text-sm text-[var(--warn)]">{tc("unsavedChanges")}</p>
@@ -118,7 +120,7 @@ export function FormDialog({
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
         <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
-        <ModalActions className="border-t border-[var(--line)] pt-4">
+        <ModalActions className={cx("border-t border-[var(--line)] pt-4", stickyActions && "sticky bottom-0 z-10 -mb-3 bg-[var(--paper)] pb-3")}>
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
           {footerStart ? <div className="contents">{footerStart}</div> : null}
           <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>

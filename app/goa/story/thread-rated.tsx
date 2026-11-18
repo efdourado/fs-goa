@@ -200,7 +200,7 @@ function Bubble({ note, text, left, top, at }: {
   return (
     <div className="absolute z-10" style={{ left, top }}>
       <div
-        className="reveal-rise w-max whitespace-nowrap rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
+        className="reveal-rise w-max whitespace-nowrap rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-[var(--elevate-card)]"
         style={{ borderLeft: `3px solid ${accent}`, animationDelay: `${at}ms` }}
       >
         {text}

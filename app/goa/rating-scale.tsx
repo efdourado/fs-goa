@@ -109,7 +109,7 @@ export function RatingScale({
         <div key={person.id} className="absolute bottom-6 -translate-x-1/2" style={{ left: `${left}%`, marginBottom: `${level * SLOT}px` }}>
           <div className="reveal-drop flex flex-col items-center" style={delay(startDelay + index * step)}>
             <span
-              className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-lg", person.self && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
+              className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-[var(--elevate-card)]", person.self && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
               style={{ background: person.tone }}
             >
               <AvatarMark />

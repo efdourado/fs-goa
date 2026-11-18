@@ -59,7 +59,7 @@ export function BottomSheet({
   /* eslint-disable jsx-a11y/no-static-element-interactions */
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/45 sm:items-center sm:justify-center sm:p-6"
+      className="fixed inset-0 z-[60] flex flex-col justify-end bg-[var(--scrim)] sm:items-center sm:justify-center sm:p-6"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div

@@ -15,7 +15,7 @@ import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import { NewChallengeButton } from "../welcome";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -350,11 +350,9 @@ export function GroupScreen({
           </div>
           <StatusMessage error={error ?? copyError} />
           <form onSubmit={inviteMember} className="mt-6">
-            <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
-              <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
-              <StateButton readiness type="submit" disabled={memberBusy} aria-label={t("sendInvite")} title={t("sendInvite")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:opacity-55">
-                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-              </StateButton>
+            <div className="flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] py-1 pl-4 pr-1 transition focus-within:border-[var(--focus)] focus-within:ring-2 focus-within:ring-[var(--focus)]/35">
+              <input className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
+              <InlineSubmit label={t("sendInvite")} disabled={memberBusy} />
             </div>
             <StatusMessage error={memberError} success={memberSuccess} />
           </form>
@@ -414,7 +412,7 @@ export function GroupScreen({
                             onClick={() => setCatalogKind(library.kind)}
                             className={cx(
                               "inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] transition",
-                              active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]",
+                              active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
                             )}
                           >
                             <LibraryGlyph source={library.source} className="h-4 w-4" />

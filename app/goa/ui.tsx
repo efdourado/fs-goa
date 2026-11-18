@@ -19,7 +19,7 @@ import {
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
-  "min-h-11 w-full rounded-xl border border-[var(--line)] bg-transparent px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/18 disabled:cursor-not-allowed disabled:text-[var(--muted)]";
+  "min-h-11 w-full rounded-xl border border-[var(--control-line)] bg-transparent px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--focus)] focus:ring-2 focus:ring-[var(--focus)]/35 disabled:cursor-not-allowed disabled:text-[var(--muted)]";
 export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 /**
  * A section title one step down from `PageHeading`'s `<h1>` — sentence case,
@@ -441,7 +441,7 @@ export function Select<T extends string>({
         onKeyDown={onListKey}
         className={cx(
           "goa-select-list m-0 overflow-y-auto border border-[var(--line)] bg-[var(--paper)] p-1.5 text-[var(--ink)] shadow-[var(--elevate-2)]",
-          sheet ? "w-full rounded-t-3xl px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop:bg-black/30" : "rounded-2xl",
+          sheet ? "w-full rounded-t-3xl px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop:bg-[var(--scrim)]" : "rounded-2xl",
         )}
       >
         {options.map((option, index) => {
@@ -537,10 +537,6 @@ export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLa
 }
 
 /** One more row for a numbered list: a dashed ＋ circle the size of the numbers, and a word, under the last row. */
-/**
- * One line to type into, with its green arrow inside the round box: invite by @username, name a new group, name a
- * challenge. Sits inside a form; the arrow submits it.
- */
 /** A round choice in a row of them: solid green once picked, dashed with a plus while it only offers to make something. */
 export function choicePillClass({ active = false, dashed = false }: { active?: boolean; dashed?: boolean } = {}) {
   return cx(
@@ -557,7 +553,7 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   placeholder?: string;
   /** What the field is, said to a screen reader. */
   label: string;
-  /** What the arrow does ("Create challenge", "Continue"). */
+  /** The visible submit action. */
   submitLabel: string;
   disabled?: boolean;
   /** Something else the form needs is still missing (the arrow waits; the field stays editable). */
@@ -576,12 +572,18 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
-    <div className={cx("flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15", className)}>
-      <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
-      <StateButton readiness type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-      </StateButton>
+    <div className={cx("flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] bg-[var(--paper)] py-1 pl-4 pr-1 transition focus-within:border-[var(--focus)] focus-within:ring-2 focus-within:ring-[var(--focus)]/35", className)}>
+      <input className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
+      <InlineSubmit label={submitLabel} disabled={disabled || submitDisabled || !value.trim()} />
     </div>
+  );
+}
+
+export function InlineSubmit({ label, disabled }: { label: string; disabled?: boolean }) {
+  return (
+    <StateButton readiness type="submit" disabled={disabled} className="inline-flex min-h-9 max-w-[60%] flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--main)] px-2.5 py-1 text-center text-xs font-medium leading-tight text-white transition hover:opacity-90 sm:px-3">
+      {label}
+    </StateButton>
   );
 }
 
@@ -936,7 +938,7 @@ export function Toggle({
         checked ? "bg-[var(--main)]" : "bg-[var(--wash-strong)]",
       )}
     >
-      <span className={cx("h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-5" : "translate-x-0")} />
+      <span className={cx("h-5 w-5 rounded-full bg-[var(--spotlight-ink)] shadow-[var(--elevate-1)] transition-transform", checked ? "translate-x-5" : "translate-x-0")} />
     </StateButton>
   );
   if (!label && !hint) return <span className={className}>{control}</span>;

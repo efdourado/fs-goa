@@ -155,7 +155,7 @@ export function RatingSlider({
             <span
               aria-hidden="true"
               className={cx(
-                "absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--paper)] shadow-[0_2px_10px_rgba(32,36,31,0.22)] ring-[3px] ring-[var(--main)] transition-[scale] duration-150",
+                "absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--paper)] shadow-[var(--elevate-card)] ring-[3px] ring-[var(--main)] transition-[scale] duration-150",
                 dragging && "scale-125",
                 ease,
               )}

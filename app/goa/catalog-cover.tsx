@@ -105,7 +105,7 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, sho
       {/* No rating yet: no badge at all, the cover stays clean. */}
       {spec.badge && showBadge && avg !== null && avg !== undefined ? (
         <span className={cx("absolute", spec.badgeInset)}>
-          <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]" textClassName={spec.badgeText} />
+          <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[var(--elevate-card)]" textClassName={spec.badgeText} />
         </span>
       ) : null}
       {children}

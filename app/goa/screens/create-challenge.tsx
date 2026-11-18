@@ -147,7 +147,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
     <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
     <PageHeading title={personal ? t("personalTitle") : ts("title")} description={ts("subtitle")} />
     <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
-      {stepKeys.map((key, index) => <StateButton key={key} type="button" disabled={stepKeys.slice(0, index).some((previous) => problemForStep(previous))} onClick={() => { setError(null); setStep(index + 1); }} className={cx("min-h-11 rounded-xl px-2 text-sm", visibleStep === index + 1 ? "bg-[var(--paper)] shadow-sm" : "text-[var(--muted)]", "disabled:opacity-45")} aria-current={visibleStep === index + 1 ? "step" : undefined}>{key === "fields" ? ts("questions") : key === "checkpoints" ? ts("itemsStep") : key === "setup" ? ts("setupStep") : t(`steps.${key}`)}</StateButton>)}
+      {stepKeys.map((key, index) => <StateButton key={key} type="button" disabled={stepKeys.slice(0, index).some((previous) => problemForStep(previous))} onClick={() => { setError(null); setStep(index + 1); }} className={cx("min-h-11 rounded-xl px-2 text-sm", visibleStep === index + 1 ? "bg-[var(--paper)] shadow-[var(--elevate-1)]" : "text-[var(--muted)]", "disabled:opacity-45")} aria-current={visibleStep === index + 1 ? "step" : undefined}>{key === "fields" ? ts("questions") : key === "checkpoints" ? ts("itemsStep") : key === "setup" ? ts("setupStep") : t(`steps.${key}`)}</StateButton>)}
     </nav>
     <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
       {stepKey === "setup" ? (<div>

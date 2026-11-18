@@ -121,7 +121,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
         <span className="relative min-w-0 flex-1 truncate text-[15px] font-light tracking-[-0.02em] sm:text-lg">{title}</span>
         {year !== null && year !== undefined && year !== "" ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
         {rated ? (
-          <ScoreRing value={avg} size={34} label={ratingLabel} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)] sm:inline-grid" textClassName="text-[11px] font-medium" />
+          <ScoreRing value={avg} size={34} label={ratingLabel} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[var(--elevate-card)] sm:inline-grid" textClassName="text-[11px] font-medium" />
         ) : null}
       </span>
       {caption || note ? (

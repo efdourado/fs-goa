@@ -3,6 +3,8 @@ import test, {after} from "node:test";
 import {act} from "react";
 import {JSDOM} from "jsdom";
 import {CheckpointPlanner} from "../app/goa/checkpoint-planner";
+import {AddItemsDialog} from "../app/goa/cine-items";
+import {API_PATHS} from "../app/goa/api";
 import {Toaster} from "../app/goa/ui";
 import {AdminScreen} from "../app/goa/screens/admin";
 import {SessionLog, sessionSpecOf} from "../app/goa/session-log";
@@ -92,10 +94,36 @@ test('new items can choose a stage and see the correct collection count', async 
   await act(async () => stage.click());
   const option = document.querySelector<HTMLButtonElement>('dialog button[role="option"][data-value="b"]')!;
   await act(async () => option.click());
-  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[aria-label="Adicionar um título"]')!, 'New thing');
-  await act(async () => ui.button('Adicionar').click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!, 'New thing');
   await act(async () => ui.button('Adicionar 1 item').click());
   assert.equal(saved[0][0].title, 'New thing'); assert.equal(saved[0][0].checkpointId, 'b');
+ } finally {await ui.cleanup();}
+});
+
+test('one confirmation adds checked collection items and the title still in the field', async () => {
+ const ui = await setup();
+ const saved: ChallengeItemInput[][] = [];
+ const fallbackFetch = globalThis.fetch;
+ try {
+  const scope = {groupId:'g'};
+  globalThis.fetch = (input, init) => String(input) === API_PATHS.catalogWorkspace(scope).list
+    ? Promise.resolve(Response.json({items: [
+      {id:'a', kind: library.kind, title:'From collection'},
+      {id:'b', kind: library.kind, title:'Leave out'},
+      {id:'other', kind:'other', title:'Different library'},
+    ]}))
+    : fallbackFetch(input, init);
+  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={challenge.libraries!} onAdd={async (items) => {saved.push(items);}} onClose={noop} />);
+  await act(async () => ui.button('Da coleção (89)').click());
+  const picks = [...document.querySelectorAll<HTMLInputElement>('dialog input[type="checkbox"]')];
+  assert.equal(picks.length, 3, 'select all plus two items from the current library');
+  await act(async () => picks[0].click());
+  await act(async () => picks[2].click());
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!, 'Brand new');
+  assert.equal(saved.length, 0);
+  assert.equal(document.querySelectorAll('dialog button[type="submit"]').length, 1);
+  await act(async () => ui.button('Adicionar 2 itens').click());
+  assert.deepEqual(saved[0].map(({title, catalogItemId}) => [title, catalogItemId]), [['From collection', 'a'], ['Brand new', undefined]]);
  } finally {await ui.cleanup();}
 });
 

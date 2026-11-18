@@ -60,7 +60,7 @@ const ICONS: Record<DockTab, ReactNode> = {
 };
 
 /** The floating pill both docks share: at the thumb, above the home indicator, phones only. */
-const dockClass = "fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 grid h-16 rounded-[2rem] border border-[var(--edge)] bg-[var(--paper)]/95 px-1.5 shadow-[0_10px_30px_-10px_rgba(20,24,20,0.35)] backdrop-blur-xl sm:hidden";
+const dockClass = "fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 grid h-16 rounded-[2rem] border border-[var(--edge)] bg-[var(--paper)]/95 px-1.5 shadow-[var(--elevate-card)] backdrop-blur-xl sm:hidden";
 const tabClass = (on: boolean) => cx(
   "relative my-1.5 flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[1.6rem] text-[10.5px] transition",
   on ? "bg-[var(--main-soft)] font-medium text-[var(--main-strong)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
