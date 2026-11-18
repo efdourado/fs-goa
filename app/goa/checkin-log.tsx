@@ -107,6 +107,7 @@ export function CheckinLog({
   streakBy = "day",
   children,
   hideDayHeading = false,
+  dayAction,
 }: {
   from: string;
   to: string;
@@ -130,6 +131,7 @@ export function CheckinLog({
   unavailableMessage?: string | null;
   children?: ReactNode;
   hideDayHeading?: boolean;
+  dayAction?: ReactNode;
 }) {
   const t = useTranslations("checkinLog");
   const storedView = useSyncExternalStore(subscribeView, () => readStoredView() ?? "strip", () => "strip" as const);
@@ -137,7 +139,7 @@ export function CheckinLog({
   const [pickedView, setPickedView] = useState<LogView | null>(null);
   const view = pickedView ?? storedView;
   const [mode, setMode] = useState<EntryMode>(counter?.entry ?? "amount");
-  // A finished road keeps its bar; the editor folds away behind "Corrigir".
+  // Every numeric entry uses the same modal, for both logging and correction.
   const [correcting, setCorrecting] = useState(false);
   const [correctionDay, setCorrectionDay] = useState(selectedDay);
   const [correctionBusy, setCorrectionBusy] = useState(false);
@@ -160,8 +162,11 @@ export function CheckinLog({
   const formatDate = useGoaFormat();
   const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
 
+  const registerLabel = (day: string) => day === today ? t("registerToday") : day === addDays(today, -1) ? t("registerYesterday") : t("registerOnDate", { date: formatDate.date(day) });
+  const actionLabel = counterFinished ? t("correct") : registerLabel(selectedDay);
+
   function openCorrection() {
-    setCorrectionDay(records.has(selectedDay) ? selectedDay : [...records.keys()].filter((day) => day <= today).sort().at(-1) ?? selectedDay);
+    setCorrectionDay(!counterFinished || records.has(selectedDay) ? selectedDay : [...records.keys()].filter((day) => day <= today).sort().at(-1) ?? selectedDay);
     setCorrecting(true);
   }
 
@@ -184,7 +189,6 @@ export function CheckinLog({
       {counter?.total ? (
         <BookProgress
           counter={counter}
-          onCorrect={counterFinished && canEdit ? openCorrection : undefined}
           values={values}
           today={today}
           selectedDay={correcting ? correctionDay : selectedDay}
@@ -227,30 +231,18 @@ export function CheckinLog({
         </div>
       )}
 
-      {counter && !counterFinished && !correcting ? (
-        <CounterEditor
-          key={`${selectedDay}-${records.get(selectedDay)?.entry.id ?? "new"}-${records.get(selectedDay)?.entry.updatedAt ?? ""}`}
-          counter={counter}
-          day={selectedDay}
-          today={today}
-          record={records.get(selectedDay)}
-          values={values}
-          mode={mode}
-          onMode={setMode}
-          onDraft={setDraft}
-          canEdit={canEdit}
-          unavailableMessage={unavailableMessage}
-          notice={notice}
-          onNotice={setNotice}
-          compact={compact}
-        />
-      ) : !counter ? (
+      {counter ? (
+        canEdit ? <StateButton type="button" aria-label={actionLabel} onClick={openCorrection} className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ink)] transition hover:opacity-70">
+          {counterFinished ? <SlidersIcon className="h-4 w-4" /> : <span className="text-lg leading-none" aria-hidden="true">＋</span>}
+          {actionLabel}
+        </StateButton> : unavailableMessage ? <p className="text-sm text-[var(--muted)]">{unavailableMessage}</p> : null
+      ) : (
         <div className="border-t border-[var(--line)] pt-6">
-          {!hideDayHeading ? <DayHeading day={selectedDay} today={today} state={logged.has(selectedDay) ? t("stateDone") : selectedDay === today ? t("stateEmptyToday") : t("stateEmpty")} /> : null}
+          {!hideDayHeading ? <DayHeading day={selectedDay} today={today} action={dayAction} /> : null}
           {children}
         </div>
-      ) : null}
-      {counter && correcting ? <Dialog wide title={t("correct")} busy={correctionBusy} onClose={() => {if (!correctionBusy) {setCorrecting(false); setDraft(null);}}}>
+      )}
+      {counter && correcting ? <Dialog wide title={counterFinished ? t("correct") : registerLabel(correctionDay)} busy={correctionBusy} onClose={() => {if (!correctionBusy) {setCorrecting(false); setDraft(null);}}}>
         <CounterEditor
           key={`${correctionDay}-${records.get(correctionDay)?.entry.id ?? "new"}`}
           counter={counter} day={correctionDay} today={today} record={records.get(correctionDay)} values={values}
@@ -283,13 +275,13 @@ function useDayLabel() {
   };
 }
 
-function DayHeading({ day, today, state }: { day: string; today: string; state: string }) {
+function DayHeading({ day, today, state, action }: { day: string; today: string; state?: string; action?: ReactNode }) {
   const tp = useTranslations("participant");
   const f = useGoaFormat();
   return (
-    <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+    <div className="mb-5 flex items-center justify-between gap-4">
       <h3 className={sectionLabelClass}>{day === today ? tp("yourResponseToday") : day === addDays(today, -1) ? tp("yourResponseYesterday") : tp("yourResponseOnDate", {date:f.date(day,{day:"numeric",month:"long"})})}</h3>
-      <span className="text-xs text-[var(--muted)]">{state}</span>
+      {action ?? (state ? <span className="text-xs text-[var(--muted)]">{state}</span> : null)}
     </div>
   );
 }
@@ -471,7 +463,6 @@ function MonthGrid({
  */
 function BookProgress({
   counter,
-  onCorrect,
   values,
   today,
   selectedDay,
@@ -479,7 +470,6 @@ function BookProgress({
   onSelect,
 }: {
   counter: LogCounter;
-  onCorrect?: () => void;
   values: ReadonlyMap<string, number>;
   today: string;
   selectedDay: string;
@@ -533,7 +523,6 @@ function BookProgress({
         )}
         <div className="text-right">
           <p className="flex items-center justify-end gap-2 text-3xl font-light leading-none tracking-[-0.04em] tabular-nums">
-            {onCorrect ? <StateButton type="button" aria-label={t("correct")} title={t("correct")} onClick={onCorrect} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"><SlidersIcon className="h-4 w-4" /></StateButton> : null}
             {value(markedDone ? total : done)} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: counter.book ? page(total) : `${page(total)}${unit}` })}</small>
           </p>
           <p className="mt-1 text-xs text-[var(--ink)]">{t(key("percentRead", "percentGoal"), { percent })}</p>
@@ -755,7 +744,7 @@ function CounterEditor({
         <DayHeading
           day={day}
           today={today}
-          state={saved !== null ? t("stateValue", { value: shown(saved) }) : day === today ? t("stateEmptyToday") : t("stateEmpty")}
+          state={saved !== null ? t("stateValue", { value: shown(saved) }) : undefined}
         />
       )}
       <Segmented

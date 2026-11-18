@@ -1061,6 +1061,7 @@
     "yourResponseYesterday": "Sua resposta para ontem"
   },
   "sessionLog": {
+    "emptyAnswers": "Nenhuma resposta ainda",
     "composerTitle": "Suas respostas",
     "itemColumn": "Item",
     "newItemPlaceholder": "Dê um nome ao novo item",
@@ -1169,7 +1170,10 @@
     "savedChangeUndated": "Alterado: {value}.",
     "positionHintBookUndated": "Você estava na p. {before}.",
     "positionHintUndated": "O total estava em {before}.",
-    "correct": "Corrigir",
+    "correct": "Corrigir registro",
+    "registerToday": "Registrar para hoje",
+    "registerYesterday": "Registrar para ontem",
+    "registerOnDate": "Registrar para {date}",
     "finishedOn": "em {date}",
     "goalReached": "Meta atingida",
     "countLabel": "Onde você está",

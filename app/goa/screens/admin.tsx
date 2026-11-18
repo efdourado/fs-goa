@@ -430,7 +430,7 @@ function AdminFields({
           lockType={challenge.status !== "draft" && editing.field !== "new" && Boolean(editing.field.id)}
           countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { goals: countGoals } : undefined}
           onCancel={() => setEditing(null)}
-          onRemove={editing.field === "new" || fields.length < 2 ? undefined : async () => {
+          onRemove={editing.field === "new" ? undefined : async () => {
             await commit(activeType.id, fields.filter((candidate) => candidate !== editing.field), t("fieldsSaved"), true);
             setEditing(null);
           }}
@@ -594,7 +594,7 @@ export function FieldEditorDialog({
       onSubmit={submit}
       submitLabel={field ? undefined : t("addField")}
       submitDisabled={!draft.label.trim()}
-      onDelete={onRemove ? { body: t("fieldDeleteBody"), onConfirm: onRemove } : undefined}
+      onDelete={onRemove ? { body: `${field?.label ?? draft.label}: ${t("fieldDeleteBody")}`, onConfirm: onRemove } : undefined}
     >
       {sharedChoice?.available ? <Toggle checked={shared} onChange={setShared} label={t("sharedField")} hint={t("sharedFieldHint")} /> : null}
       <Field label={tf("labelLabel")}>

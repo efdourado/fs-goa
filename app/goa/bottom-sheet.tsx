@@ -18,12 +18,15 @@ export function BottomSheet({
   onClose,
   children,
   tall = false,
+  wide = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   /** Nearly the whole screen on a phone — for work done inside it (logging a workout), not a short menu. */
   tall?: boolean;
+  /** More room for forms with several side-by-side fields on desktop. */
+  wide?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -67,7 +70,8 @@ export function BottomSheet({
         className={cx(
           "safe-area-bottom overflow-y-auto rounded-t-[26px] border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-8 pt-2 shadow-[var(--elevate-2)]",
           // From `sm:` up it's a card in the middle of the screen rather than a panel from the edge.
-          "sm:w-full sm:max-w-2xl sm:rounded-[26px] sm:border",
+          "sm:w-full sm:rounded-[26px] sm:border",
+          wide ? "sm:max-w-4xl" : "sm:max-w-2xl",
           tall ? "max-h-[92dvh] min-h-[70dvh] sm:min-h-0" : "max-h-[85dvh]",
         )}
       >

@@ -1061,6 +1061,7 @@
     "yourResponseYesterday": "Your response for yesterday"
   },
   "sessionLog": {
+    "emptyAnswers": "No answers yet",
     "composerTitle": "Your answers",
     "itemColumn": "Item",
     "newItemPlaceholder": "Name the new item",
@@ -1169,7 +1170,10 @@
     "savedChangeUndated": "Changed: {value}.",
     "positionHintBookUndated": "You were on p. {before}.",
     "positionHintUndated": "The total was {before}.",
-    "correct": "Correct it",
+    "correct": "Correct entry",
+    "registerToday": "Log for today",
+    "registerYesterday": "Log for yesterday",
+    "registerOnDate": "Log for {date}",
     "finishedOn": "on {date}",
     "goalReached": "Goal reached",
     "countLabel": "Where you are",

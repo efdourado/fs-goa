@@ -9451,3 +9451,27 @@ test('book page totals block cumulative overflow, concurrent writes and invalid 
  const entries=((await call('GET',`/api/challenges/${cid}/entries`,{session:owner})).body as {entries:Array<{entryTypeId:string;values:Record<string,number>}>}).entries.filter((entry)=>entry.entryTypeId===type.id);
  assert.equal(entries.length,2); assert.equal(entries.reduce((sum,entry)=>sum+entry.values[field],0),256);
 });
+
+test('the only check-in note can be removed while workout fields and saved exercise values survive', async () => {
+ const owner=await register('Note Owner','note_owner');
+ const gid=((await call('POST','/api/groups',{session:owner,body:{name:'Exercises'}})).body as {id:string}).id;
+ const library=(await call('POST',`/api/groups/${gid}/catalog/libraries`,{session:owner,body:{label:'Exercises'}})).body as {id:string};
+ const created=await call('POST',`/api/groups/${gid}/challenges`,{session:owner,body:{recipe:'custom',recordingMode:'session',sessionNoteLabel:'Como foi?',title:'Workout',libraryId:library.id,participantIds:[owner.user.id],fields:[{key:'weight',label:'Weight',type:'number',required:true},{key:'reps',label:'Reps',type:'number',required:true}],items:[{title:'Squat'}]}});
+ assert.equal(created.response.status,201,JSON.stringify(created.body));
+ const cid=(created.body as {id:string}).id;
+ const get=async()=>(await call('GET',`/api/challenges/${cid}`,{session:owner})).body as import('../../app/goa/types').ChallengeDetail;
+ const d=await get(); const child=d.entryTypes.find((type)=>type.parentTypeId)!;const parent=d.entryTypes.find((type)=>type.id===child.parentTypeId)!;
+ assert.equal((await call('POST',`/api/challenges/${cid}/transition`,{session:owner,body:{status:'active'}})).response.status,200);
+ const recorded=await call('POST',`/api/challenges/${cid}/entries`,{session:owner,body:{entryTypeId:parent.id,occurredOn:'2026-11-17',values:{[parent.fields[0].id!]:'Good'},children:[{itemId:d.items[0].id,values:{[child.fields[0].id!]:40,[child.fields[1].id!]:8}}]}});
+ assert.equal(recorded.response.status,201,JSON.stringify(recorded.body));
+ const entries=async()=>((await call('GET',`/api/challenges/${cid}/entries`,{session:owner})).body as {entries:import('../../app/goa/types').Entry[]}).entries;
+ const before=await entries();const body={entryTypeId:parent.id,fields:[],replace:true,archiveMissing:true};
+ assert.equal((await call('POST',`/api/challenges/${cid}/fields`,{session:owner,body})).response.status,409,'saved note deletion still requires confirmation');
+ assert.deepEqual(await entries(),before);
+ const removed=await call('POST',`/api/challenges/${cid}/fields`,{session:owner,body:{...body,deleteAnswers:true}});
+ assert.equal(removed.response.status,201,JSON.stringify(removed.body));
+ const after=await get(); assert.deepEqual(after.entryTypes.find((type)=>type.id===parent.id)!.fields,[]);
+ assert.deepEqual(after.entryTypes.find((type)=>type.id===child.id)!.fields,child.fields);
+ assert.deepEqual((await entries()).filter((entry)=>entry.entryTypeId===child.id),before.filter((entry)=>entry.entryTypeId===child.id));
+ assert.equal((await entries()).filter((entry)=>entry.entryTypeId===parent.id).length,1,'the dated check-in itself is retained');
+});

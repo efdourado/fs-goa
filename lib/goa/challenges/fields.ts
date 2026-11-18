@@ -169,7 +169,7 @@ export async function saveChallengeFields(
 ) {
   if (!Array.isArray(body.fields)) return addChallengeField(session, challengeId, body);
   const requestedFields = body.fields;
-  if (!requestedFields.length || requestedFields.length > 30) throw new ApiError(400, "field_limit", "Use de 1 a 30 campos.");
+  if (requestedFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar campos.");

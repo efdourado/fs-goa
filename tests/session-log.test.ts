@@ -45,7 +45,9 @@ test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', se
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.match(html, /＋ Registrar as respostas de hoje/, "o caminho do dia, num botão só");
+  assert.match(html, /aria-label="Registrar as respostas de hoje"/, "o + do título abre o modal");
+  assert.doesNotMatch(html, /Ainda sem registro|>Registrado</);
+  assert.match(html, /aria-label="Registrar as respostas de hoje"[^>]*class="[^"]*h-11 w-11[^"]*bg-\[var\(--main\)\]/, "o + usa o mesmo círculo verde de itens e campos");
   assert.doesNotMatch(html, /Treino|Desempenho/, "nomes internos não viram títulos do registro");
   assert.doesNotMatch(html, /Repetir o último/);
   assert.match(html, /<strong[^>]*>2<\/strong> dias com registro desde/, "só os seus dois treinos contam");
@@ -55,7 +57,7 @@ test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', se
   assert.doesNotMatch(html, /Salvar treino/, "não há botão de salvar: o registro se salva sozinho, na folha");
 });
 
-test("o treino de hoje já registrado aparece num cartão que abre o treino, e dá para registrar outro no mesmo dia", () => {
+test("o treino de hoje registrado abre para editar sem oferecer outro registro no mesmo dia", () => {
   const spec = sessionSpecOf(challenge)!;
   const today = dateKeyInSaoPaulo(new Date());
   const withToday = [
@@ -66,12 +68,13 @@ test("o treino de hoje já registrado aparece num cartão que abre o treino, e d
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => ({ id: "saved", children: [] }), onDelete: async () => undefined,
   }));
-  assert.match(html, />Respostas<\/strong>/, "um registro só no dia: sem número");
-  assert.match(html, />1 item</);
-  assert.match(html, /Supino<\/span><span[^>]*>60 · 8<\/span>/, "cada exercício numa linha, com os números");
+  assert.doesNotMatch(html, />Respostas<|>1 item<|>Registrado</);
+  assert.match(html, /Supino<\/strong>/);
+  assert.match(html, /Carga \(kg\)<\/span><span[^>]*>60<\/span>/, "valores têm seus próprios rótulos");
+  assert.match(html, /Repetições<\/span><span[^>]*>8<\/span>/);
   assert.match(html, /<button[^>]*aria-label="Abrir respostas"/, "o cartão inteiro abre o registro, sem botão Editar");
   assert.doesNotMatch(html, />Editar</);
-  assert.match(html, /＋ Novo registro/, "outro registro no mesmo dia");
+  assert.doesNotMatch(html, /aria-label="Novo registro"|aria-label="Registrar as respostas de hoje"/, "um dia respondido não oferece + para outro registro");
 });
 
 test("quem não pode registrar vê o resumo, sem o botão", () => {

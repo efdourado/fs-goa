@@ -224,9 +224,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // instead of blocking with a "fill this in" error.
   onDelete?: () => Promise<void>;
   // Admin correction always wants the live form, never the read-only summary —
-  // that IS the point of that screen. The participant's Today tab leaves this
-  // false: an already-answered checkpoint shows a quiet summary instead of a
-  // save button and a delete link sitting there forever.
+  // that IS the point of that screen. Participant answers lock after saving;
+  // their Save button stays visible and disabled until editing changes them.
   alwaysEditable?: boolean;
   // When several required-field sections are stacked, a single button below
   // the whole group saves all of them — each section's own Save button would
@@ -236,6 +235,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   editingOverride?: boolean;
   hideEditLock?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
+  onReadyChange?: (ready: boolean) => void;
   // Reports every change of the open/collapsed state — the combined button
   // above uses this to know whether any section actually needs saving.
   onEditingChange?: (editing: boolean) => void;
@@ -256,6 +256,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   editingOverride,
   hideEditLock = false,
   onDirtyChange,
+  onReadyChange,
   onEditingChange,
 }, ref) {
   const t = useTranslations("entryForm");
@@ -268,9 +269,13 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   // An already-answered checkpoint opens as a summary; editing is opt-in.
-  const [localEditing, setEditing] = useState(alwaysEditable || !entry);
+  const hasAnswer = (answers: Record<Id, unknown>) => fields.some((field) => field.id && answers[field.id] !== undefined && answers[field.id] !== null && answers[field.id] !== "");
+  const [localEditing, setEditing] = useState(alwaysEditable || !entry || !hasAnswer(values));
   const editing = editingOverride ?? localEditing;
   const [baseline, setBaseline] = useState(values);
+  const missingRequired = findMissingRequiredField(fields, values);
+  const ready = !missingRequired || isEmptySaveADelete(missingRequired, Boolean(entry), Boolean(onDelete));
+  useEffect(() => { onReadyChange?.(ready); }, [ready, onReadyChange]);
   const dirty = JSON.stringify(fields.map((field) => values[field.id ?? ""] ?? "")) !== JSON.stringify(fields.map((field) => baseline[field.id ?? ""] ?? ""));
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
@@ -344,6 +349,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // several stacked sections, which calls every open section's version of
   // this in one go instead of each showing its own Save button.
   async function performSubmit(): Promise<boolean> {
+    if (!canEdit || !editing || busy || deleting) return false;
     if (!dirty) return true;
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
@@ -355,6 +361,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         setError(null);
         try {
           await onDelete!();
+          setBaseline(values);
+          setDeleting(false);
+          setEditing(true);
           return true;
         } catch (cause) {
           setError(f.error(cause));
@@ -373,7 +382,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
       await onSave(values, entry);
       setBaseline(values);
       setSuccess(entry ? t("entryUpdated") : t("entrySaved"));
-      if (!alwaysEditable) setEditing(false);
+      if (!alwaysEditable) setEditing(!hasAnswer(values));
       return true;
     } catch (cause) {
       setError(f.error(cause));
@@ -403,15 +412,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
-  // A saved answer keeps showing the same fields (disabled), just with the
-  // Save/Cancel row swapped out for a lock icon next to the heading — no
-  // separate "summary" box. The icon is offered independent of `canEdit`'s
-  // effect on interactivity below, so a lock that engages AFTER the answer
-  // was given (e.g. an expectation once the rating comes in) still reads as
-  // a normal locked field, not a disabled-but-still-open-looking form.
-  const canReopen = !hideEditLock && canEdit;
+  // Only a saved, nonempty response has a header lock. Save stays visible,
+  // but becomes available only while editing a changed, valid response.
+  const canReopen = !hideEditLock && canEdit && hasAnswer(baseline);
   const interactive = canEdit && editing;
-  const showsButtons = editing && canEdit;
+  const showsButtons = canEdit;
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
   // the heading keeps the name (and the required mark), the field's label stays only for screen readers.
   const namedFields = fields.filter((candidate) => candidate.id);
@@ -515,7 +520,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         <StatusMessage error={error} success={success} />
         {showsButtons && !hideOwnSaveButton ? (
           <div className="flex gap-2">
-            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting || !dirty}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
+            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={!interactive || busy || deleting || !dirty || !ready}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
         {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: timeZone ? f.itemDeadline(item, timeZone) ?? "" : f.dateTime(item.dueAt) })}</p> : null}
@@ -856,7 +861,22 @@ function ItemEntryPanel({
       && (candidate.entryTypeId ?? "") === type.id
       && (!perDay || candidate.occurredOn === (occurredOn || today)));
   };
-  const [editingAll, setEditingAll] = useState(() => !types.some((type) => entryForType(type)));
+  const filled = (type: EntryTypeView, values: Record<Id, unknown>) => type.fields.some((field) => field.id && values[field.id] !== undefined && values[field.id] !== null && values[field.id] !== "");
+  const initialSavedTypes = () => new Set(types.filter((type) => filled(type, valuesAsRecord(entryForType(type)?.values ?? {}))).map((type) => type.id));
+  const [savedTypes, setSavedTypes] = useState(initialSavedTypes);
+  const savedTypesRef = useRef(savedTypes);
+  function markSaved(type: EntryTypeView, values: Record<Id, unknown>) {
+    const next = new Set(savedTypesRef.current);
+    if (filled(type, values)) next.add(type.id); else next.delete(type.id);
+    savedTypesRef.current = next;
+    setSavedTypes(next);
+  }
+  const [editingAll, setEditingAll] = useState(() => savedTypes.size === 0);
+  const [unreadyTypes, setUnreadyTypes] = useState<Set<Id>>(new Set());
+  const markReady = (id: Id, ready: boolean) => setUnreadyTypes((current) => {
+    if (current.has(id) === !ready) return current;
+    const next = new Set(current); if (ready) next.delete(id); else next.add(id); return next;
+  });
   const formRefs = useRef(new Map<Id, DynamicEntryFormHandle | null>());
   const [dirtyTypeIds, setDirtyTypeIds] = useState<Set<Id>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
@@ -868,7 +888,7 @@ function ItemEntryPanel({
     setSavingAll(true);
     try {
       const results = await Promise.all([...dirtyTypeIds].map((id) => formRefs.current.get(id)?.submitIfEditing()));
-      if (results.every((result) => result?.ok)) setEditingAll(false);
+      if (results.every((result) => result?.ok)) setEditingAll(savedTypesRef.current.size === 0);
     } finally {setSavingAll(false);}
   }
   function cancelAll() {
@@ -877,7 +897,7 @@ function ItemEntryPanel({
   }
   return (
     <div className="space-y-6">
-      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]">{editingAll ? <LockStateIcon locked={false} /> : <LockIcon />}</StateButton> : null}</div> : null}
+      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit && savedTypes.size > 0 ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]">{editingAll ? <LockStateIcon locked={false} /> : <LockIcon />}</StateButton> : null}</div> : null}
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -897,6 +917,7 @@ function ItemEntryPanel({
               hideEditLock
               editingOverride={editingAll}
               onDirtyChange={(dirty) => markDirty(type.id, dirty)}
+              onReadyChange={(ready) => markReady(type.id, ready)}
               note={note}
               fields={type.fields}
               item={item}
@@ -904,21 +925,20 @@ function ItemEntryPanel({
               canEdit={canEdit && !savingAll}
               unavailableMessage={unavailableMessage}
               timeZone={timeZone}
-              onSave={(values, saved) => onSaveEntry(
-                item.id,
-                values,
-                saved,
-                saved ? undefined : perDay ? occurredOn || today : undefined,
-                type.id || undefined,
-                type.schedulePolicy === "checkpoint" ? checkpointId ?? null : undefined,
-              )}
-              onDelete={entry && onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
+              onSave={async (values, saved) => {
+                await onSaveEntry(
+                  item.id, values, saved, saved ? undefined : perDay ? occurredOn || today : undefined,
+                  type.id || undefined, type.schedulePolicy === "checkpoint" ? checkpointId ?? null : undefined,
+                );
+                markSaved(type, values);
+              }}
+              onDelete={entry && onDeleteEntry ? async () => { await onDeleteEntry(entry.id); markSaved(type, {}); } : undefined}
             />
           </div>
         );
       })}
-      {types.length && canEdit && editingAll ? <div className="flex gap-2 [&>*]:flex-1">
-        <Button disabled={savingAll || dirtyTypeIds.size === 0} onClick={saveAll}>{savingAll ? tc("saving") : tc("save")}</Button>
+      {types.length && canEdit ? <div className="flex gap-2 [&>*]:flex-1">
+        <Button disabled={!editingAll || savingAll || dirtyTypeIds.size === 0 || [...dirtyTypeIds].some((id) => unreadyTypes.has(id))} onClick={saveAll}>{savingAll ? tc("saving") : tc("save")}</Button>
       </div> : null}
       {sharedTypes.map((type) => (
         <SharedAnswerSection
@@ -1817,7 +1837,7 @@ export function ParticipantChallengeScreen({
                     {logItem ? (
                       <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                     ) : (
-                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={effectiveOccurredOn === today ? t("yourResponseToday") : effectiveOccurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(effectiveOccurredOn,{day:"numeric",month:"long"})})} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={effectiveOccurredOn === today ? t("yourResponseToday") : effectiveOccurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(effectiveOccurredOn,{day:"numeric",month:"long"})})} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                     )}
                   </CheckinLog>
                 ) : null}
@@ -1839,7 +1859,7 @@ export function ParticipantChallengeScreen({
                 {useItemPanel && selectedItem ? (
                   <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                 ) : (
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}
                 </>}
               </section>

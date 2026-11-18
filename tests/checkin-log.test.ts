@@ -128,7 +128,8 @@ test("o log de um livro mostra a página, o ritmo e um dia por chip, com hoje ai
   assert.match(html, /Faltam <strong[^>]*>287<\/strong> páginas/);
   assert.match(html, /aria-label="Hoje, 28 de setembro, sem registro"/);
   assert.match(html, /aria-label="[^"]*16 de setembro, sem registro"/);
-  assert.match(html, /Parei na página/);
+  assert.match(html, /Registrar para hoje/);
+  assert.doesNotMatch(html, /<form/, "o formulário abre no modal");
   // dias futuros ficam travados
   assert.match(html, /disabled=""[^>]*data-day="2026-10-01"|data-day="2026-10-01"[^>]*disabled=""/);
 });
@@ -164,7 +165,8 @@ test("contagem com as datas escondidas: a estrada e 'parei na página', sem faix
   assert.doesNotMatch(html, /data-day=/, "sem a faixa de dias");
   assert.doesNotMatch(html, /Hoje, 28 de setembro/, "sem o dia por extenso");
   assert.doesNotMatch(html, /ritmo/);
-  assert.match(html, /aria-pressed="true"[^>]*>Parei na página/, "abre em 'parei na página'");
+  assert.match(html, /Registrar para hoje/);
+  assert.doesNotMatch(html, /<form/);
 });
 
 test("ao chegar ao fim, a estrada fica com 'livro terminado' e o dia; o editor se recolhe atrás de 'corrigir'", () => {
@@ -177,7 +179,7 @@ test("ao chegar ao fim, a estrada fica com 'livro terminado' e o dia; o editor s
   assert.match(html, /Livro terminado/);
   assert.match(html, /em 20 de setembro de 2026/, "o dia em que a contagem cruzou o total");
   assert.match(html, /role="img"/, "a estrada continua");
-  assert.match(html, /aria-label="Corrigir"/);
+  assert.match(html, />Corrigir registro</);
   assert.doesNotMatch(html, /Parei na página/, "sem o editor");
 });
 
@@ -204,5 +206,5 @@ test("um livro já terminado de outro jeito (com nota) mostra a estrada cheia, s
   assert.match(html, /p\. 352/, "a estrada cheia");
   assert.match(html, /100% lido/);
   assert.doesNotMatch(html, /em \d+ de/, "sem data, porque não sabemos quando terminou");
-  assert.match(html, /aria-label="Corrigir"/);
+  assert.match(html, />Corrigir registro</);
 });

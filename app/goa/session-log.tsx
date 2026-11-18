@@ -13,7 +13,7 @@ import { DeleteButton, DeleteConfirm } from "./dialog";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
-import { Button, cardClass, cx, EmptyState, inputClass, labelClass, Select, StatusMessage } from "./ui";
+import { Button, cardClass, cx, EmptyState, FaceEmptyState, inputClass, labelClass, Select, StatusMessage } from "./ui";
 import { dateKeyInSaoPaulo, displayAnswer, findMissingRequiredField, valuesAsRecord } from "./utils";
 
 /** The check-in and the type of record it holds — a workout and its exercise records. */
@@ -502,14 +502,6 @@ export function SessionLog({
   const dayVisits = visitsByDay.get(day) ?? [];
   // A check-in started on this device but not saved yet (its items still missing a number).
   const draftWaiting = !sheetOpen && !dayVisits.length && Boolean(readDraft(day)?.rows.length);
-  /** "62,5 kg · 8" — a saved record in one line. */
-  const recordSummary = (record: Entry) => {
-    const values = valuesAsRecord(record.values);
-    return recordFields.map((field) => {
-      const value = numberValue(values[field.id as Id]);
-      return value !== null ? `${nf.number(value, { maximumFractionDigits: 2 })}${field.config?.unit ? ` ${field.config.unit}` : ""}` : showValue(field, values[field.id as Id]);
-    }).filter(Boolean).join(" · ");
-  };
   // What the draft still needs, said plainly: "Supino · Repetições".
   const firstGap = rows.map((row) => ({ row, missing: rowGap(row) })).find((candidate) => candidate.missing);
   const visitGap = visitGapOf(editing, visitValues);
@@ -539,38 +531,50 @@ export function SessionLog({
           unavailableMessage={unavailableMessage}
           openEnded={!challenge.startsOn && !challenge.endsOn}
           streakBy="week"
+          dayAction={canEdit && !dayVisits.length ? <StateButton
+            type="button"
+            onClick={() => openSheet(null)}
+            aria-label={day === today ? t("logToday") : t("logOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })}
+            title={day === today ? t("logToday") : t("logOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })}
+            className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          </StateButton> : undefined}
         >
           {/* The picked day: what's been logged, and one clear way in. Logging itself happens in the sheet. */}
           <div className="space-y-3">
+            {!dayVisits.length && !draftWaiting ? <FaceEmptyState title={t("emptyAnswers")} compact /> : null}
             {dayVisits.slice().reverse().map((visit, index) => {
               const records = sortedRecords(visit.id);
               // One card per workout, the whole of it a way back in: no button to hunt for.
               const body = (
                 <>
-                  <span className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">
-                      <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10.4l3.200 3.200L15 6.800" /></svg>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { number: index + 1 }) : t("answers")}</strong>
-                      <span className="block text-xs text-[var(--muted)]">{t("visitCount", { count: records.length })}</span>
-                    </span>
-                  </span>
-                  {records.length ? (
-                    <span className="mt-3.5 block divide-y divide-[var(--line)] border-t border-[var(--line)]">
-                      {records.map((record) => (
-                        <span key={record.id} className="flex items-baseline justify-between gap-4 py-2.5 text-sm last:pb-0">
-                          <span className="min-w-0 truncate">{itemTitle(record.itemId)}</span>
-                          <span className="flex-none text-[13px] tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
+                  {dayVisits.length > 1 ? <span className="mb-3 block text-xs text-[var(--muted)]">{t("visitNumbered", { number: index + 1 })}</span> : null}
+                  <span className="block divide-y divide-[var(--line)]">
+                    {records.map((record) => {
+                      const values = valuesAsRecord(record.values);
+                      return <span key={record.id} className="block py-4 first:pt-0 last:pb-0 lg:grid lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+                        <strong className="block text-[15px] font-medium tracking-[-0.01em] text-[var(--ink)]">{itemTitle(record.itemId)}</strong>
+                        <span className="mt-3 flex min-w-0 flex-wrap gap-x-7 gap-y-3 lg:mt-0">
+                          {recordFields.map((field) => {
+                            const raw = values[field.id as Id];
+                            if (raw === undefined || raw === null || raw === "") return null;
+                            const number = numberValue(raw);
+                            const value = number !== null ? `${nf.number(number, { maximumFractionDigits: 2 })}${field.config?.unit ? ` ${field.config.unit}` : ""}` : showValue(field, raw);
+                            return <span key={field.id} className={cx("flex min-w-0 max-w-full flex-col gap-0.5 break-words", field.type === "text" ? "basis-full lg:min-w-32 lg:basis-40 lg:flex-1" : "min-w-16")}>
+                              <span className="text-[11px] leading-4 text-[var(--muted)]">{field.label}</span>
+                              <span className={cx("text-[var(--ink)]", field.type === "text" ? "text-sm leading-relaxed" : "text-lg font-medium leading-6 tabular-nums")}>{value}</span>
+                            </span>;
+                          })}
                         </span>
-                      ))}
-                    </span>
-                  ) : null}
+                      </span>;
+                    })}
+                  </span>
                 </>
               );
-              const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 text-left";
+              const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--wash)] p-4 text-left sm:p-5";
               return canEdit ? (
-                <StateButton key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit")} className={cx(shell, "cursor-pointer transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
+                <StateButton key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit")} className={cx(shell, "cursor-pointer transition hover:opacity-75 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
                   {body}
                 </StateButton>
               ) : (
@@ -582,17 +586,13 @@ export function SessionLog({
                 {t("draftWaiting")}
               </StateButton>
             ) : null}
-            {canEdit ? (
-              <Button className="w-full rounded-full" onClick={() => openSheet(null)}>
-                ＋ {dayVisits.length ? t("newVisitOnDay") : day === today ? t("logToday") : t("logOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })}
-              </Button>
-            ) : unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
+            {!canEdit && unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
           </div>
         </CheckinLog>
       </section>
 
       {sheetOpen ? (
-        <BottomSheet tall title={day === today ? t("sheetToday") : t("sheetOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
+        <BottomSheet tall wide title={day === today ? t("sheetToday") : t("sheetOnDay", { date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
           {/* One even rhythm: status, today's items, the rest to pick from, the check-in's own fields. */}
           <div className="space-y-6">
             <div className="flex items-center justify-between gap-3">
@@ -615,22 +615,20 @@ export function SessionLog({
                 });
                 return (
                   <li key={row.key} data-item={row.itemId} className="py-4">
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
-                      </div>
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <strong className="min-w-0 truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
                       <StateButton type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="min-h-9 flex-none cursor-pointer px-1 text-[13px] font-light text-[var(--muted)]/80 transition hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
                         {tc("remove")}
                       </StateButton>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 [&>*:last-child:nth-child(odd)]:col-span-2">
+                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-wrap sm:gap-3">
                       {recordFields.map((field) => {
                         const id = `${row.key}-${field.id}`;
                         const current = numberValue(row.values[field.id as Id]);
                         const previous = lastNumber(last, field);
                         const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
                         return (
-                          <div key={field.id} className="min-w-0">
+                          <div key={field.id} className={cx("min-w-0 sm:flex-1", field.type === "text" ? "sm:basis-full" : "sm:basis-36")}>
                             <label className="mb-1 block truncate text-[11px] font-medium text-[var(--muted)]" htmlFor={id}>
                               {field.label}{field.config?.unit ? ` (${field.config.unit})` : ""}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
                             </label>
@@ -770,9 +768,9 @@ export function SessionLog({
             </div>
           ) : null}
           {/* The bar stays at the bottom, clear of the phone's home area. */}
-          <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
-            {editing && onDelete ? <DeleteButton open={removing} onClick={() => setRemoving((open) => !open)} /> : <span className="flex-1" />}
-            <Button className="px-6" onClick={closeSheet}>{t("done")}</Button>
+          <div className="sticky bottom-0 -mx-5 mt-6 grid auto-cols-fr grid-flow-col items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
+            {editing && onDelete ? <DeleteButton open={removing} onClick={() => setRemoving((open) => !open)} /> : null}
+            <Button className="w-full" onClick={closeSheet}>{t("done")}</Button>
           </div>
         </BottomSheet>
       ) : null}

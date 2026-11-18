@@ -210,7 +210,7 @@ test('the multi-item log uses today’s answers for its title instead of a custo
  ]} as ChallengeDetail;
  try {
   await ui.render(<SessionLog challenge={value} spec={sessionSpecOf(value)!} entries={[]} userId="me" canEdit onSave={async () => {saves++;return {id:'unused',children:[]};}} />);
-  await act(async () => ui.button('＋ Registrar as respostas de hoje').click());
+  await act(async () => ui.button('Registrar as respostas de hoje').click());
   const dialog = document.querySelector('[role="dialog"]')!;
   assert.equal(dialog.querySelector('h2')!.textContent,'Respostas de hoje');
   assert.doesNotMatch(dialog.textContent!,/Custom workout title|Exercise records/);
@@ -278,7 +278,7 @@ for (const fails of [false,true]) {
   try {
    await ui.render(<CheckinLog from={day} to={today} today={today} selectedDay={today} onSelectDay={() => {}} canEdit compact records={new Map([[day,{entry,value:10}]])} counter={{field:field as ChallengeField,notes:[],total:10,book:false,entry:'position',paceFrom:day,paceTo:null,onSave:async (...args) => {if(fails) throw new Error('Correction failed');saved.push(args);}}} />);
    assert.equal(document.querySelector('form'),null);
-   await act(async () => ui.button('Corrigir').click());
+   await act(async () => ui.button('Corrigir registro').click());
    assert.ok(document.querySelector('dialog'));
    assert.equal(document.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.disabled,true);
    await ui.fill(document.querySelector<HTMLInputElement>('dialog input[type=number]')!,'8');
@@ -288,7 +288,7 @@ for (const fails of [false,true]) {
     assert.equal(document.querySelector<HTMLInputElement>('dialog input[type=number]')!.value,'8');
    } else {
     assert.equal(document.querySelector('dialog'),null);
-    assert.equal(ui.button('Corrigir').disabled,false);
+    assert.equal(ui.button('Corrigir registro').disabled,false);
     assert.equal((saved[0] as [string,Record<string,unknown>])[0],day,"correct the saved date rather than create a new entry today");
     assert.equal((saved[0] as [string,Record<string,unknown>])[1].answer,8);
     assert.equal((entry.values as Record<string,unknown>).answer,10,'the provided entry is not mutated');
@@ -315,6 +315,8 @@ test('book totals block overflow without an editions warning and yesterday gets 
  const ui=await setup();let saves=0;const day='2026-09-27';
  try {
   await ui.render(<CheckinLog from={day} to="2026-09-28" today="2026-09-28" selectedDay={day} onSelectDay={()=>{}} canEdit records={new Map([[day,{entry:{id:'read',values:{answer:8}} as Entry,value:8}]])} counter={{field:field as ChallengeField,notes:[],total:10,book:true,entry:'position',paceFrom:day,paceTo:null,onSave:async()=>{saves++;}}} />);
+  assert.equal(document.querySelector('form'),null);
+  await act(async () => ui.button('Registrar para ontem').click());
   assert.match(document.body.textContent!,/Sua resposta para ontem/);
   await ui.fill(document.querySelector<HTMLInputElement>('#checkin-amount')!,'11');
   assert.equal(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled,true);
@@ -326,3 +328,45 @@ test('book totals block overflow without an editions warning and yesterday gets 
   assert.equal(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled,false);
  } finally {await ui.cleanup();}
 });
+
+test('the only day-note field can be deleted without removing exercise fields', async () => {
+ const ui=await setup(); const saved:unknown[][]=[];
+ const value={...challenge,entryTypes:[
+  {id:'day',name:'Check-in',purpose:'checkin',fields:[{id:'note',key:'note',label:'Como foi?',type:'text',required:false}]},
+  {...challenge.entryTypes[0],parentTypeId:'day'},
+ ]} as ChallengeDetail;
+ try {
+  await ui.render(<AdminScreen {...adminProps({challenge:value,onSaveFields:async (...args)=>{saved.push(args);}})} />);
+  await act(async()=>ui.button('Ajustes de Como foi?').click());
+  await act(async()=>ui.button('Excluir').click());
+  assert.equal(saved.length,0,'opening the confirmation does not delete anything');
+  await act(async()=>ui.button('Confirmar exclusão').click());
+  assert.deepEqual(saved,[['day',[],true]]);
+  assert.match(document.body.textContent!,/Amount/);
+  assert.deepEqual(value.entryTypes[1].fields,[field]);
+ } finally {await ui.cleanup();}
+});
+
+for (const [day,label] of [['2026-09-28','Registrar para hoje'],['2026-09-27','Registrar para ontem'],['2026-09-25','Registrar para 25 de set.']] as const) {
+ test(`incomplete progress uses the correction modal for ${day}`,async()=>{
+  const ui=await setup();const saves:unknown[]=[];
+  const counter={field:field as ChallengeField,notes:[],total:10,book:true,entry:'position' as const,paceFrom:'2026-09-20',paceTo:null,onSave:async(...args:unknown[])=>{saves.push(args);}};
+  const records=new Map([['2026-09-20',{entry:{id:'previous',values:{answer:2}} as Entry,value:2}]]);
+  try {
+   await ui.render(<CheckinLog from="2026-09-20" to="2026-09-28" today="2026-09-28" selectedDay={day} onSelectDay={()=>{}} canEdit records={records} counter={counter} />);
+   assert.equal(document.querySelector('form'),null);
+   await act(async()=>ui.button(label).click());
+   assert.ok(document.querySelector('dialog[open]'));
+   assert.equal(document.querySelector('dialog')!.querySelector('h2')!.textContent,label);
+   await ui.fill(document.querySelector<HTMLInputElement>('#checkin-amount')!,'5');
+   await act(async()=>document.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.click());
+   assert.equal((saves[0] as unknown[])[0],day,'log the selected date, not the latest existing entry');
+   assert.deepEqual((saves[0] as unknown[])[1],{answer:3});
+   assert.equal(document.querySelector('dialog'),null);
+   const completed=new Map([...records,[day,{entry:{id:'finished',values:{answer:8}} as Entry,value:8}]]);
+   await ui.render(<CheckinLog from="2026-09-20" to="2026-09-28" today="2026-09-28" selectedDay={day} onSelectDay={()=>{}} canEdit records={completed} counter={counter} />);
+   assert.ok(ui.button('Corrigir registro'));
+   assert.equal(document.querySelector('form'),null);
+  } finally {await ui.cleanup();}
+ });
+}
