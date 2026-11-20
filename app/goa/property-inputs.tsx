@@ -11,8 +11,8 @@ import { Field, inputClass, Select } from "./ui";
 /** Values typed into a library's property fields, by `LibraryProperty.key`. Booleans are `"true"` / `"false"` / `""`. */
 export type PropertyValues = Record<string, string>;
 
-const NATIVE_FIELD: Record<string, { field: keyof CatalogItem; body: string; integer: boolean }> = {
-  author: { field: "author", body: "author", integer: false },
+const NATIVE_FIELD: Record<string, { field: keyof CatalogItem; body: string; integer: boolean; maxLength?: number }> = {
+  author: { field: "author", body: "author", integer: false, maxLength: 200 },
   year: { field: "year", body: "year", integer: true },
   main_genre: { field: "mainGenre", body: "mainGenre", integer: false },
   page_count: { field: "pageCount", body: "pageCount", integer: true },
@@ -168,8 +168,9 @@ export function PropertyInputs({
       {visible.map((property) => {
         const value = values[property.key] ?? "";
         const label = name(property);
+        const native = property.storage === "native" ? NATIVE_FIELD[property.key] : undefined;
         return (
-          <Field key={property.key} label={label} optional>
+          <Field key={property.key} label={label}>
             {property.type === "boolean" ? (
               <Select value={value} disabled={disabled} ariaLabel={label} onChange={(next) => onChange(property.key, next)}
                 options={[{ value: "", label: "" }, { value: "true", label: tc("yes") }, { value: "false", label: tc("no") }]} />
@@ -180,7 +181,7 @@ export function PropertyInputs({
                 inputMode={property.type === "number" ? "numeric" : undefined}
                 value={value}
                 disabled={disabled}
-                maxLength={property.type === "text" ? 500 : undefined}
+                maxLength={property.type === "text" ? (native?.maxLength ?? 500) : undefined}
                 onChange={(event) => onChange(property.key, event.target.value)}
               />
             )}

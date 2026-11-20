@@ -15,7 +15,6 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
-  authorRequired,
   createCatalogItem,
   upsertCatalogItem,
 } from "../catalog";
@@ -154,7 +153,7 @@ export async function addChallengeItem(
 ) {
   assertNoBuiltInRecommendation(body);
   const title = stringValue(body, "title", { max: 200 })!;
-  const author = stringValue(body, "author", { max: 200, optional: true }) ?? null;
+  const author = stringValue(body, "author", { min: 0, max: 200, optional: true }) || null;
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
@@ -163,9 +162,6 @@ export async function addChallengeItem(
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
     const linked = await ensureChallengeLibraries(client, access.challenge, session.user.id);
     const catalogKind = await resolveItemLibrary(client, access.challenge, linked, body, body.catalogItemId);
-    if (!author && await authorRequired(client, access.challenge.group_id, catalogKind)) {
-      throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
-    }
     const position = integerValue(body.position, 0, 0, 10_000);
     const checkpointId = await resolveCheckpointId(client, challengeId, body.checkpointId);
 
@@ -257,9 +253,6 @@ export async function saveChallengeItems(
         { libraryId: item.libraryId ?? body.libraryId, libraryKind: item.libraryKind ?? body.libraryKind },
         item.catalogItemId,
       );
-      if (!author && await authorRequired(client, access.challenge.group_id, catalogKind)) {
-        throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
-      }
       const id = publicId();
       const position = (base?.position ?? 0) + index;
 
@@ -386,14 +379,6 @@ export async function updateChallengeItem(
           if (!cp) throw new ApiError(400, "invalid_checkpoint", "Etapa inexistente neste desafio.");
           checkpointId = wanted;
         }
-      }
-      if (Object.hasOwn(body, "author")
-        && !(typeof body.author === "string" && body.author.trim())
-        && current.catalog_item_id
-        && await authorRequired(client, access.challenge.group_id, (await oneOrNull<{ kind: string }>(
-          client, "SELECT kind FROM catalog_items WHERE id = $1", [current.catalog_item_id],
-        ))?.kind ?? "")) {
-        throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
       }
       const schedule = resolveItemSchedule(body, access.challenge.time_zone, {
         opensAt: current.opens_at, dueAt: current.due_at, schedulePrecision: current.schedule_precision,

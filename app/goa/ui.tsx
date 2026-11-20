@@ -3,7 +3,7 @@
 import { StateButton } from "./state-button";
 
 import { useTranslations } from "next-intl";
-import { Children, isValidElement, createContext, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
+import { Children, isValidElement, createContext, Fragment, type ClipboardEventHandler, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
@@ -554,9 +554,13 @@ export function choicePillClass({ active = false, dashed = false, split = false 
   );
 }
 
-export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false }: {
+export function ArrowField({ value, onChange, onAction, onPaste, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false, "aria-invalid": invalid }: {
   value: string;
   onChange: (value: string) => void;
+  /** Handle the arrow inside a form with its own separate submit action. */
+  onAction?: () => void;
+  onPaste?: ClipboardEventHandler<HTMLInputElement>;
+  "aria-invalid"?: boolean;
   placeholder?: string;
   /** What the field is, said to a screen reader. */
   label: string;
@@ -571,6 +575,12 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   takesCursor?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const arrowDisabled = disabled || submitDisabled || !value.trim();
+  function activate() {
+    if (arrowDisabled) return;
+    onAction?.();
+    inputRef.current?.focus({ preventScroll: true });
+  }
   useEffect(() => {
     if (!takesCursor) return;
     inputRef.current?.focus({ preventScroll: true });
@@ -580,15 +590,31 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   }, []);
   return (
     <div className={cx("flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] bg-[var(--paper)] py-1 pl-4 pr-1 transition focus-within:border-[var(--focus)] focus-within:ring-2 focus-within:ring-[var(--focus)]/35", className)}>
-      <input className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
-      <InlineSubmit label={submitLabel} disabled={disabled || submitDisabled || !value.trim()} />
+      <input
+        className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+        ref={inputRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        aria-invalid={invalid}
+        maxLength={maxLength}
+        disabled={disabled}
+        onPaste={onPaste}
+        onKeyDown={(event) => {
+          if (!onAction || event.key !== "Enter" || event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          activate();
+        }}
+      />
+      <InlineSubmit label={submitLabel} disabled={arrowDisabled} onClick={onAction ? activate : undefined} />
     </div>
   );
 }
 
-export function InlineSubmit({ label, disabled }: { label: string; disabled?: boolean }) {
+export function InlineSubmit({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick?: () => void }) {
   return (
-    <StateButton readiness type="submit" aria-label={label} disabled={disabled} className="grid size-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90">
+    <StateButton readiness type={onClick ? "button" : "submit"} onClick={onClick} aria-label={label} disabled={disabled} className="grid size-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90">
       <ArrowRightIcon />
     </StateButton>
   );
@@ -613,6 +639,15 @@ export function SwitchIcon({ className }: { className?: string }) {
 
 export function ChevronIcon({ dir, className = "h-4 w-4" }: { dir: "up" | "down"; className?: string }) {
   return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={dir === "up" ? "M4.5 9.5 8 6l3.5 3.5" : "M4.5 6.5 8 10l3.5-3.5"} /></svg>;
+}
+
+export function CatalogIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <circle cx="7.75" cy="7.75" r="3.25" /><circle cx="16.25" cy="7.75" r="3.25" />
+      <circle cx="7.75" cy="16.25" r="3.25" /><circle cx="16.25" cy="16.25" r="3.25" />
+    </svg>
+  );
 }
 
 /**

@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 import type { ParticipantTab, Screen } from "./types";
-import { cx } from "./ui";
+import { CatalogIcon, cx } from "./ui";
 
 export type DockTab = "home" | "catalog" | "activity" | "you";
 
@@ -51,7 +51,7 @@ const ICONS: Record<DockTab, ReactNode> = {
   // Home: a progress ring, what Goa is about.
   home: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" opacity="0.35" /><path d="M12 3.5a8.5 8.5 0 0 1 8.2 10.7" strokeWidth="2.2" /><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /></svg>,
   // Catalogue: a little gallery of round covers.
-  catalog: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="7.75" cy="7.75" r="3.25" /><circle cx="16.25" cy="7.75" r="3.25" /><circle cx="7.75" cy="16.25" r="3.25" /><circle cx="16.25" cy="16.25" r="3.25" /></svg>,
+  catalog: <CatalogIcon className={icon} />,
   activity: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>,
   // You: a person in a circle.
   you: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="10" r="3" /><path d="M6.6 18.2c1.2-2.2 3.1-3.3 5.4-3.3s4.2 1.1 5.4 3.3" /></svg>,

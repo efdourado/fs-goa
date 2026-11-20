@@ -6,7 +6,6 @@ import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
-  authorRequired,
   createCatalogItem,
   findLibraryBySource,
   resolveItemKind,
@@ -294,9 +293,6 @@ export async function createChallenge(
         const itemAuthor = typeof item.author === "string" ? item.author.trim() : "";
         // Each item names its library, or takes the challenge's only one.
         const catalogKind = await resolveItemLibrary(client, { id, group_id: groupId }, linkedRows, item, item.catalogItemId);
-        if (!itemAuthor && await authorRequired(client, groupId, catalogKind)) {
-          throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
-        }
 
         let catalogItemId: string | null = null;
         if (typeof item.catalogItemId === "string" && item.catalogItemId) {

@@ -353,24 +353,6 @@ export async function resolveItemKind(
 }
 
 /**
- * Whether a book needs its author to be told apart. The author is half of a
- * book's identity (two works can share a title), so it is asked for — unless the
- * library hid the Author property, in which case people were told they don't
- * need to fill it in and the requirement goes with it.
- */
-export async function authorRequired(client: PoolClient, groupId: string, kind: string): Promise<boolean> {
-  if (kind !== "book") return false;
-  const hidden = await oneOrNull<{ hidden: boolean }>(
-    client,
-    `SELECT n.hidden FROM catalog_native_property_configs n
-       JOIN catalog_libraries l ON l.id = n.library_id
-      WHERE l.group_id = $1 AND l.kind = 'book' AND n.property_key = 'author'`,
-    [groupId],
-  );
-  return hidden?.hidden !== true;
-}
-
-/**
  * A whole catalogue, or with `perKind` only the newest items of each library — the head a page's shelf shows.
  * Anything with a `query` works, and handing it the pool (not one checked-out connection) lets the three reads
  * below go out at the same moment.

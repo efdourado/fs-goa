@@ -89,7 +89,7 @@ test('new items can choose a stage and see the correct collection count', async 
  try {
   await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={noop} itemTools={{scope: {groupId:'g'},onAdd: async (values) => {saved.push(values);},onUpdate:noop,onRemove:noop}} />);
   await act(async () => ui.button('Adicionar itens').click());
-  assert.match(document.querySelector('dialog')!.textContent!, /Da coleção \(89\)/);
+  assert.ok(ui.button('Da coleção (89)'));
   const stage = document.querySelector<HTMLButtonElement>('dialog button[aria-label="Etapa"]')!;
   await act(async () => stage.click());
   const option = document.querySelector<HTMLButtonElement>('dialog button[role="option"][data-value="b"]')!;
@@ -106,32 +106,120 @@ test('one confirmation adds checked collection items and the title still in the 
  const fallbackFetch = globalThis.fetch;
  try {
   const scope = {groupId:'g'};
-  globalThis.fetch = (input, init) => String(input) === API_PATHS.catalogWorkspace(scope).list
-    ? Promise.resolve(Response.json({items: [
-      {id:'a', kind: library.kind, title:'From collection'},
-      {id:'b', kind: library.kind, title:'Leave out'},
+  const books = {...library, kind:'book', label:'Books', source:'pages' as const};
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/shelf')) return Response.json({libraries:[books], counts:{book:89}, items:[]});
+    if (String(input) === API_PATHS.catalogWorkspace(scope).list) return Response.json({items: [
+      {id:'a', kind: books.kind, title:'From collection', year:2020, challengeCount:2, roundCount:4},
+      {id:'b', kind: books.kind, title:'Leave out'},
       {id:'other', kind:'other', title:'Different library'},
-    ]}))
-    : fallbackFetch(input, init);
-  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={challenge.libraries!} onAdd={async (items) => {saved.push(items);}} onClose={noop} />);
-  await act(async () => ui.button('Da coleção (89)').click());
+    ]});
+    if (String(input).endsWith('/properties')) return Response.json({properties:[
+      {key:'author', label:'Author', type:'text', storage:'native', hidden:false, position:0},
+      {key:'year', label:'Year', type:'number', storage:'native', hidden:false, position:1},
+      {key:'page_count', label:'Pages', type:'number', storage:'native', hidden:false, position:2},
+      {key:'edition', label:'Edition', type:'text', storage:'attribute', hidden:false, position:3},
+    ]});
+    return fallbackFetch(input, init);
+  };
+  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={[books]} onAdd={async (items) => {saved.push(items);}} onClose={noop} />);
+  const collectionToggle = ui.button('Da coleção (89)');
+  const collectionPanel = document.getElementById(collectionToggle.getAttribute('aria-controls')!)!;
+  assert.equal(collectionPanel.hidden, true);
+  await act(async () => collectionToggle.click());
+  assert.equal(collectionToggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(collectionPanel.hidden, false);
+  const search = collectionPanel.querySelector<HTMLInputElement>('input[type="search"]')!;
+  assert.equal(document.activeElement, search);
+  const metadata = [...collectionPanel.querySelectorAll('li .truncate')].find((line) => line.textContent === '2020 · 2 rodadas');
+  assert.ok(metadata, 'the round count shares the truncated property line');
+  await ui.fill(search, 'Leave out');
+  assert.equal(collectionPanel.querySelectorAll('li').length, 1);
+  await ui.fill(search, '');
   const picks = [...document.querySelectorAll<HTMLInputElement>('dialog input[type="checkbox"]')];
   assert.equal(picks.length, 3, 'select all plus two items from the current library');
   await act(async () => picks[0].click());
-  const catalogCards = document.querySelectorAll('dialog ol:last-of-type > li');
-  assert.equal(catalogCards.length, 2);
-  for (const card of catalogCards) assert.equal(card.querySelector('h3, button[aria-label="remover"]'), null);
+  assert.deepEqual(picks.map((pick) => pick.checked), [true, true, true]);
+  assert.ok(ui.button('Adicionar 2 itens'));
+  assert.equal(document.querySelectorAll('dialog ol').length, 0, 'catalogue selections do not create item cards');
   await act(async () => picks[2].click());
-  assert.equal(document.querySelectorAll('dialog ol:last-of-type > li').length, 1);
+  assert.deepEqual(picks.map((pick) => pick.checked), [false, true, false]);
+  assert.ok(ui.button('Adicionar 1 item'));
+  assert.equal(document.querySelectorAll('dialog ol').length, 0);
+  await act(async () => collectionToggle.click());
+  assert.equal(collectionToggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(collectionPanel.hidden, true);
+  assert.ok(ui.button('Adicionar 1 item'));
+  await act(async () => collectionToggle.click());
+  assert.equal(document.activeElement, collectionPanel.querySelector('input[type="search"]'));
+  assert.equal(document.querySelectorAll('dialog input[type="checkbox"]:checked').length, 1);
   const title = () => document.querySelector<HTMLInputElement>('dialog input[placeholder="Digite um título ou cole uma lista"]')!;
+  const card = () => document.querySelector('dialog ol > li')!;
+  const property = (name: string) => [...card().querySelectorAll('label')]
+    .find((label) => label.textContent?.startsWith(name))?.querySelector('input');
+  const cardLabels = () => [...document.querySelectorAll('dialog ol button[aria-label="remover"]')]
+    .map((button) => button.previousElementSibling?.textContent);
+  const arrow = ui.button('Adicionar item');
+  assert.equal(arrow.disabled, true);
+  await ui.fill(title(), 'From collection');
+  assert.equal(arrow.disabled, true, 'a duplicate title cannot be queued');
   await ui.fill(title(), 'Temporary manual title');
-  await act(async () => ui.button('Digitar outro título').click());
-  await act(async () => ui.button('remover').click());
+  assert.equal(document.querySelectorAll('dialog fieldset input:not([type="checkbox"]):not([type="search"])').length, 1);
+  assert.doesNotMatch(document.querySelector('dialog')!.textContent!, /\+\d+ propriedades?/);
+  await act(async () => title().dispatchEvent(new window.KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true})));
+  assert.equal(title().value, '');
+  assert.deepEqual(cardLabels(), ['Item 1']);
   await ui.fill(title(), 'Brand new');
+  assert.equal(ui.button('Adicionar 3 itens').disabled, false, 'a title is sufficient for books');
+  await act(async () => arrow.click());
+  assert.equal(title().value, '');
+  assert.equal(document.activeElement, title());
+  assert.deepEqual(cardLabels(), ['Item 1', 'Item 2']);
+  await act(async () => ui.button('remover').click());
+  assert.deepEqual(cardLabels(), ['Item 1']);
+  assert.equal(card().querySelectorAll('input').length, 4, 'queued cards show the title and three properties');
+  assert.ok(property('Author'));
+  assert.ok(property('Year'));
+  assert.ok(property('Pages'));
+  assert.doesNotMatch(card().textContent!, /opcional/i);
+  assert.equal(property('Edition'), undefined);
+  await ui.fill(property('Author')!, 'New author');
+  await act(async () => ui.button('+1 propriedade').click());
+  await ui.fill(property('Edition')!, 'First edition');
+  await act(async () => ui.button('Mostrar menos').click());
+  assert.equal(property('Edition'), undefined);
+  assert.equal(property('Author')?.value, 'New author');
+  await ui.fill(title(), 'Still in the field');
+  const queuedTitle = document.querySelector<HTMLInputElement>('dialog input[maxlength="200"][placeholder]')!;
+  await ui.fill(queuedTitle, '   ');
+  assert.equal(ui.button('Adicionar 3 itens').disabled, true, 'clearing a queued title blocks the batch');
+  await ui.fill(queuedTitle, 'Brand new');
   assert.equal(saved.length, 0);
   assert.equal(document.querySelectorAll('dialog button[type="submit"]').length, 1);
-  await act(async () => ui.button('Adicionar 2 itens').click());
-  assert.deepEqual(saved[0].map(({title, catalogItemId}) => [title, catalogItemId]), [['From collection', 'a'], ['Brand new', undefined]]);
+  await act(async () => ui.button('Adicionar 3 itens').click());
+  assert.deepEqual(saved[0].map(({title, catalogItemId, author, attributes}) => ({title, catalogItemId, author, attributes})), [
+    {title:'From collection', catalogItemId:'a', author:undefined, attributes:undefined},
+    {title:'Brand new', catalogItemId:undefined, author:'New author', attributes:{edition:'First edition'}},
+    {title:'Still in the field', catalogItemId:undefined, author:undefined, attributes:undefined},
+  ]);
+ } finally {await ui.cleanup();}
+});
+
+test('an empty collection picker shows the compact face and a short title', async () => {
+ const ui = await setup();
+ const scope = {groupId:'g'};
+ const fallbackFetch = globalThis.fetch;
+ try {
+  globalThis.fetch = (input, init) => String(input) === API_PATHS.catalogWorkspace(scope).list
+    ? Promise.resolve(Response.json({items:[]}))
+    : fallbackFetch(input, init);
+  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={challenge.libraries!} onAdd={noop} onClose={noop} />);
+  await act(async () => ui.button('Da coleção (89)').click());
+  const title = [...document.querySelectorAll('dialog p')].find((paragraph) => paragraph.textContent === 'Coleção vazia');
+  assert.ok(title);
+  assert.equal(title.previousElementSibling?.getAttribute('aria-hidden'), 'true');
+  assert.match(title.previousElementSibling?.textContent ?? '', /ᴖ̈/);
+  assert.doesNotMatch(document.querySelector('dialog')!.textContent!, /Os títulos que você adicionar aqui/);
  } finally {await ui.cleanup();}
 });
 

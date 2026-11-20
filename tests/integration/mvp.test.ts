@@ -2871,17 +2871,6 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
 
   const period = { startsOn: "2024-05-01", endsOn: "2024-06-30" };
 
-  // livro sem autor é recusado — autor é obrigatório para a Library
-  const noAuthor = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "library", title: "Sem autor", ...period, participantIds: [owner.user.id],
-      items: [{ title: "Norwegian Wood" }],
-    },
-  });
-  assert.equal(noAuthor.response.status, 400, "livro precisa de autor");
-  assert.equal((noAuthor.body as { error: string }).error, "invalid_item");
-
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
@@ -7289,29 +7278,46 @@ test("a migração 0049 liga desafios antigos às bibliotecas dos seus itens e d
   assert.deepEqual(byChallenge.get(booksId), ["book"]);
 });
 
-test("esconder o autor na biblioteca de livros tira a exigência do autor nos itens do desafio", async () => {
-  const owner = await register("Kaio", "kaio_autor");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Leitores" } })).body as { id: string }).id;
-  const first = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "bookshelf", title: "Livros", participantIds: [owner.user.id], items: [{ title: "Ficciones", author: "Borges" }] },
+test("itens de biblioteca exigem apenas o título no acervo e nos desafios", async () => {
+  const session = await register("Kaio", "kaio_autor");
+  const gid = ((await call("POST", "/api/groups", { session, body: { name: "Leitores" } })).body as { id: string }).id;
+  const challengePath = `/api/groups/${gid}/challenges`;
+  const catalogPath = `/api/groups/${gid}/catalog`;
+  const setup = { recipe: "bookshelf", title: "Livros", participantIds: [session.user.id] };
+  const created = await call("POST", challengePath, {
+    session, body: { ...setup, items: [{ title: "Livro sem autor" }, { title: "Ficciones", author: "Borges", pageCount: 200 }] },
   });
-  assert.equal(first.response.status, 201, JSON.stringify(first.body));
-  const cid = (first.body as { id: string }).id;
-  const pages = (await adminPool.query<{ id: string }>("SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = 'book'", [gid])).rows[0].id;
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const itemsPath = `/api/challenges/${cid}/items`;
+  const catalog = await call("POST", `${catalogPath}/items`, { session, body: { kind: "book", title: "Só no acervo" } });
+  assert.equal(catalog.response.status, 201, JSON.stringify(catalog.body));
+  const catalogId = (catalog.body as { id: string }).id;
 
-  const needsAuthor = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Sem autor" } });
-  assert.equal(needsAuthor.response.status, 400, "com o autor visível, ele continua obrigatório");
-  assert.equal((await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "bookshelf", title: "Outra", participantIds: [owner.user.id], items: [{ title: "Sem autor" }] },
-  })).response.status, 400);
-
-  assert.equal((await call("PATCH", `/api/catalog/libraries/${pages}/properties/author`, { session: owner, body: { hidden: true } })).response.status, 200);
-  const hidden = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Sem autor" } });
-  assert.equal(hidden.response.status, 201, JSON.stringify(hidden.body));
-  const other = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "bookshelf", title: "Outra", participantIds: [owner.user.id], items: [{ title: "Outro sem autor" }] },
+  const single = await call("POST", itemsPath, { session, body: { title: "Adição avulsa", author: "   " } });
+  assert.equal(single.response.status, 201, JSON.stringify(single.body));
+  const appended = await call("POST", itemsPath, {
+    session, body: { items: [{ title: "Em lote" }, { title: "Só no acervo", catalogItemId: catalogId }] },
   });
-  assert.equal(other.response.status, 201, JSON.stringify(other.body));
+  assert.equal(appended.response.status, 201, JSON.stringify(appended.body));
+
+  const detail = await call("GET", `/api/challenges/${cid}`, { session });
+  const item = (detail.body as { items: DetailItem[] }).items.find(({ title }) => title === "Ficciones");
+  assert.ok(item);
+  const edited = await call("PATCH", `${itemsPath}/${item.id}`, { session, body: { title: item.title, author: "", pageCount: null } });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const catalogue = (await call("GET", catalogPath, { session })).body as { items: Array<{ title: string; author: string | null; pageCount: number | null }> };
+  const book = catalogue.items.find(({ title }) => title === item.title);
+  assert.ok(book);
+  assert.equal(book.author, null);
+  assert.equal(book.pageCount, null);
+
+  const blank = { title: "   ", author: "Borges" };
+  assert.equal((await call("POST", `${catalogPath}/items`, { session, body: { kind: "book", ...blank } })).response.status, 400);
+  assert.equal((await call("POST", challengePath, { session, body: { ...setup, items: [blank] } })).response.status, 400);
+  assert.equal((await call("POST", itemsPath, { session, body: blank })).response.status, 400);
+  assert.equal((await call("POST", itemsPath, { session, body: { items: [blank] } })).response.status, 400);
+  assert.equal((await call("PATCH", `${itemsPath}/${item.id}`, { session, body: blank })).response.status, 400);
 });
 
 test("receitas não aceitam biblioteca a mais; o item do desafio edita as propriedades da sua biblioteca", async () => {

@@ -31,6 +31,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
 }) {
   const t = useTranslations("createChallenge");
   const ts = useTranslations("challengeCreate");
+  const tCatalogAdd = useTranslations("catalogAdd");
   const f = useGoaFormat();
   const draft = initialDraft;
   const [step, setStep] = useState(() => {
@@ -58,7 +59,6 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
   const [additionalResponses, setAdditionalResponses] = useState<ChallengeResponseInput[]>(draft?.additionalResponses ?? []);
   const [cineItems, setCineItems] = useState<CineRow[]>(draft?.cineItems ?? []);
   const [itemsAdding, setItemsAdding] = useState(false);
-  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
   const [participantIds, setParticipantIds] = useState<Id[]>(draft?.participantIds ?? group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
   function pickLibrary(library: ChallengeLibrary) {
     const previous = pickedLibrary ?? chosenLibrary;
     const previousKind = pickedKind ?? previous?.kind ?? cineItems[0]?.libraryKind;
-    if (previousKind && previousKind !== library.kind) { setCineItems([]); setItemProblem(null); }
+    if (previousKind && previousKind !== library.kind) setCineItems([]);
     const changed = previousKind !== library.kind || (previous?.id ?? cineItems[0]?.libraryId) !== library.id;
     setChosenLibrary(library); setPickedKind(library.kind); if (changed) setLegacyProgress(false);
   }
@@ -109,7 +109,6 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
     setPickedKind(null);
     setChosenLibrary(null);
     setCineItems([]);
-    setItemProblem(null);
     setLegacyProgress(false);
   }
   function problemForStep(key: StepKey): string | null {
@@ -128,8 +127,8 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
       if (totalFields > 30) return t("errTooManyFields");
     }
     if (key === "checkpoints") {
+      if (itemInputs.length !== cineItems.length) return tCatalogAdd("titleRequired");
       if (!itemInputs.length) return ts("errNoItems");
-      if (itemProblem) return t("errNoAuthor");
     }
     return null;
   }
@@ -172,7 +171,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
     <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
       {stepKey === "setup" ? (<div>
         <label className="mb-6 block"><span className={labelClass}>{ts("name")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required placeholder={ts("namePlaceholder")} /></label>
-        <ChallengeSource scope={scope} libraries={libraries} linked={linked} libraryKind={pickedKind} dated={dated} onLinked={(next) => { setLinked(next); if (!next) { setDated(true); setItemProblem(null); } if (next !== linked) setLegacyProgress(false); }} onLibrary={pickLibrary} onDated={(next) => { setDated(next); if (next !== dated) setLegacyProgress(false); }} onLibraryCleared={clearLibrary} onLibraryDeleted={removeDraftLibrary} />
+        <ChallengeSource scope={scope} libraries={libraries} linked={linked} libraryKind={pickedKind} dated={dated} onLinked={(next) => { setLinked(next); if (!next) setDated(true); if (next !== linked) setLegacyProgress(false); }} onLibrary={pickLibrary} onDated={(next) => { setDated(next); if (next !== dated) setLegacyProgress(false); }} onLibraryCleared={clearLibrary} onLibraryDeleted={removeDraftLibrary} />
         {legacyProgress ? <p className="mt-4 text-sm text-[var(--muted)]">{ts("legacyDraft")}</p> : null}
             <h3 className="mt-8 mb-5 border-t border-[var(--line)] pt-6 text-lg font-light">{ts("detailsTitle")}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -239,7 +238,6 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
                 scope={scope}
                 libraries={itemLibraries}
 
-                onProblem={setItemProblem}
                 addDialogOpen={itemsAdding}
                 onAddDialogOpenChange={setItemsAdding}
                 showAddButton={false}

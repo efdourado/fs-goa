@@ -656,7 +656,6 @@ export function ItemEditorDialog({
       item={{ ...item.catalogItem, title: item.title }}
       library={item.catalogItem ? library : null}
       maxTitleLength={200}
-      requireAuthor
       onCancel={onCancel}
       onSave={onSave}
       onRemove={removal}

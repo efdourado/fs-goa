@@ -15,7 +15,6 @@
   --ink: #26342f;
   --ink-strong: #192a24;
   --muted: #53655d;
-  --catalog-trigger-ink: #27282a;
   --canvas: #edf1eb;
   --canvas-glow: var(--main);
   --paper: #f7f9f5;
@@ -74,7 +73,6 @@
     --ink: #e7e7e8;
     --ink-strong: #f5f5f5;
     --muted: #bdbec1;
-    --catalog-trigger-ink: #fff;
     --canvas: #232425;
     --canvas-glow: #606367;
     --paper: #2d2e30;
@@ -133,7 +131,6 @@
   --ink: #e7e7e8;
   --ink-strong: #f5f5f5;
   --muted: #bdbec1;
-  --catalog-trigger-ink: #fff;
   --canvas: #232425;
   --canvas-glow: #606367;
   --paper: #2d2e30;

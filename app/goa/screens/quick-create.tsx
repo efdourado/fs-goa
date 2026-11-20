@@ -61,7 +61,6 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [rows, setRows] = useState<CineRow[]>([]);
-  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scope: CatalogScope | null = where ? where.kind === "personal" ? "personal" : { groupId: where.groupId } : null;
@@ -69,6 +68,7 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
   const selectedLibrary = linked ? library : null;
   const fieldsValid = fields.length > 0 && fields.length <= 30 && fields.every((field) => field.label.trim());
   const items = selectedLibrary ? cineRowsToInput(rows) : [];
+  const itemsValid = items.length > 0 && items.length === rows.length;
   const setupValid = Boolean(title.trim()) && (!linked || Boolean(library)) && (scheduleMode === "none" || Boolean(startsOn && endsOn && endsOn >= startsOn));
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { if (setupReady) end.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [where, setupReady, itemsReady]);
@@ -86,7 +86,7 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
     finally { setGroupBusy(false); }
   }
   async function create() {
-    if (!where || !setupValid || !fieldsValid || (linked && (!library || !items.length || itemProblem))) return;
+    if (!where || !setupValid || !fieldsValid || (linked && (!library || !itemsValid))) return;
     setBusy(true); setError(null);
     try {
       const input: ChallengeCreationInput = {
@@ -120,7 +120,7 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
       {where && scope ? <div className="space-y-3"><Ask>{ts("setupQuestion")}</Ask>
         {setupReady ? <Answered onEdit={() => { setSetupReady(false); setItemsReady(false); }} editLabel={t("change")}>{title} · {ts(dated ? "daily" : "list")}{selectedLibrary ? ` · ${selectedLibrary.label || ts("library")}` : ""}</Answered> : <form className="ml-10 space-y-5" onSubmit={(event) => { event.preventDefault(); if (setupValid) { setSetupReady(true); setError(null); } }}>
           <label className="block"><span className={labelClass}>{ts("name")}</span><input className={inputClass} aria-label={ts("name")} placeholder={ts("namePlaceholder")} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} /></label>
-          <ChallengeSource scope={scope} libraries={libraries} linked={linked} dated={dated} libraryKind={library?.kind ?? null} onLinked={(next) => { setLinked(next); if (!next) setItemProblem(null); }} onDated={setDated} onLibrary={(next) => { if (library?.kind !== next.kind) { setRows([]); setItemProblem(null); } setLibrary(next); }} />
+          <ChallengeSource scope={scope} libraries={libraries} linked={linked} dated={dated} libraryKind={library?.kind ?? null} onLinked={setLinked} onDated={setDated} onLibrary={(next) => { if (library?.kind !== next.kind) setRows([]); setLibrary(next); }} />
           <fieldset className="space-y-3"><legend className={labelClass}>{ts("deadline")}</legend>
             <SelectableCards value={scheduleMode} onChange={setScheduleMode} options={[
               { value: "none", label: ts("withoutDeadline"), hint: tr("scheduleNoneHint") },
@@ -134,13 +134,13 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
       {where && scope && setupReady && selectedLibrary ? <div className="space-y-3"><Ask>{ts("itemsQuestion")}</Ask>
         {itemsReady ? <Answered onEdit={() => setItemsReady(false)} editLabel={t("change")}>{items.map((item) => item.title).join(" · ")}</Answered> : <div className="ml-10 space-y-4">
           <p className="text-sm text-[var(--muted)]">{ts("itemsHint")}</p>
-          <CineItemsEditor value={rows} onChange={setRows} scope={scope} libraries={[selectedLibrary]} members={where.kind === "group" ? standardGroups.find((group) => group.id === where.groupId)?.members ?? [] : []} onProblem={setItemProblem} />
-          <CreationButton className="w-full" disabled={!items.length || Boolean(itemProblem)} onClick={() => { setItemsReady(true); setError(null); }}>{tc("continue")}</CreationButton>
+          <CineItemsEditor value={rows} onChange={setRows} scope={scope} libraries={[selectedLibrary]} members={where.kind === "group" ? standardGroups.find((group) => group.id === where.groupId)?.members ?? [] : []} />
+          <CreationButton className="w-full" disabled={!itemsValid} onClick={() => { setItemsReady(true); setError(null); }}>{tc("continue")}</CreationButton>
         </div>}
       </div> : null}
       {where && setupReady && (!selectedLibrary || itemsReady) ? <div className="space-y-3"><Ask>{ts("questionsQuestion")}</Ask><div className="ml-10 space-y-4">
         <ResponseFields fields={fields} onChange={setFields} linked={linked} dated={dated} answerScope={answerScope} onScope={setAnswerScope} />
-        <CreationButton className="w-full" disabled={busy || !setupValid || !fieldsValid || Boolean(selectedLibrary && (!items.length || itemProblem))} onClick={() => void create()}>{busy ? tr("creatingDraft") : tr("createDraft")}</CreationButton>
+        <CreationButton className="w-full" disabled={busy || !setupValid || !fieldsValid || Boolean(selectedLibrary && !itemsValid)} onClick={() => void create()}>{busy ? tr("creatingDraft") : tr("createDraft")}</CreationButton>
       </div></div> : null}
       <StatusMessage error={error} />
       <div ref={end} />

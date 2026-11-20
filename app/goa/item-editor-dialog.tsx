@@ -17,17 +17,15 @@ const VISIBLE_PROPERTIES = 6;
 const EMPTY_PROPERTIES: LibraryProperty[] = [];
 
 /** One item editor for both catalogue and challenge views. Callers supply only their save/removal actions. */
-export function ItemEditorDialog({ item, library, maxTitleLength, requireAuthor = false, onCancel, onSave, onRemove }: {
+export function ItemEditorDialog({ item, library, maxTitleLength, onCancel, onSave, onRemove }: {
   item: EditorItem;
   library: { id: Id | null; kind: string } | null;
   maxTitleLength: number;
-  requireAuthor?: boolean;
   onCancel: () => void;
   onSave: (payload: ItemEditorPayload) => Promise<void>;
   onRemove?: { body: string; onConfirm: () => Promise<void> };
 }) {
   const t = useTranslations("catalogAdd");
-  const tCine = useTranslations("cineItems");
   const tFields = useTranslations("entryForm");
   const f = useGoaFormat();
   const { properties: loadedProperties, error: propertiesError } = useLibraryProperties(library);
@@ -47,11 +45,6 @@ export function ItemEditorDialog({ item, library, maxTitleLength, requireAuthor 
     const name = title.trim();
     if (!name) { setError(t("titleRequired")); return; }
     if (!properties || propertiesError) return;
-    if (requireAuthor && library?.kind === "book" && properties.some((property) => property.key === "author" && !property.hidden) && !(values.author ?? "").trim()) {
-      setExpanded(true);
-      setError(tCine("authorRequired"));
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
