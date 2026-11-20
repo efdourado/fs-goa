@@ -3,6 +3,7 @@ import { withClient } from "../../db";
 import { challengeAccess } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { normalizeTitle } from "../catalog";
+import { MAX_CHALLENGE_ITEM_BATCH } from "../domain/item-limits";
 import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN } from "../domain/shared";
 import { entryTypesForChallenge, usesRoundItems } from "./entry-types";
 import { readChallengeLibraries, resolveItemLibrary } from "./libraries";
@@ -27,7 +28,7 @@ const FIELD_ALIASES: Record<MappableField, string[]> = {
 
 const KNOWN_KEYS = new Set(Object.values(FIELD_ALIASES).flat().map((key) => key.toLowerCase()));
 
-export const LIST_IMPORT_LIMIT = 200;
+export const LIST_IMPORT_LIMIT = MAX_CHALLENGE_ITEM_BATCH;
 
 function firstString(value: unknown): string {
   if (Array.isArray(value)) {

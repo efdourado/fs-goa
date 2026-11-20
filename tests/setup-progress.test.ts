@@ -2,54 +2,47 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import test from "node:test";
 
-import type { PreflightReport } from "../app/goa/preflight-panel";
-import { SETUP_STEPS, SetupSummary, setupState } from "../app/goa/setup-progress";
+import { ChallengeStatePanel } from "../app/goa/screens/challenge-actions";
+import { SETUP_STEPS, SetupBlockerList, setupBlockersByTab } from "../app/goa/setup-progress";
+import type { ChallengeDetail } from "../app/goa/types";
+import type { PreflightIssue, PreflightReport } from "../lib/goa/challenges/preflight";
 import { renderWithIntl } from "./helpers/intl";
 
-const issue = (code: string, severity: "error" | "warning" = "error") => ({ code, severity, message: code });
+const issue = (code: string, severity: PreflightIssue["severity"] = "error"): PreflightIssue => ({ code, severity, message: code });
 
-test("o progresso da configuração agrupa os bloqueios por aba e aponta a primeira que falta", () => {
+test("os bloqueios aparecem apenas nas abas em que podem ser corrigidos", () => {
+  const participants = issue("no_participants");
+  const items = issue("no_items");
+  const checkpoints = issue("no_checkpoints");
+  const metrics = issue("metric_field_archived");
+  const unknown = issue("codigo_novo");
   const report: PreflightReport = {
     ready: false,
-    errors: [issue("no_participants"), issue("no_items"), issue("metric_field_archived"), issue("codigo_novo")],
+    errors: [participants, items, checkpoints, metrics, unknown],
     warnings: [issue("no_metrics", "warning")],
   };
-  const state = setupState(report, SETUP_STEPS);
-  assert.deepEqual(state.errors, { overview: 1, checkpoints: 1, metrics: 1 }, "participantes ficam em Geral e itens em Itens e etapas; códigos desconhecidos contam sem apontar aba");
-  assert.equal(state.errorCount, 4);
-  assert.equal(state.todoCount, 4, "uma coisa a fazer por aba com problema, mais o que não aponta para aba nenhuma");
-  assert.equal(state.firstTodo, "overview", "a primeira etapa, na ordem de trabalho");
-
-  // Dois problemas na mesma aba são um serviço só, com um só motivo na tela.
-  const sameTab = setupState({ ready: false, errors: [issue("no_items"), issue("no_checkpoints")], warnings: [] }, SETUP_STEPS);
-  assert.equal(sameTab.errorCount, 2);
-  assert.equal(sameTab.todoCount, 1);
-  assert.deepEqual(sameTab.reasons.map((reason) => reason.code), ["no_items"]);
-
-  const onlyLater = setupState({ ready: false, errors: [issue("no_items"), issue("no_checkpoints")], warnings: [] }, SETUP_STEPS);
-  assert.equal(onlyLater.firstTodo, "checkpoints", "items and stages are managed together");
-  const noStages = setupState({ ready: false, errors: [issue("no_checkpoints")], warnings: [] }, ["overview", "fields"]);
-  assert.equal(noStages.firstTodo, null, "uma aba que este desafio não tem nunca é a próxima");
+  const blockers = setupBlockersByTab(report, SETUP_STEPS);
+  assert.deepEqual(blockers, { overview: [participants, unknown], checkpoints: [items, checkpoints], results: [metrics] });
+  assert.deepEqual(setupBlockersByTab(report, ["overview", "results"]), { overview: [participants, items, checkpoints, unknown], results: [metrics] });
+  const itemsHtml = renderWithIntl(createElement(SetupBlockerList, { issues: blockers.checkpoints }));
+  assert.match(itemsHtml, /Faltam 2 coisas para poder começar/);
+  assert.doesNotMatch(itemsHtml, /O desafio não tem participantes|<button/);
 });
 
-test("sem bloqueios só há avisos: a configuração está pronta e o desafio pode começar", () => {
-  const report: PreflightReport = { ready: true, errors: [], warnings: [issue("no_metrics", "warning")] };
-  const state = setupState(report, SETUP_STEPS);
-  assert.equal(state.errorCount, 0);
-  assert.equal(state.firstTodo, null);
-  const html = renderWithIntl(createElement(SetupSummary, { state, activeTab: "overview", onGo: () => undefined }));
-  assert.match(html, /Comece o desafio pelo menu no topo/);
-  assert.doesNotMatch(html, /<button/);
-});
+test("Ativação do desafio mostra o interruptor no cabeçalho e o bloqueio de Geral logo abaixo", () => {
+  const blockers = setupBlockersByTab({ ready: false, errors: [issue("no_participants"), issue("choice_without_options")], warnings: [] }, SETUP_STEPS);
+  const props = {
+    challenge: { kind: "round", status: "draft" } as ChallengeDetail,
+    canActivate: false,
+    onTransition: async () => undefined,
+  };
+  const html = renderWithIntl(createElement(ChallengeStatePanel, { ...props, blockers: blockers.overview }));
+  assert.match(html, /Ativação do desafio.*Ative o desafio para liberar os registros\. Só administradores veem o rascunho\..*role="switch"[^>]*aria-checked="false"[^>]* disabled=""[^>]*>.*Falta 1 coisa para poder começar.*O desafio não tem participantes/);
+  assert.doesNotMatch(html, /campo de escolha|Ir para Geral/);
 
-test("o resumo diz o que falta e leva à próxima coisa a fazer, sem oferecer ir para onde já se está", () => {
-  const report: PreflightReport = { ready: false, errors: [issue("no_participants"), issue("choice_without_options")], warnings: [] };
-  const state = setupState(report, SETUP_STEPS);
-  const elsewhere = renderWithIntl(createElement(SetupSummary, { state, activeTab: "fields", onGo: () => undefined }));
-  assert.match(elsewhere, /Faltam 2 coisas para poder começar/);
-  assert.doesNotMatch(elsewhere, /coisa para poder/, "no plural certo");
-  assert.match(elsewhere, /O desafio não tem participantes/);
-  assert.match(elsewhere, />Ir para Geral</);
-  const there = renderWithIntl(createElement(SetupSummary, { state, activeTab: "overview", onGo: () => undefined }));
-  assert.doesNotMatch(there, /<button/);
+  const ready = setupBlockersByTab({ ready: true, errors: [], warnings: [issue("no_metrics", "warning")] }, SETUP_STEPS);
+  const readyHtml = renderWithIntl(createElement(ChallengeStatePanel, { ...props, canActivate: true, blockers: ready.overview }));
+  assert.match(readyHtml, /Ative o desafio para liberar os registros\..*role="switch"[^>]*aria-checked="false"/);
+  assert.doesNotMatch(readyHtml, /role="switch"[^>]* disabled=""/);
+  assert.doesNotMatch(readyHtml, /para poder começar|<li>/);
 });

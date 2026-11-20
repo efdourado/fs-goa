@@ -204,7 +204,7 @@ test("explica por que um registro está indisponível sem chamar futuro de encer
   });
   assert.match(scheduled ?? "", /ainda não abriram/i);
   assert.doesNotMatch(scheduled ?? "", /desafio.*encerrado/i);
-  assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "draft", isParticipant: true }) ?? "", /rascunho/i);
+  assert.equal(ptFormat.entryUnavailableMessage({ challengeStatus: "draft", isParticipant: true }), null);
   assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "active", isParticipant: false }) ?? "", /não está entre/i);
   assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "closed", isParticipant: true }) ?? "", /encerrado/i);
   assert.equal(ptFormat.entryUnavailableMessage({ challengeStatus: "active", isParticipant: true, itemStatus: "open" }), null);
@@ -703,16 +703,17 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
     result: null,
   } as unknown as ChallengeDetail;
 
-  const html = renderWithIntl(createElement(ParticipantChallengeScreen, {
+  const props = {
     preview: false,
     user: null,
     challenge,
     entries: [],
-    tab: "today",
+    tab: "today" as const,
     onTab: () => undefined,
     onBack: () => undefined,
     onSaveEntry: async () => undefined,
-  }));
+  };
+  const html = renderWithIntl(createElement(ParticipantChallengeScreen, props));
 
   assert.match(html, /<h2[^>]*>Parasita<\/h2>/);
   assert.match(html, /2019 · Drama · 2h12 · Bong Joon-ho · 0 · Não/);
@@ -722,6 +723,10 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
   assert.match(html, /Salvar/, "um único botão salva as duas seções obrigatórias de uma vez");
   assert.doesNotMatch(html, /border-l/, "expectation and rating fields have no decorative left border");
   assert.doesNotMatch(html, /Salvar registro/, "cada seção não carrega mais o próprio botão de salvar");
+
+  const draft = renderWithIntl(createElement(ParticipantChallengeScreen, { ...props, challenge: { ...challenge, status: "draft" } }));
+  assert.match(draft, /Parasita/);
+  assert.doesNotMatch(draft, /Ative-o para liberar os registros|Somente para leitura|Salvar/i);
 });
 
 test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pula os escondidos", () => {

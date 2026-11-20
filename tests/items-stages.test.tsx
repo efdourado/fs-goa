@@ -5,6 +5,7 @@ import {JSDOM} from "jsdom";
 import {CheckpointPlanner} from "../app/goa/checkpoint-planner";
 import {AddItemsDialog} from "../app/goa/cine-items";
 import {API_PATHS} from "../app/goa/api";
+import {OrganiseDialog} from "../app/goa/organize-panel";
 import {Toaster} from "../app/goa/ui";
 import {AdminScreen} from "../app/goa/screens/admin";
 import {SessionLog, sessionSpecOf} from "../app/goa/session-log";
@@ -35,6 +36,34 @@ async function setup() {
  return {root, button, fill, render, cleanup: async () => {await act(async () => root.unmount()); globalThis.fetch = beforeFetch;}};
 }
 const noop = async () => undefined;
+
+test("retry previews stop after the last distinct order and reset when properties change", async () => {
+ const ui = await setup();
+ const keys = ["a1", "a2", "b1", "b2", "c1", "c2"];
+ const items = keys.map((key, index) => ({key, values: {author: key[0], year: 2000 + index}}));
+ const titles = Object.fromEntries(keys.map((key) => [key, key]));
+ const saved: string[][] = [];
+ try {
+  await ui.render(<OrganiseDialog input={{items, titles, traits: [{key: "author", label: "Autor", kind: "category"}, {key: "year", label: "Ano", kind: "number"}]}} onApply={(order) => {saved.push(order);}} onClose={() => undefined} />);
+  const retry = ui.button("Tentar outra");
+  assert.equal(retry.disabled, false);
+  const before = document.querySelector("dialog ol")?.textContent;
+  await act(async () => {for (let i = 0; i < 100; i += 1) retry.click();});
+  assert.equal(retry.disabled, true);
+  const last = document.querySelector("dialog ol")?.textContent;
+  assert.notEqual(last, before);
+  await act(async () => retry.click());
+  assert.equal(document.querySelector("dialog ol")?.textContent, last);
+  assert.equal(saved.length, 0);
+
+  await act(async () => ui.button("Ano").click());
+  assert.equal(retry.disabled, false);
+  const shown = [...document.querySelectorAll("dialog ol li span:nth-child(2)")].map((title) => title.textContent);
+  await act(async () => ui.button("Aplicar ordem").click());
+  assert.deepEqual(saved, [shown]);
+ } finally {await ui.cleanup();}
+});
+
 function adminProps(extra: Partial<Parameters<typeof AdminScreen>[0]> = {}): Parameters<typeof AdminScreen>[0] {
  return {challenge, entries: [], tab: 'fields', onTab() {}, onBack() {}, duplicateTargets: [], onSaveFields: noop, onAddSharedResponse: noop, onRenameEntryType: noop, ...extra} as unknown as Parameters<typeof AdminScreen>[0];
 }

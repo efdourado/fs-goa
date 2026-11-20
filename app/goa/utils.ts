@@ -183,7 +183,7 @@ export function entryUnavailableMessage({
   opensAt?: string | null;
 }): string | null {
   if (challengeStatus === "closed") return "Este desafio foi encerrado. O registro está disponível somente para leitura.";
-  if (challengeStatus === "draft") return "Este desafio ainda é um rascunho. Ative-o para liberar os registros.";
+  if (challengeStatus === "draft") return null;
   if (isParticipant === false) return "Você pode acompanhar este desafio, mas não está entre as pessoas selecionadas para registrar.";
   if (itemStatus === "scheduled") {
     return opensAt

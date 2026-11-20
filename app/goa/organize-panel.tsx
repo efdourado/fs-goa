@@ -7,9 +7,10 @@ import { useMemo, useState } from "react";
 
 import type { CineRow } from "./cine-items";
 import { FormDialog } from "./dialog";
-import { organiseList, suggestedTraits, type OrganiseItem, type Trait, usableTraits } from "./organize-list";
+import { organiseOptions, suggestedTraits, type OrganiseItem, type Trait, usableTraits } from "./organize-list";
+import { editableProperties, type PropertyValues, valuesFromItem } from "./property-inputs";
 import type { ChallengeItem, Id, LibraryProperty } from "./types";
-import { cx } from "./ui";
+import { CircleCheckIcon, cx } from "./ui";
 
 /** What the organiser reads: each item's values, the properties on offer, and a title to show per key. */
 export interface OrganiseInput {
@@ -18,72 +19,57 @@ export interface OrganiseInput {
   titles: Record<string, string>;
 }
 
-type Labels = (key: "runtime" | "pages" | "year" | "genre" | "author") => string;
+type PropertyName = (property: LibraryProperty) => string;
+type PropertiesByKind = ReadonlyMap<string, LibraryProperty[]>;
 
-const NATIVE: Array<{ key: "runtime" | "pages" | "year" | "genre" | "author"; kind: Trait["kind"]; fair?: boolean }> = [
-  { key: "runtime", kind: "number" },
-  { key: "pages", kind: "number" },
-  { key: "genre", kind: "category" },
-  { key: "author", kind: "category" },
-  { key: "year", kind: "number" },
-];
-
-/** A library's own properties (Attention 1–5, Director…) as organiser properties, by type. Dates aren't spread. */
-function customTraits(properties: LibraryProperty[]): Trait[] {
-  return properties
-    .filter((property) => property.storage === "attribute" && !property.hidden && (property.type === "number" || property.type === "text" || property.type === "boolean"))
-    .map((property) => ({ key: `attr:${property.key}`, label: property.label ?? property.key, kind: property.type === "number" ? "number" : "category" }));
+function organiseProperties(propertiesByKind: PropertiesByKind, name: PropertyName) {
+  const traits = new Map<string, Trait>();
+  const byKind = new Map([...propertiesByKind].map(([kind, properties]) => [kind, editableProperties(properties).map((property) => {
+    const label = name(property);
+    // Native fields with the same display name can be compared across libraries. Custom fields belong to one library.
+    const key = JSON.stringify([property.storage === "native" ? null : kind, property.key, property.type, label]);
+    traits.set(key, { key, label, kind: property.type === "number" || property.type === "date" ? "number" : "category", suggest: property.key !== "year" });
+    return { property, key };
+  })]));
+  return {
+    traits: [...traits.values()],
+    values(kind: string, read: (properties: LibraryProperty[]) => PropertyValues): OrganiseItem["values"] {
+      const columns = byKind.get(kind) ?? [];
+      const raw = read(columns.map(({ property }) => property));
+      return Object.fromEntries(columns.map(({ property, key }) => {
+        const value = raw[property.key]?.trim();
+        if (!value) return [key, null];
+        if (property.type === "text" || property.type === "boolean") return [key, value];
+        const number = property.type === "date" ? Date.parse(value) : Number(value);
+        return [key, Number.isFinite(number) ? number : null];
+      }));
+    },
+  };
 }
 
-const asNumber = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number.isFinite(Number(value)) ? Number(value) : null);
-
 /** The wizard's rows (a challenge being created). */
-export function organiseFromRows(rows: CineRow[], properties: LibraryProperty[], label: Labels): OrganiseInput {
-  const items = rows.map((row): OrganiseItem => ({
-    key: row.key,
-    values: {
-      runtime: asNumber(row.runtimeMinutes),
-      pages: asNumber(row.pages),
-      year: asNumber(row.year),
-      genre: row.mainGenre || null,
-      author: row.author || null,
-      ...Object.fromEntries(customTraits(properties).map((trait) => {
-        const raw = row.extra[trait.key.slice(5)];
-        return [trait.key, trait.kind === "number" ? asNumber(raw) : raw === undefined || raw === "" ? null : String(raw)];
-      })),
-    },
-  }));
+export function organiseFromRows(rows: CineRow[], properties: PropertiesByKind, defaultKind: string, name: PropertyName, rowValues: (row: CineRow, columns: LibraryProperty[]) => PropertyValues): OrganiseInput {
+  const model = organiseProperties(properties, name);
   return {
-    items,
-    traits: [...NATIVE.map((native) => ({ key: native.key, label: label(native.key), kind: native.kind, fair: native.fair })), ...customTraits(properties)],
+    items: rows.map((row) => ({ key: row.key, values: model.values(row.libraryKind || defaultKind, (columns) => rowValues(row, columns)) })),
+    traits: model.traits,
     titles: Object.fromEntries(rows.map((row) => [row.key, row.title])),
   };
 }
 
 /** A challenge's saved items; `pinned` ones (already logged) keep their place. */
-export function organiseFromItems(challengeItems: ChallengeItem[], properties: LibraryProperty[], pinned: Set<Id>, label: Labels): OrganiseInput {
-  const items = challengeItems.map((item): OrganiseItem => {
-    const catalog = item.catalogItem;
-    const attributes = new Map((catalog?.attributes ?? []).map((attribute) => [attribute.key, attribute.value]));
-    return {
-      key: item.id,
-      pinned: pinned.has(item.id),
-      values: {
-        runtime: catalog?.runtimeMinutes ?? null,
-        pages: catalog?.pageCount ?? null,
-        year: catalog?.year ?? null,
-        genre: catalog?.mainGenre ?? null,
-        author: catalog?.author ?? null,
-        ...Object.fromEntries(customTraits(properties).map((trait) => {
-          const raw = attributes.get(trait.key.slice(5));
-          return [trait.key, trait.kind === "number" ? asNumber(raw) : raw === undefined || raw === "" ? null : String(raw)];
-        })),
-      },
-    };
-  });
+export function organiseFromItems(challengeItems: ChallengeItem[], properties: PropertiesByKind, pinned: Set<Id>, name: PropertyName): OrganiseInput {
+  const model = organiseProperties(properties, name);
   return {
-    items,
-    traits: [...NATIVE.map((native) => ({ key: native.key, label: label(native.key), kind: native.kind, fair: native.fair })), ...customTraits(properties)],
+    items: challengeItems.map((item) => {
+      const catalog = item.catalogItem;
+      return {
+        key: item.id,
+        pinned: pinned.has(item.id),
+        values: catalog ? model.values(catalog.kind, (columns) => valuesFromItem(columns, catalog)) : {},
+      };
+    }),
+    traits: model.traits,
     titles: Object.fromEntries(challengeItems.map((item) => [item.id, item.title])),
   };
 }
@@ -107,8 +93,13 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
   const offered = useMemo(() => usableTraits(input.items, input.traits), [input]);
   const [chosen, setChosen] = useState<string[]>(() => suggestedTraits(input.items, input.traits));
   const [attempt, setAttempt] = useState(0);
-  const active = offered.filter((trait) => chosen.includes(trait.key));
-  const result = useMemo(() => organiseList(input.items, active, attempt), [input.items, active, attempt]);
+  const active = useMemo(() => offered.filter((trait) => chosen.includes(trait.key)), [offered, chosen]);
+  const options = useMemo(() => organiseOptions(input.items, active), [input.items, active]);
+  const lastAttempt = options.length - 1;
+  const result = options[Math.min(attempt, lastAttempt)];
+  const canRetry = !busy && attempt < lastAttempt;
+  const canApply = !busy && active.length > 0 && result.changed;
+  const positionDigits = String(result.order.length).length;
   const pinned = new Set(input.items.filter((item) => item.pinned).map((item) => item.key));
 
   const reason = (row: (typeof result.report)[number]) => {
@@ -125,9 +116,24 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
       dirty={false}
       busy={busy}
       onCancel={onClose}
-      submitDisabled={!active.length || !result.changed}
+      stickyActions
+      submitDisabled={!canApply}
       submitLabel={t("apply")}
-      onSubmit={() => onApply(result.order)}
+      onSubmit={() => { if (canApply) return onApply(result.order); }}
+      footerStart={(
+        <StateButton
+          type="button"
+          aria-label={t("another")}
+          title={t("another")}
+          className="grid size-9 flex-none cursor-pointer place-items-center rounded-full border border-[var(--line)] text-[var(--ink)] hover:bg-[var(--wash)] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          disabled={!canRetry}
+          onClick={() => setAttempt((value) => Math.min(value + 1, lastAttempt))}
+        >
+          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 1 2.64 6.36M3 5v7h7" />
+          </svg>
+        </StateButton>
+      )}
     >
       <p className="text-sm leading-6 text-[var(--muted)]">{t("intro")}</p>
       <fieldset className="mt-4">
@@ -143,7 +149,7 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
                 onClick={() => { setAttempt(0); setChosen((current) => (on ? current.filter((key) => key !== trait.key) : [...current, trait.key])); }}
                 className={cx("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm transition", on ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]")}
               >
-                {on ? <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
+                {on ? <CircleCheckIcon className="size-4 flex-none" /> : null}
                 {trait.label}
               </StateButton>
             );
@@ -161,14 +167,10 @@ export function OrganiseDialog({ input, onApply, onClose, busy = false }: {
               </li>
             ))}
           </ul>
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-[13px] font-medium">{t("preview")}</p>
-            <StateButton type="button" className="cursor-pointer text-xs text-[var(--main-strong)] hover:underline" onClick={() => setAttempt((value) => value + 1)}>{t("another")}</StateButton>
-          </div>
           <ol className="mt-2 max-h-72 divide-y divide-[var(--line)] overflow-y-auto rounded-2xl border border-[var(--line)]">
             {result.order.map((key, index) => (
               <li key={key} className="flex items-center gap-3 px-3 py-2 text-sm">
-                <span className="w-6 flex-none text-right text-xs tabular-nums text-[var(--muted)]">{index + 1}</span>
+                <span className="w-6 flex-none text-right text-xs tabular-nums text-[var(--muted)]">{String(index + 1).padStart(positionDigits, "0")}</span>
                 <span className="min-w-0 flex-1 truncate">{input.titles[key]}</span>
                 {pinned.has(key) ? <span className="flex-none text-[11px] text-[var(--muted)]">{t("stays")}</span> : null}
               </li>

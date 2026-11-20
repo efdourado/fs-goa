@@ -4533,7 +4533,7 @@ test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desc
   // O limite da operação vale.
   const tooMany = await call("POST", `/api/challenges/${challengeId}/items/preview`, {
     session: owner,
-    body: { json: JSON.stringify(Array.from({ length: 201 }, (_, i) => ({ title: `Filme ${i}` }))) },
+    body: { json: JSON.stringify(Array.from({ length: 301 }, (_, i) => ({ title: `Filme ${i}` }))) },
   });
   assert.equal(tooMany.response.status, 400);
   assert.equal((tooMany.body as { error: string }).error, "json_too_large");

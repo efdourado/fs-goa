@@ -20,6 +20,8 @@ export interface Trait {
   kind: TraitKind;
   /** Spread so the same values do not cluster at the start or the end. */
   fair?: boolean;
+  /** Whether this property may be selected initially when enough items have it. */
+  suggest?: boolean;
 }
 
 export interface OrganiseItem {
@@ -47,7 +49,7 @@ const HIGH = 2 / 3;
 const NEAR = 0.4;
 const STARTS = 12;
 
-type Prepared = { trait: Trait; at: (index: number) => number | string | null };
+type Prepared = { trait: Trait; values: (number | string | null)[] };
 
 function prepare(items: OrganiseItem[], traits: Trait[]): Prepared[] {
   return traits.flatMap((trait): Prepared[] => {
@@ -58,21 +60,21 @@ function prepare(items: OrganiseItem[], traits: Trait[]): Prepared[] {
       const lo = Math.min(...known);
       const hi = Math.max(...known);
       if (hi === lo) return [];
-      return [{ trait, at: (index: number) => (numbers[index] === null ? null : (numbers[index]! - lo) / (hi - lo)) }];
+      return [{ trait, values: numbers.map((value) => value === null ? null : (value - lo) / (hi - lo)) }];
     }
     const labels = items.map((item) => {
       const value = item.values[trait.key];
       return value === null || value === undefined || value === "" ? null : String(value).trim().toLowerCase();
     });
     if (new Set(labels.filter(Boolean)).size < 2 && labels.filter(Boolean).length < 2) return [];
-    return [{ trait, at: (index: number) => labels[index] }];
+    return [{ trait, values: labels }];
   });
 }
 
 /** How much two neighbours (`gap` apart) clash on one property. */
 function clash(prepared: Prepared, a: number, b: number, gap: number): number {
-  const x = prepared.at(a);
-  const y = prepared.at(b);
+  const x = prepared.values[a];
+  const y = prepared.values[b];
   if (x === null || y === null) return 0;
   if (prepared.trait.kind === "number") {
     if (gap > 1) return 0;
@@ -86,14 +88,14 @@ function clash(prepared: Prepared, a: number, b: number, gap: number): number {
 function drift(prepared: Prepared, order: number[]): number {
   const totals = new Map<string, number>();
   for (const index of order) {
-    const value = prepared.at(index);
+    const value = prepared.values[index];
     if (value !== null) totals.set(String(value), (totals.get(String(value)) ?? 0) + 1);
   }
   if (totals.size < 2) return 0;
   const seen = new Map<string, number>();
   let cost = 0;
   order.forEach((index, position) => {
-    const value = prepared.at(index);
+    const value = prepared.values[index];
     if (value !== null) seen.set(String(value), (seen.get(String(value)) ?? 0) + 1);
     for (const [key, total] of totals) {
       const expected = ((position + 1) * total) / order.length;
@@ -120,8 +122,8 @@ function cost(prepared: Prepared[], order: number[]): number {
 function clashes(property: Prepared, order: number[]): number {
   let count = 0;
   for (let position = 1; position < order.length; position += 1) {
-    const a = property.at(order[position - 1]);
-    const b = property.at(order[position]);
+    const a = property.values[order[position - 1]];
+    const b = property.values[order[position]];
     if (a === null || b === null) continue;
     if (property.trait.kind === "number" ? (a as number) >= HIGH && (b as number) >= HIGH : a === b) count += 1;
   }
@@ -148,30 +150,61 @@ function greedy(prepared: Prepared[], slots: Array<number | null>, free: number[
     if (first) { order.push(start); first = false; continue; }
     let best = 0;
     let bestCost = Infinity;
-    left.forEach((candidate, index) => {
-      const value = local(prepared, order, candidate);
+    // Sample across the remaining items on long lists so retry stays responsive.
+    const step = slots.length >= 100 ? Math.max(1, Math.ceil(left.length / 64)) : 1;
+    for (let index = 0; index < left.length; index += step) {
+      const value = local(prepared, order, left[index]);
       if (value < bestCost - 1e-12) { bestCost = value; best = index; }
-    });
+    }
     order.push(left[best]);
     left.splice(best, 1);
   }
   return order;
 }
 
+/** Scores the adjacent and two-apart pairs ending in this window. */
+function windowCost(prepared: Prepared[], order: number[], start: number, end: number): number {
+  let sum = 0;
+  for (const property of prepared) {
+    for (let position = Math.max(1, start); position < Math.min(end, order.length); position += 1) {
+      sum += clash(property, order[position - 1], order[position], 1);
+      if (position > 1) sum += clash(property, order[position - 2], order[position], 2);
+    }
+  }
+  return sum;
+}
+
+function swapWindowCost(prepared: Prepared[], order: number[], left: number, right: number): number {
+  return (windowCost(prepared, order, left, left + 3)
+    + windowCost(prepared, order, Math.max(left + 3, right), right + 3)) / (order.length - 1);
+}
+
 /** Swaps pairs of free positions while that lowers the cost. */
 function improve(prepared: Prepared[], order: number[], movable: boolean[]): number[] {
-  let current = [...order];
-  let currentCost = cost(prepared, current);
+  const current = [...order];
+  const hasFairness = prepared.some(({ trait }) => trait.fair);
+  let currentCost = hasFairness ? cost(prepared, current) : 0;
+  // The greedy pass compares across the whole list. Refine locally on long lists to keep the modal responsive.
+  const swapDistance = order.length >= 100 ? 2 : order.length;
   for (let pass = 0; pass < 3; pass += 1) {
     let changed = false;
     for (let i = 0; i < current.length; i += 1) {
       if (!movable[i]) continue;
-      for (let j = i + 1; j < current.length; j += 1) {
+      for (let j = i + 1; j < current.length && j <= i + swapDistance; j += 1) {
         if (!movable[j]) continue;
-        const trial = [...current];
-        [trial[i], trial[j]] = [trial[j], trial[i]];
-        const trialCost = cost(prepared, trial);
-        if (trialCost < currentCost - 1e-9) { current = trial; currentCost = trialCost; changed = true; }
+        const before = hasFairness ? currentCost : swapWindowCost(prepared, current, i, j);
+        const left = current[i];
+        const right = current[j];
+        current[i] = right;
+        current[j] = left;
+        const after = hasFairness ? cost(prepared, current) : swapWindowCost(prepared, current, i, j);
+        if (after < before - 1e-9) {
+          currentCost = after;
+          changed = true;
+        } else {
+          current[i] = left;
+          current[j] = right;
+        }
       }
     }
     if (!changed) break;
@@ -187,30 +220,40 @@ export interface Organised {
   changed: boolean;
 }
 
-/** The best order for `items` by the chosen `traits`; `attempt` (0, 1, 2…) gives the next-best alternatives. */
-export function organiseList(items: OrganiseItem[], traits: Trait[], attempt = 0): Organised {
+/** Compute the distinct previews once, ranked by the chosen properties. */
+export function organiseOptions(items: OrganiseItem[], traits: Trait[]): Organised[] {
   const prepared = prepare(items, traits);
   const identity = items.map((_, index) => index);
   const slots = items.map((item, index) => (item.pinned ? index : null));
   const free = identity.filter((index) => !items[index].pinned);
   const movable = slots.map((slot) => slot === null);
-  let order = identity;
+  let orders = [identity];
   if (prepared.length && free.length > 1) {
     const starts = free.slice(0, Math.min(free.length, STARTS));
-    const candidates = starts
+    const seen = new Set<string>();
+    orders = starts
       .map((start) => improve(prepared, greedy(prepared, slots, free, start), movable))
+      .filter((candidate) => {
+        const key = candidate.join();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .map((candidate) => ({ candidate, value: cost(prepared, candidate) }))
-      .filter((entry, index, list) => list.findIndex((other) => other.candidate.join() === entry.candidate.join()) === index)
-      .sort((a, b) => a.value - b.value);
-    order = candidates[Math.min(attempt, candidates.length - 1)].candidate;
+      .sort((a, b) => a.value - b.value)
+      .map(({ candidate }) => candidate);
   }
+  return orders.map((order) => describeOrder(items, prepared, order, identity));
+}
+
+function describeOrder(items: OrganiseItem[], prepared: Prepared[], order: number[], identity: number[]): Organised {
   const report = prepared.map((property): TraitReport => {
     const values = property.trait.kind === "category"
       ? [...new Set(order.map((index) => items[index].values[property.trait.key]).filter((value): value is string | number => value !== null && value !== undefined && value !== "").map(String))]
       : undefined;
     const counts = new Map<string, number>();
     for (const index of order) {
-      const value = property.at(index);
+      const value = property.values[index];
       if (value !== null && property.trait.kind === "category") counts.set(String(value), (counts.get(String(value)) ?? 0) + 1);
     }
     const crowded = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -229,6 +272,12 @@ export function organiseList(items: OrganiseItem[], traits: Trait[], attempt = 0
   return { order: order.map((index) => items[index].key), report, changed: order.some((value, index) => value !== index) };
 }
 
+/** `attempt` (0, 1, 2…) selects the next-best order. */
+export function organiseList(items: OrganiseItem[], traits: Trait[], attempt = 0): Organised {
+  const options = organiseOptions(items, traits);
+  return options[Math.min(attempt, options.length - 1)];
+}
+
 /** Properties worth offering: those filled in on at least two items with two different values. */
 export function usableTraits(items: OrganiseItem[], traits: Trait[]): Trait[] {
   return traits.filter((trait) => prepare(items, [trait]).length > 0);
@@ -237,7 +286,7 @@ export function usableTraits(items: OrganiseItem[], traits: Trait[]): Trait[] {
 /** Pre-ticked: filled in on at least half the items. Year is offered but left off — spreading years is rarely the point. */
 export function suggestedTraits(items: OrganiseItem[], traits: Trait[]): string[] {
   return usableTraits(items, traits)
-    .filter((trait) => trait.key !== "year")
+    .filter((trait) => trait.suggest !== false && trait.key !== "year")
     .filter((trait) => items.filter((item) => item.values[trait.key] !== null && item.values[trait.key] !== undefined && item.values[trait.key] !== "").length * 2 >= items.length)
     .map((trait) => trait.key);
 }

@@ -1781,7 +1781,7 @@ export function ParticipantChallengeScreen({
       ) : null}
 
       <div className="mt-5">
-        {activeTab === "today" ? (
+        {activeTab === "today" && challenge.status !== "draft" ? (
           challenge.status === "closed" ? (
             <FaceEmptyState title={t("closedTitle")} />
           ) : sessionSpec ? (

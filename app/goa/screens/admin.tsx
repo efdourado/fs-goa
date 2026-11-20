@@ -15,7 +15,6 @@ import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, Fie
 import { type CatalogScope } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
 import { ItemEditorDialog as SharedItemEditorDialog } from "../item-editor-dialog";
-import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStatePanel, type CopyMode } from "./challenge-actions";
 import type {
@@ -35,7 +34,6 @@ import type {
 } from "../types";
 import {
   BackButton,
-  BoxSection,
   Button,
   ChallengeStatusBadge,
   CheckCircle,
@@ -51,8 +49,8 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { isLivingList, itemIdForEntry } from "../utils";
-import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
+import { isLivingList } from "../utils";
+import { SETUP_STEPS, SetupBlockerList, SetupBlockerMarker, setupBlockersByTab, useChallengePreflight } from "../setup-progress";
 
 interface DuplicateTargetGroup {
   id: Id;
@@ -178,11 +176,11 @@ function AdminGeneral({
     <div className="mx-auto max-w-2xl">
       <PageHeading title={t("basicsTitle")} />
       {lead ? <div className="mb-4">{lead}</div> : null}
-      <form onSubmit={save}>
-        <fieldset disabled={locked} className="min-w-0 space-y-4">
-          {/* What the challenge is called and what it asks, in one box. */}
-          <BoxSection title={t("titleLabel")}>
-            <div className="space-y-5">
+      <form onSubmit={save} className="rounded-[20px] border border-[var(--line)]">
+        <fieldset disabled={locked} className="min-w-0 divide-y divide-[var(--line)]">
+          <div className="p-5 sm:p-6">
+            <h2 className="text-lg font-medium tracking-tight">{t("titleLabel")}</h2>
+            <div className="mt-4 space-y-5">
               <input className={inputClass} aria-label={t("titleLabel")} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
               <Field label={t("descriptionLabel")} optional>
                 <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={locked} />
@@ -191,9 +189,10 @@ function AdminGeneral({
                 <RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={locked} />
               </Field>
             </div>
-          </BoxSection>
+          </div>
 
-          <BoxSection title={t("scheduleLegend")}>
+          <div className="p-5 sm:p-6">
+            <h2 className="mb-4 text-lg font-medium tracking-tight">{t("scheduleLegend")}</h2>
             {endOnly ? (
               <>
                 <SelectableCards
@@ -233,50 +232,49 @@ function AdminGeneral({
                 {challenge.status === "active" ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("scheduleActiveNote")}</p> : null}
               </>
             )}
-          </BoxSection>
+          </div>
+
+          {!isPersonal ? (
+            <div className="p-5 sm:p-6">
+              <h2 className="text-lg font-medium tracking-tight">{t("participantsTitle")}</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">{t("participantsSubtitle")}</p>
+              <div className="mt-4">
+                {group?.members?.length ? (
+                  <ul className="grid gap-2 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+                    {group.members.map((member) => {
+                      const checked = selected.includes(member.id);
+                      const disabled = locked || saving;
+                      return (
+                        <li key={member.id}>
+                          <label className={cx(
+                            "flex min-h-14 items-center gap-3 rounded-xl border px-4 py-3 transition",
+                            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                            checked ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
+                          )}>
+                            <input type="checkbox" className="peer sr-only" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled}
+                              onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
+                            <CheckCircle on={checked} />
+                            <span className="min-w-0">
+                              <strong className="block text-sm font-medium">{member.name}</strong>
+                              <small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small>
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : <EmptyState title={t("noMembersTitle")} />}
+              </div>
+            </div>
+          ) : null}
         </fieldset>
 
-        {!isPersonal ? (
-          <div className="mt-4">
-          <BoxSection title={t("participantsTitle")} hint={t("participantsSubtitle")}>
-            {group?.members?.length ? (
-            <ul className="grid gap-2 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-              {group.members.map((member) => {
-                const checked = selected.includes(member.id);
-                const disabled = locked || saving;
-                return (
-                  <li key={member.id}>
-                    <label className={cx(
-                      "flex min-h-14 items-center gap-3 rounded-xl border px-4 py-3 transition",
-                      disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-                      checked ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
-                    )}>
-                      <input type="checkbox" className="peer sr-only" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled}
-                        onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
-                      <CheckCircle on={checked} />
-                      <span className="min-w-0">
-                        <strong className="block text-sm font-medium">{member.name}</strong>
-                        <small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-            ) : <EmptyState title={t("noMembersTitle")} />}
-          </BoxSection>
+        <StatusMessage error={error} success={success} />
+        {locked ? null : (
+          <div className="sticky bottom-0 z-10 rounded-b-[19px] border-t border-[var(--line)] bg-[var(--canvas)] px-5 py-3 sm:px-6">
+            <Button type="submit" className="w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveBasics")}</Button>
           </div>
-        ) : null}
-
-        <div className={cx("z-10 mt-8 border-[var(--line)] py-3", dirty ? "sticky bottom-0 -mx-4 border-t bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] px-4 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border" : "px-0")}>
-          <StatusMessage error={error} success={success} />
-          {locked ? null : (
-            <div className="space-y-2">
-              <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : null}</span>
-              <Button type="submit" className="w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveBasics")}</Button>
-            </div>
-          )}
-        </div>
+        )}
       </form>
     </div>
   );
@@ -693,64 +691,6 @@ function CheckpointEditorDialog({ item, onCancel, onSave, onRemove }: {
   );
 }
 
-/**
- * Manage › General's one item job: "Organise" — spreading the items so similar ones don't bunch up. Only when it
- * applies (three items or more, with a library detail to spread); everything else about items lives on Today.
- */
-export function AdminItemsSection({ challenge, entries, onReorder }: {
-  challenge: ChallengeDetail;
-  entries: Entry[];
-  /** Saves a new order (positions, stages unchanged). */
-  onReorder: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position: number }>) => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const tOrganise = useTranslations("organise");
-  const f = useGoaFormat();
-  const linked = challenge.libraries ?? [];
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [organising, setOrganising] = useState(false);
-  // Items someone already logged keep their place; the rest are spread out.
-  const { properties: libraryProperties } = useLibraryProperties(linked[0] ?? null);
-  const organiseInput = challenge.submissionMode === "item" && linked.length
-    ? organiseFromItems(
-        [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-        libraryProperties ?? [],
-        new Set(entries.map((entry) => itemIdForEntry(entry)).filter((id): id is Id => Boolean(id))),
-        (key) => tOrganise(`property.${key}`),
-      )
-    : null;
-  if (!organiseInput || !canOrganise(organiseInput) || challenge.status === "closed") return null;
-
-  return (
-    <section className="mt-6">
-      <Button variant="secondary" className="w-full rounded-full" onClick={() => setOrganising(true)}>
-        {/* A small chart: the order being worked out. */}
-        <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4.5 16v-5M10 16V4M15.5 16V8" /></svg>
-        {t("organiseItems")}
-      </Button>
-      <div className="mt-3"><StatusMessage error={error} success={success} /></div>
-      {organising ? (
-        <OrganiseDialog
-          input={organiseInput}
-          busy={busy}
-          onClose={() => setOrganising(false)}
-          onApply={async (order) => {
-            setBusy(true); setError(null); setSuccess(null);
-            try {
-              const stageOf = new Map(challenge.items.map((item) => [item.id, item.checkpointId ?? null]));
-              await onReorder(order.map((itemId, position) => ({ itemId, checkpointId: stageOf.get(itemId) ?? null, position })));
-              setOrganising(false);
-              setSuccess(tOrganise("applied"));
-            } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-          }}
-        />
-      ) : null}
-    </section>
-  );
-}
-
 export function AdminScreen({
   challenge,
   entries,
@@ -835,10 +775,9 @@ export function AdminScreen({
   ];
   const requestedTab = tab === "participants" ? "overview" : tab === "metrics" ? "results" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
-  // While it is a draft, the tabs that must be in order before it can start show their progress.
   const setupOrder = SETUP_STEPS.filter((step) => tabs.includes(step));
-  const preflight = useChallengePreflight(challenge.id, challenge.status === "draft", challenge);
-  const setup = preflight ? setupState(preflight, setupOrder) : null;
+  const preflight = useChallengePreflight(challenge);
+  const blockers = preflight.report ? setupBlockersByTab(preflight.report, tabs) : null;
 
   return (
     <main className="pb-24">
@@ -862,7 +801,7 @@ export function AdminScreen({
                   activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]",
                 )}
               >
-                {setup && setupOrder.includes(id) ? <StepMarker number={setupOrder.indexOf(id) + 1} todo={(setup.errors[id] ?? 0) > 0} /> : null}
+                {blockers?.[id]?.length && setupOrder.includes(id) ? <SetupBlockerMarker number={setupOrder.indexOf(id) + 1} /> : null}
                 {t(`tabs.${id}`)}
               </StateButton>
             ))}
@@ -871,16 +810,18 @@ export function AdminScreen({
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
-        {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
+        {activeTab !== "overview" && blockers?.[activeTab]?.length ? (
+          <div className="mx-auto mb-8 max-w-2xl"><SetupBlockerList issues={blockers[activeTab]} /></div>
+        ) : null}
         {activeTab === "overview" ? (
           <>
             <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants}
-              lead={<ChallengeStatePanel challenge={challenge} onTransition={onTransition} />} />
+              lead={<ChallengeStatePanel challenge={challenge} blockers={blockers?.overview} canActivate={preflight.report?.ready === true} onRetryCheck={preflight.failed ? preflight.retry : undefined} onTransition={onTransition} />} />
 
           </>
         ) : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSetExpectation={onSetExpectation} onSetTracking={onSetPageCount} onAddShared={onAddSharedResponse} /> : null}
-        {activeTab === "checkpoints" ? <><CheckpointPlanner challenge={challenge} entries={entries} itemTools={itemTools} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /><div className="mx-auto max-w-2xl"><AdminItemsSection challenge={challenge} entries={entries} onReorder={onAssignCheckpointItems} /></div></> : null}
+        {activeTab === "checkpoints" ? <CheckpointPlanner challenge={challenge} entries={entries} itemTools={itemTools} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "results" ? <AdminMetrics challenge={challenge} entries={entries} onSaveSettings={onSaveBasics} onSaveMetric={onSaveMetric} onDeleteMetric={onDeleteMetric} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

@@ -111,7 +111,7 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     timeZone?: string;
   }): string | null {
     if (input.challengeStatus === "closed") return t("entryForm.unavailable.closed");
-    if (input.challengeStatus === "draft") return t("entryForm.unavailable.draft");
+    if (input.challengeStatus === "draft") return null;
     if (input.isParticipant === false) return t("entryForm.unavailable.notParticipant");
     if (input.itemStatus === "scheduled") {
       return input.opensAt

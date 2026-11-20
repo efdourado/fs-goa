@@ -526,6 +526,13 @@
       "when": 1793732485918,
       "tag": "0074_purge_unused_result_definitions",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793733000000,
+      "tag": "0075_library_item_capacity",
+      "breakpoints": true
     }
   ]
 }

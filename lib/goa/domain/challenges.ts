@@ -17,6 +17,7 @@ import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/librarie
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
+import { MAX_CHALLENGE_ITEM_BATCH } from "./item-limits";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { MAX_CHALLENGE_RULES } from "./rule-limits";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
@@ -107,7 +108,9 @@ export async function createChallenge(
   if (totalFieldCount > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos entre todas as respostas.");
   const wantsCheckpoints = recipe.entryTypes.some((type) => type.schedulePolicy === "checkpoint");
   const items = Array.isArray(body.items) ? body.items : [];
-  assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
+  if (items.length > MAX_CHALLENGE_ITEM_BATCH) {
+    throw new ApiError(400, "challenge_item_batch_limit", `Adicione de 1 a ${MAX_CHALLENGE_ITEM_BATCH} itens por vez.`);
+  }
   assertArrayWithin(body.participantIds, LIMITS.membersPerGroup, "Participantes demais para um único desafio.");
   const participantIds = options.personal
     ? [session.user.id]
@@ -252,7 +255,9 @@ export async function createChallenge(
     }
 
     if (wantsItems) {
-      if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");
+      if (!items.length) {
+        throw new ApiError(400, "challenge_item_batch_limit", `Adicione de 1 a ${MAX_CHALLENGE_ITEM_BATCH} itens por vez.`);
+      }
       // The one library this challenge draws from, stored on the challenge itself (one per challenge, see
       // docs/architecture.md). Cinema/Estante/Library track their fixed one; Tables the workspace's own Tables
       // library (which the person creates first, never on their behalf); `custom` the one the caller names.

@@ -4,6 +4,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, publicId, semanticKey, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { MAX_LIBRARY_ITEMS } from "../domain/item-limits";
 import { deleteCheckpointsHard } from "../hard-delete";
 
 export type CheckpointKind = "day" | "week" | "session" | "milestone";
@@ -208,7 +209,7 @@ export async function assignCheckpointItems(
   if (!assignments) {
     throw new ApiError(400, "invalid_assignment", "Envie a lista de atribuições.");
   }
-  if (assignments.length > 400) {
+  if (assignments.length > MAX_LIBRARY_ITEMS) {
     throw new ApiError(400, "assignment_limit", "Atribuições demais numa só operação.");
   }
   const parsed = assignments.map((raw, index) => {
@@ -249,7 +250,6 @@ export async function assignCheckpointItems(
       ).rows.map((row) => row.id),
     );
 
-    let changed = 0;
     for (const assignment of parsed) {
       if (!validItems.has(assignment.itemId)) {
         throw new ApiError(404, "not_found", "Um dos itens não pertence a este desafio.");
@@ -257,13 +257,30 @@ export async function assignCheckpointItems(
       if (assignment.checkpointId && !validCheckpoints.has(assignment.checkpointId)) {
         throw new ApiError(400, "invalid_checkpoint", "Uma etapa da atribuição não existe.");
       }
+    }
+
+    let changed = 0;
+    if (new Set(parsed.map(({ itemId }) => itemId)).size === parsed.length) {
       const result = await client.query(
-        `UPDATE challenge_items SET checkpoint_id = $3, position = $4, updated_at = now()
-          WHERE id = $1 AND challenge_id = $2
-            AND (checkpoint_id IS DISTINCT FROM $3 OR position IS DISTINCT FROM $4)`,
-        [assignment.itemId, challengeId, assignment.checkpointId, assignment.position],
+        `UPDATE challenge_items AS item
+            SET checkpoint_id = ordered.checkpoint_id, position = ordered.position, updated_at = now()
+           FROM unnest($2::text[], $3::text[], $4::int[]) AS ordered(item_id, checkpoint_id, position)
+          WHERE item.id = ordered.item_id AND item.challenge_id = $1
+            AND (item.checkpoint_id IS DISTINCT FROM ordered.checkpoint_id OR item.position IS DISTINCT FROM ordered.position)`,
+        [challengeId, parsed.map(({ itemId }) => itemId), parsed.map(({ checkpointId }) => checkpointId), parsed.map(({ position }) => position)],
       );
-      changed += result.rowCount ?? 0;
+      changed = result.rowCount ?? 0;
+    } else {
+      // The API also accepts repeated assignments and applies them in the order sent.
+      for (const { itemId, checkpointId, position } of parsed) {
+        const result = await client.query(
+          `UPDATE challenge_items SET checkpoint_id = $3, position = $4, updated_at = now()
+            WHERE id = $1 AND challenge_id = $2
+              AND (checkpoint_id IS DISTINCT FROM $3 OR position IS DISTINCT FROM $4)`,
+          [itemId, challengeId, checkpointId, position],
+        );
+        changed += result.rowCount ?? 0;
+      }
     }
 
     if (changed > 0) {

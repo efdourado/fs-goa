@@ -96,7 +96,7 @@ export function FormDialog({
   danger?: boolean;
   submitDisabled?: boolean;
   stickyActions?: boolean;
-  /** Extra footer actions; each shares the row equally with Save. */
+  /** Compact action immediately before Save. */
   footerStart?: ReactNode;
   /** A Delete action sharing the footer with Save, confirmed in a panel below (see `DeleteConfirm`). */
   onDelete?: { body: ReactNode; onConfirm: () => Promise<void> | void; busyLabel?: string };
@@ -106,6 +106,11 @@ export function FormDialog({
   const [discard, setDiscard] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const close = () => { if (dirty) setDiscard(true); else onCancel(); };
+  const submit = (
+    <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled} className={footerStart ? "min-w-0 flex-1" : undefined}>
+      {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
+    </Button>
+  );
   return (
     <Dialog title={title} busy={busy} onClose={close} stickyActions={stickyActions}>
       {discard ? (
@@ -122,10 +127,7 @@ export function FormDialog({
         <StatusMessage error={error} />
         <ModalActions className={cx("border-t border-[var(--line)] pt-4", stickyActions && "sticky bottom-0 z-10 -mb-3 bg-[var(--paper)] pb-3")}>
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
-          {footerStart ? <div className="contents">{footerStart}</div> : null}
-          <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
-            {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
-          </Button>
+          {footerStart ? <div className="flex items-center gap-2">{footerStart}{submit}</div> : submit}
         </ModalActions>
         {onDelete && deleting ? <DeleteConfirm {...onDelete} /> : null}
       </form>

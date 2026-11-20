@@ -10,6 +10,8 @@ import { useGoaFormat } from "./format";
 import { ItemEditorDialog } from "./item-editor-dialog";
 import type { CatalogScope } from "./libraries";
 import { applyOrder, type OrderStrategy } from "./ordering";
+import { canOrganise, OrganiseDialog, organiseFromItems } from "./organize-panel";
+import { useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
 import { itemIdForEntry, formatRuntime } from "./utils";
 import { AddRow, Button, ChevronIcon, Field, inputClass, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
@@ -32,6 +34,8 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const t = useTranslations("checkpointPlanner");
   const ta = useTranslations("adminChallenge");
   const ti = useTranslations("cineItems");
+  const to = useTranslations("organise");
+  const propertyName = useNativePropertyName();
   const f = useGoaFormat();
   const locked = challenge.status === "closed";
   const autoDays = challenge.checkpoints.some((stage) => stage.kind === "day");
@@ -44,11 +48,24 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const [movingItem, setMovingItem] = useState<ChallengeItem | null>(null);
   const [editingItem, setEditingItem] = useState<ChallengeItem | null>(null);
   const [addingItems, setAddingItems] = useState(false);
+  const [organising, setOrganising] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [seed, setSeed] = useState(0);
+  const organiseLibraries = !locked && challenge.submissionMode === "item" ? challenge.libraries ?? [] : [];
+  const propertiesByKind = useLibrariesProperties(organiseLibraries);
+  const organiseInput = propertiesByKind.size ? organiseFromItems(
+    items,
+    propertiesByKind,
+    new Set(entries.map(itemIdForEntry).filter((id): id is Id => id !== null)),
+    propertyName,
+  ) : null;
+  const showOrganise = organiseInput && canOrganise(organiseInput);
+  const showAdd = !locked && itemTools && Boolean(challenge.libraries?.length);
+
   async function run(action: () => Promise<void>) {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setSuccess(null);
     try { await action(); } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
   function reorderStage(index: number, delta: number) {
@@ -58,6 +75,14 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   function organise(strategy: OrderStrategy) {
     const next = applyOrder(items.map((item, position) => ({key: item.id, checkpointId: item.checkpointId ?? null, position})), strategy);
     void run(() => onAssign(next.map((item, position) => ({itemId: item.key, checkpointId: item.checkpointId, position}))));
+  }
+  function applyOrganisedOrder(order: string[]) {
+    return run(async () => {
+      const stageOf = new Map(items.map((item) => [item.id, item.checkpointId ?? null]));
+      await onAssign(order.map((itemId, position) => ({ itemId, checkpointId: stageOf.get(itemId) ?? null, position })));
+      setOrganising(false);
+      setSuccess(to("applied"));
+    });
   }
   function itemRows(list: ChallengeItem[], key = "unassigned") {
     const limit = visibleItems[key] ?? 12;
@@ -72,11 +97,31 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const stageIds = new Set(stages.map((stage) => stage.id));
   const loose = items.filter((item) => !item.checkpointId || !stageIds.has(item.checkpointId));
   return <div className="mx-auto max-w-2xl">
-    <div className="mb-7 flex items-start justify-between gap-4">
-      <div className="min-w-0"><h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{t("title")}</h1><p className="mt-2 text-sm leading-6 text-[var(--muted)]">{t("itemsDescription")}</p></div>
-      {!locked && itemTools && challenge.libraries?.length ? <StateButton type="button" aria-label={ti("addItems")} title={ti("addItems")} onClick={() => setAddingItems(true)} className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></StateButton> : null}
+    <div className="mb-7 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+      <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{t("title")}</h1>
+      {showOrganise || showAdd ? (
+        <div className="flex items-center gap-2">
+          {showOrganise ? (
+            <StateButton
+              type="button"
+              aria-label={to("button")}
+              title={to("button")}
+              className="inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full border border-[var(--line)] text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:px-3.5"
+              disabled={busy}
+              onClick={() => setOrganising(true)}
+            >
+              <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <path d="M4.5 16v-5M10 16V4M15.5 16V8" />
+              </svg>
+              <span className="hidden sm:inline">{to("button")}</span>
+            </StateButton>
+          ) : null}
+          {showAdd ? <StateButton type="button" aria-label={ti("addItems")} title={ti("addItems")} onClick={() => setAddingItems(true)} className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></StateButton> : null}
+        </div>
+      ) : null}
+      <p className="col-span-full text-sm leading-6 text-[var(--muted)]">{t("itemsDescription")}</p>
     </div>
-    <StatusMessage error={error} />
+    <StatusMessage error={error} success={success} />
     {autoDays ? <p className="mb-5 text-sm text-[var(--muted)]">{t("dailyAutoNote")}</p> : null}
     <div className="space-y-4">
       {!stages.length || loose.length ? <section className="rounded-[20px] border border-[var(--line)] px-5 py-4 sm:px-6">
@@ -117,6 +162,9 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     {assigning ? <StageItemsDialog stage={assigning} stages={stages} items={items} onCancel={() => setAssigning(null)} onSave={async (selected) => {await onAssign(items.map((item, position) => ({itemId: item.id, position, checkpointId: selected.has(item.id) ? assigning.id : item.checkpointId === assigning.id ? null : item.checkpointId ?? null}))); setAssigning(null); setOpen((current) => new Set([...current, assigning.id]));}} /> : null}
     {movingItem ? <MoveItemDialog item={movingItem} stages={stages} onCancel={() => setMovingItem(null)} onSave={async (checkpointId) => {await onAssign([{itemId: movingItem.id, position: movingItem.position ?? items.indexOf(movingItem), checkpointId}]); setMovingItem(null);}} /> : null}
     {addingItems && itemTools ? <AddItemsDialog members={itemTools.members ?? []} scope={itemTools.scope} libraries={challenge.libraries ?? []} checkpoints={autoDays ? undefined : stages} onClose={() => setAddingItems(false)} onAdd={async (added) => {await itemTools.onAdd(added); setAddingItems(false);}} /> : null}
+    {organising && showOrganise && organiseInput ? (
+      <OrganiseDialog input={organiseInput} busy={busy} onClose={() => setOrganising(false)} onApply={applyOrganisedOrder} />
+    ) : null}
     {editingItem ? locked || !itemTools ? <ItemDetails item={editingItem} onClose={() => setEditingItem(null)} /> : <ItemEditorDialog item={{...editingItem.catalogItem, title: editingItem.title}} library={editingItem.catalogItem ? (challenge.libraries ?? []).find((library) => library.kind === editingItem.catalogItem?.kind) ?? null : null} maxTitleLength={200} onCancel={() => setEditingItem(null)} onSave={async (value) => {await itemTools.onUpdate(editingItem.id, value); setEditingItem(null);}} onRemove={{body: ta("itemRemoveConfirmWithEntries", {title: editingItem.title, count: entries.filter((entry) => itemIdForEntry(entry) === editingItem.id).length}), onConfirm: async () => {await itemTools.onRemove(editingItem.id); setEditingItem(null);}}} /> : null}
   </div>;
 }

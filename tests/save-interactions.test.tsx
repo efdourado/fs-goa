@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 
+import { ChallengeStatePanel } from "../app/goa/screens/challenge-actions";
 import { SessionLog, sessionSpecOf, type SessionPayload, type SessionSaveResult } from "../app/goa/session-log";
 import { ParticipantChallengeScreen } from "../app/goa/screens/participant-challenge";
 import type { ChallengeDetail, Entry } from "../app/goa/types";
@@ -73,6 +74,33 @@ const cinema = {
     { id: "rating", name: "Avaliação", purpose: "rating", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: true, fields: [{ id: "score", key: "score", label: "Nota", type: "rating", required: false }] },
   ],
 } as unknown as ChallengeDetail;
+
+test("the challenge switch activates, closes, and reopens using the saved state", async () => {
+  const ui = setup();
+  try {
+    const transitions: Array<"active" | "closed"> = [];
+    const renderState = (status: ChallengeDetail["status"]) => {
+      ui.root.render(withIntl(<ChallengeStatePanel challenge={{ ...cinema, status }} canActivate={status === "draft"} onTransition={async (next) => {
+        transitions.push(next);
+        renderState(next);
+      }} />));
+    };
+    await act(async () => renderState("draft"));
+    const toggle = ui.button("Desafio ativo");
+    assert.equal(toggle.getAttribute("aria-checked"), "false");
+
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute("aria-checked"), "true");
+
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute("aria-checked"), "false");
+    assert.match(document.body.textContent ?? "", /Clique para reabrir/);
+
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute("aria-checked"), "true");
+    assert.deepEqual(transitions, ["active", "closed", "active"]);
+  } finally { await ui.cleanup(); }
+});
 
 test("expectation and optional rating share one Save; a guess can be saved before rating", async () => {
   const ui = setup();

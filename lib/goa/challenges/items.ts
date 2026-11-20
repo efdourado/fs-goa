@@ -19,6 +19,7 @@ import {
   upsertCatalogItem,
 } from "../catalog";
 import { ensureChallengeLibraries, resolveItemLibrary } from "./libraries";
+import { MAX_CHALLENGE_ITEM_BATCH } from "../domain/item-limits";
 import { midnightInTimeZone } from "../domain/shared";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { deleteChallengeItemsHard } from "../hard-delete";
@@ -221,8 +222,10 @@ export async function saveChallengeItems(
   }
   if (!Array.isArray(body.items)) return addChallengeItem(session, challengeId, body);
   const requestedItems = body.items;
-  if (!requestedItems.length || requestedItems.length > 200) throw new ApiError(400, "item_limit", "Use de 1 a 200 itens.");
-  return inTransaction(async (client) => {
+  if (!requestedItems.length || requestedItems.length > MAX_CHALLENGE_ITEM_BATCH) {
+    throw new ApiError(400, "challenge_item_batch_limit", `Adicione de 1 a ${MAX_CHALLENGE_ITEM_BATCH} itens por vez.`);
+  }
+   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Itens não podem ser editados depois do encerramento.");

@@ -9,9 +9,10 @@ import { API_PATHS, apiRequest } from "./api";
 import { useCatalogPropertyText } from "./catalog-views";
 import { Dialog, FormDialog, ModalActions } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
+import { MAX_CHALLENGE_ITEM_BATCH } from "../../lib/goa/domain/item-limits";
 import { type CatalogScope, useCatalogShelf } from "./libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
-import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, Member } from "./types";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName, valuesFromItem } from "./property-inputs";
+import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { ArrowField, Button, CatalogIcon, ChevronIcon, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, Field, Select, SlidersIcon } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
@@ -29,7 +30,8 @@ export interface CineRow {
   /** Films/series only, in minutes. */
   runtimeMinutes: string;
   mainGenre: string;
-  /** The item's own date and time (a match's kickoff), as the event inputs hold it — blank when it has none. */
+  /** Saved custom values when the row reuses an existing catalog item. */
+  catalogAttributes?: CatalogItem["attributes"];
   /** What was typed into a custom library's own properties, by `LibraryProperty.key`. */
   extra: PropertyValues;
   /** The same values as the request wants them, by the property's storage key — kept in step with `extra` by the editor. */
@@ -81,9 +83,10 @@ const NATIVE_ROW_FIELD = {
   author: "author", year: "year", main_genre: "mainGenre", page_count: "pages", runtime_minutes: "runtimeMinutes",
 } as const;
 
-function rowValues(row: CineRow): PropertyValues {
+function rowValues(row: CineRow, properties: LibraryProperty[]): PropertyValues {
   return {
     author: row.author, year: row.year, main_genre: row.mainGenre, page_count: row.pages, runtime_minutes: row.runtimeMinutes,
+    ...(row.catalogItemId ? valuesFromItem(properties.filter((property) => property.storage === "attribute"), { attributes: row.catalogAttributes }) : {}),
     ...row.extra,
   };
 }
@@ -94,6 +97,7 @@ type EditorLibrary = Pick<ChallengeLibraryRef, "id" | "kind" | "source" | "label
 function rowFromCatalog(item: CatalogItem): CineRow {
   return newCineRow(item.title, {
     catalogItemId: item.id,
+    catalogAttributes: item.attributes,
     author: item.author ?? "",
     year: item.year ? String(item.year) : "",
     pages: item.pageCount ? String(item.pageCount) : "",
@@ -234,7 +238,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false, unb
             </label>
             {shown.length > 0 ? (
               <div className="mt-2">
-                <PropertyInputs properties={shown} values={rowValues(row)} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
+                <PropertyInputs properties={shown} values={rowValues(row, shown)} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
               </div>
             ) : null}
             {!openByDefault && extraCount > 0 ? (
@@ -275,6 +279,7 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
   const t = useTranslations("cineItems");
   const tStages = useTranslations("checkpointPlanner");
   const tCatalogAdd = useTranslations("catalogAdd");
+  const tErrors = useTranslations("errors.byCode");
   const format = useFormatter();
   const f = useGoaFormat();
   const catalogPanelId = useId();
@@ -310,7 +315,8 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
   const manualRows = draft.filter((row) => !row.catalogItemId);
   const rows = hasTitle ? [...draft, pending] : draft;
   const missingTitle = draft.some((row) => !row.title.trim());
-  const canSave = Boolean(target && rows.length && !duplicate && !missingTitle);
+  const exceedsBatch = existing.length + rows.length > MAX_CHALLENGE_ITEM_BATCH;
+  const canSave = Boolean(target && rows.length && !duplicate && !missingTitle && !exceedsBatch);
 
   function pasteTitles(titles: string[]) {
     const seen = new Set(knownTitles);
@@ -356,6 +362,7 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
         }
       }}
     >
+      {exceedsBatch ? <p role="alert" className="text-sm text-[var(--danger)]">{tErrors("challenge_item_batch_limit")}</p> : null}
       {target ? <>
         <div className="min-w-0">
           <span className={labelClass}>{t("typeLabel")}</span>
@@ -447,9 +454,10 @@ export function CineItemsEditor({
   const t = useTranslations("cineItems");
   const propertiesByKind = useLibrariesProperties(shared.libraries, shared.refreshKey);
   const tOrganise = useTranslations("organise");
+  const propertyName = useNativePropertyName();
   const summary = useRowSummary();
   const [organising, setOrganising] = useState(false);
-  const organiseInput = organiseFromRows(value, propertiesByKind.get(shared.libraries[0]?.kind ?? "") ?? [], (key) => tOrganise(`property.${key}`));
+  const organiseInput = organiseFromRows(value, propertiesByKind, shared.libraries[0]?.kind ?? "", propertyName, rowValues);
   const [localAdding, setLocalAdding] = useState(false);
   const adding = addDialogOpen ?? localAdding;
   const setAdding = onAddDialogOpenChange ?? setLocalAdding;

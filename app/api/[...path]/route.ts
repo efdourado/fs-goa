@@ -315,7 +315,9 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const session = await requireMutationSession(request, { allowDeactivated: true });
-    const body = await readJsonObject(request);
+    const assignsItems = path[0] === "challenges" && path[2] === "items" && path[3] === "assign" && path.length === 4;
+    // A full library's order can carry two IDs for each item, plus its position.
+    const body = await readJsonObject(request, assignsItems ? 256 * 1024 : undefined);
 
     // Account lifecycle. A deactivated account may only reactivate or log out.
     if (isPath(path, "account", "reactivate")) {
@@ -430,7 +432,7 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "challenges" && path[2] === "items" && path[3] === "preview" && path.length === 4) {
       return json(await previewListImport(session, path[1], body));
     }
-    if (path[0] === "challenges" && path[2] === "items" && path[3] === "assign" && path.length === 4) {
+    if (assignsItems) {
       return json(await assignCheckpointItems(session, path[1], body));
     }
     if (path[0] === "challenges" && path[2] === "items" && path[4] === "reveal" && path.length === 5) {

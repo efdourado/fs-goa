@@ -1,4 +1,5 @@
 import { requestHasExactOrigin } from "./security";
+import { MAX_LIBRARY_ITEMS } from "./goa/domain/item-limits";
 
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -23,18 +24,18 @@ export function json(data: unknown, status = 200, headers?: HeadersInit): Respon
   return new Response(JSON.stringify(data), { status, headers: responseHeaders });
 }
 
-export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
+export async function readJsonObject(request: Request, maxBytes = MAX_JSON_BYTES): Promise<Record<string, unknown>> {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
     throw new ApiError(415, "content_type", "Envie o corpo como application/json.");
   }
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BYTES) {
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     throw new ApiError(413, "payload_too_large", "O corpo da requisição é grande demais.");
   }
 
   const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_JSON_BYTES) {
+  if (new TextEncoder().encode(text).byteLength > maxBytes) {
     throw new ApiError(413, "payload_too_large", "O corpo da requisição é grande demais.");
   }
 
@@ -126,6 +127,9 @@ export async function handleApi(
     }
     if (databaseError?.code === "23505") {
       return json({ error: "conflict", message: "Já existe um registro com esses dados." }, 409);
+    }
+    if (databaseError?.code === "23514" && databaseError.constraint === "catalog_items_library_capacity") {
+      return json({ error: "library_item_limit", message: `Uma biblioteca pode ter até ${MAX_LIBRARY_ITEMS} itens.` }, 409);
     }
     if (databaseError?.code === "23503" || databaseError?.code === "23514") {
       return json({ error: "invalid_relation", message: "A operação viola uma regra do domínio." }, 400);

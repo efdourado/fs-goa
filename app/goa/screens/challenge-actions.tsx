@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import type { PreflightIssue } from "../../../lib/goa/challenges/preflight";
 import { SkippedPropertiesNotice } from "../copy-notice";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { PreflightPanel } from "../preflight-panel";
+import { SetupBlockerList } from "../setup-progress";
 import type { ChallengeDetail, CopyResult, Id } from "../types";
 import { BoxSection, Button, ChallengeStatusBadge, labelClass, PageHeading, Select, SelectableCards, StatusMessage, Toggle } from "../ui";
 import { isChallengeScheduled, isLivingList } from "../utils";
@@ -14,45 +15,61 @@ import { PublicationPanel } from "./publication";
 type Target = { id: Id; name: string; challengeCount: number; challengeLimit: number };
 
 /**
- * Geral's first box: where the challenge stands and the one move it can make (activate a draft, close an active
- * round, reopen a closed one), with a draft's readiness check under it. Every move acts at once.
+ * The switch starts a draft, closes an active round, or reopens a closed round.
  * A living list has no round to open or close, so it gets no box.
  */
-export function ChallengeStatePanel({ challenge, onTransition }: {
+export function ChallengeStatePanel({ challenge, blockers, canActivate, onRetryCheck, onTransition }: {
   challenge: ChallengeDetail;
+  blockers?: PreflightIssue[];
+  canActivate: boolean;
+  onRetryCheck?: () => void;
   onTransition: (status: "active" | "closed") => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
+  const tp = useTranslations("preflight");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preflightReady, setPreflightReady] = useState(false);
   if (isLivingList(challenge)) return null;
+  const isDraft = challenge.status === "draft";
+  const isActive = challenge.status === "active";
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
+  const hint = isDraft ? t("stateDraft")
+    : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) })
+      : isActive ? t("stateActive") : t("stateClosed");
 
-  async function run(action: "activate" | "close" | "reopen") {
+  async function setActive(active: boolean) {
     setBusy(true); setError(null);
     try {
-      await onTransition(action === "close" ? "closed" : "active");
+      await onTransition(active ? "active" : "closed");
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
   return (
-    <BoxSection title={t("stateTitle")} mark={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}>
-      <p className="-mt-2 text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p>
-      {challenge.status === "draft" ? (
-        <div className="mt-5 border-t border-[var(--line)] pt-5"><PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} /></div>
-      ) : null}
-      {/* The one move, as the box's footer. */}
-      <div className="mt-5">
-        {challenge.status === "draft" ? <Button className="w-full" disabled={busy || !preflightReady} onClick={() => void run("activate")}>{busy ? tc("saving") : t("activate")}</Button> : null}
-        {challenge.status === "active" ? <Button className="w-full" variant="danger" disabled={busy} onClick={() => void run("close")}>{busy ? tc("saving") : t("close")}</Button> : null}
-        {challenge.status === "closed" ? <Button className="w-full" variant="secondary" disabled={busy} onClick={() => void run("reopen")}>{busy ? tc("saving") : t("reopen")}</Button> : null}
+    <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2.5 text-lg font-medium tracking-tight">
+            <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
+            {t("stateTitle")}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]" aria-live="polite">{busy ? tc("saving") : hint}</p>
+        </div>
+        <Toggle className="flex-none" checked={isActive} disabled={busy || (isDraft && !canActivate)} onChange={(active) => void setActive(active)} ariaLabel={t("activeToggle")} />
       </div>
+      {onRetryCheck ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-[var(--danger)]" role="alert">{tp("loadError")}</p>
+          <Button variant="secondary" onClick={onRetryCheck}>{tp("recheck")}</Button>
+        </div>
+      ) : null}
+      {isDraft && blockers?.length ? (
+        <div className="mt-4"><SetupBlockerList issues={blockers} /></div>
+      ) : null}
       <StatusMessage error={error} />
-    </BoxSection>
+    </section>
   );
 }
 
