@@ -498,6 +498,7 @@
     "hideIndex": "Esconder filtros",
     "showIndex": "Mostrar filtros",
     "showMore": "+ {count} mais",
+    "showMoreItems": "Mostrar mais (+{count})",
     "clearShort": "Limpar",
     "showItems": "Mostrar itens",
     "moreFacets": "Mais {count}"

@@ -20,11 +20,12 @@ import {
 } from "../libraries";
 import { editableProperties, useLibraryProperties, useNativePropertyName, valueFromItem } from "../property-inputs";
 import type { CatalogItem, CatalogLibrary, Id, LibraryProperty, Member } from "../types";
-import { BackButton, Button, CheckCircle, cx, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
+import { BackButton, Button, CheckCircle, cx, FaceEmptyState, ListMoreButton, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
 
 type Sort = "recent" | "title" | "date";
 
-/** How many rows a library shows at first, and how many more each "Show more" adds. */
+const INITIAL_ITEMS = 12;
+/** How many rows each "Show more" adds. */
 const PAGE_SIZE = 30;
 /** A filter shows this many values before its own "+ N more". */
 const FACET_SIZE = 6;
@@ -137,7 +138,7 @@ export function CatalogWorkspaceScreen({
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [propertyFilter, setPropertyFilter] = useState<{ propertyKey: string; values: string[] } | null>(null);
-  const [shown, setShown] = useState(PAGE_SIZE);
+  const [shown, setShown] = useState(INITIAL_ITEMS);
   const [openFacets, setOpenFacets] = useState<string[]>([]);
   const indexOpen = useSyncExternalStore(subscribeIndex, readIndexOpen, () => true);
   const toggleIndex = () => storeIndexOpen(!indexOpen);
@@ -214,7 +215,7 @@ export function CatalogWorkspaceScreen({
     clearFilters();
     setGroupBy("none");
     setQuery("");
-    setShown(PAGE_SIZE);
+    setShown(INITIAL_ITEMS);
   }
 
   function clearFilters() {
@@ -546,7 +547,7 @@ export function CatalogWorkspaceScreen({
               ) : !sorted.length ? (
                 <FaceEmptyState title={t("noMatches")} />
               ) : (
-                <div className="space-y-10">
+                <div className="[&>section+section]:mt-10">
                   {groups.map((group) => (
                     <section key={group.key} aria-label={activeGroupBy === "none" ? undefined : groupLabel(group.label)}>
                       {activeGroupBy !== "none" ? (
@@ -577,9 +578,11 @@ export function CatalogWorkspaceScreen({
                     </section>
                   ))}
                   {hiddenCount > 0 ? (
-                    <StateButton type="button" onClick={() => setShown(shown + PAGE_SIZE)} className={cx(chipClass(), "mx-auto flex")}>
-                      {t("showMore", { count: Math.min(PAGE_SIZE, hiddenCount) })}
-                    </StateButton>
+                    <div className="border-t border-[var(--line)]">
+                      <ListMoreButton onClick={() => setShown((current) => current + PAGE_SIZE)}>
+                        {t("showMoreItems", { count: Math.min(PAGE_SIZE, hiddenCount) })}
+                      </ListMoreButton>
+                    </div>
                   ) : null}
                 </div>
               )}

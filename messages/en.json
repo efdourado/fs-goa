@@ -498,6 +498,7 @@
     "hideIndex": "Hide filters",
     "showIndex": "Show filters",
     "showMore": "+ {count} more",
+    "showMoreItems": "Show more (+{count})",
     "clearShort": "Clear",
     "showItems": "Show items",
     "moreFacets": "{count} more"
