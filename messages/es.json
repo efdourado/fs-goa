@@ -242,7 +242,6 @@
     "adminUnavailableTitle": "Sin acceso de admin",
     "backToStart": "Volver al inicio",
     "groupCatalogTitle": "{name} · colección",
-    "groupCatalogSubtitle": "Todo lo que sigue este grupo, organizado en bibliotecas. Los admins añaden ítems y dan forma a cada biblioteca.",
     "groupWithoutId": "Se creó el grupo, pero perdimos su rastro."
   },
   "auth": {
@@ -484,17 +483,15 @@
     "sortDate": "Fecha",
     "group": {
       "none": "Ninguno",
-      "genre": "Género",
-      "decade": "Década",
-      "year": "Año"
+      "decade": "Década"
     },
     "resultCount": "{count, plural, one {# ítem} other {# ítems}}",
     "resultOf": "{shown} de {total} ítems",
     "undated": "Sin fecha",
+    "missingPropertyValue": "Sin valor",
     "searchPlaceholder": "Buscar en {name}",
     "newItem": "Ítem",
     "filter": "Filtrar",
-    "showOnly": "Mostrar solo",
     "unusedOnly": "En ningún desafío",
     "chooseLibrary": "Elegir una biblioteca",
     "removeFilter": "Quitar el filtro: {name}",
@@ -905,7 +902,7 @@
     "wrappedBlocks": "Bloques del Wrapped",
     "includeRankings": "Rankings personales",
     "includeAffinity": "Afinidades",
-    "showMoreItems": "Ver {count} más",
+    "showMoreItems": "Mostrar más (+{count})",
     "showLess": "Ver menos",
     "commentPrivacyWarning": "El anonimato quita la autoría, pero el texto se publica tal cual (relee cada comentario y descarta los que citen nombres, contactos o detalles que la persona no quiera en público).",
     "metricHidden": "Oculta en las dos vistas",
@@ -1191,7 +1188,7 @@
   "resultView": {
     "emptyTitle": "Vitrina en preparación",
     "liveEmptyTitle": "Sin números todavía",
-    "shareCopy": "Copiar enlace para compartir",
+    "shareCopy": "Copiar enlace público",
     "shareCopied": "Copiado"
   },
   "rules": {
@@ -1518,7 +1515,6 @@
     "shuffleAll": "Sortear todo",
     "shuffleWithin": "Sortear dentro de cada uno",
     "unassigned": "Sin etapa",
-    "emptyCheckpoint": "Nada aquí todavía.",
     "cpDescription": "Descripción (opcional)",
     "cpDescriptionPlaceholder": "Tema de la etapa, lectura acordada, aviso…",
     "moveItem": "Etapa de {title}",
@@ -1529,14 +1525,13 @@
     "removeStage": "Quitar etapa",
     "saveToFill": "Guarda para poner ítems aquí.",
     "saveStages": "Guardar etapas",
-    "undatedHint": "Las etapas agrupan los elementos en orden. Define un plazo en General si las etapas necesitan fechas.",
     "itemsDescription": "Añade y edita los elementos y agrúpalos en etapas cuando lo necesites.",
     "allItems": "Elementos",
     "noItems": "Todavía no hay elementos. Añade elementos de tu biblioteca para empezar.",
     "stageSettings": "Configuración de la etapa: {title}",
-    "chooseItems": "Elegir elementos",
+    "chooseItems": "+ Elemento",
     "itemsForStage": "Elementos de {title}",
-    "chooseItemsHint": "Selecciona los elementos de esta etapa. Elegir un elemento de otra etapa lo mueve aquí; desmarcarlo lo conserva en el desafío sin etapa.",
+    "chooseItemsHint": "Marca los elementos para moverlos aquí. Desmárcalos para dejarlos sin etapa.",
     "removeStageBody": "¿Eliminar esta etapa? Sus elementos permanecen en el desafío sin etapa. Las etapas con registros guardados siguen protegidas.",
     "searchItems": "Buscar elementos",
     "scheduleTitle": "Etapas"

@@ -1206,9 +1206,7 @@ function EntryPicker({
 const STAGE_PREVIEW = 6;
 
 /**
- * Read-only stages view: each stage as a card with its items, a past/now/upcoming badge, and the
- * total runtime when the items carry one. Only shown for round-item challenges organised into
- * stages (not the automatic day-by-day ones).
+ * Read-only schedule for round-item challenges organised into stages.
  */
 function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   const tp = useTranslations("checkpointPlanner");
@@ -1251,19 +1249,12 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
   const tp = useTranslations("checkpointPlanner");
   const f = useGoaFormat();
   const [open, setOpen] = useState(false);
-  const runtime = formatRuntime(stage.totalRuntimeMinutes ?? items.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
   const shown = open ? items : items.slice(0, STAGE_PREVIEW);
   return (
     <article
       className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 opacity-70"
     >
-      <div className="flex items-center justify-between gap-2">
-        <strong className="text-sm">{stage.title}
-          <span className="text-xs text-[var(--muted)]">
-            {runtime ? ` | ${runtime}` : ""}
-          </span>
-        </strong>
-      </div>
+      <strong className="block text-sm">{stage.title}</strong>
       {items.length ? (
         <>
           <ul className="mt-2 space-y-1 text-sm">

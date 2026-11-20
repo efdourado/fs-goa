@@ -1,46 +1,40 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useId } from "react";
+import { type PointerEvent, useId } from "react";
 
 import { coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
 import { useGoaFormat } from "./format";
+import { StateButton } from "./state-button";
 import type { CatalogItem } from "./types";
 import { cx } from "./ui";
 import { formatRuntime } from "./utils";
-
-export type CatalogGroupBy = "none" | "genre" | "decade" | "year";
 
 export const decadeOf = (year: number): string => `${Math.floor(year / 10) * 10}s`;
 
 export interface CatalogGroup<T> {
   key: string;
-  /** Empty for the single unlabelled group, and for "no genre" / "undated" (the caller names those). */
+  /** Empty for the ungrouped view or items missing the chosen value. */
   label: string;
   items: T[];
 }
 
-interface Groupable {
-  mainGenre?: string | null;
-  year?: number | null;
-}
-
 /**
- * Splits already-sorted items into sections, keeping each item's place inside its section. Genres run A→Z,
- * decades and years newest first; the items that lack the field come last as one unlabelled section.
+ * Groups an already-sorted list by property value. Items keep their relative order within each group,
+ * and items missing the value go last.
  */
-export function groupCatalogItems<T extends Groupable>(items: readonly T[], by: CatalogGroupBy): CatalogGroup<T>[] {
-  if (by === "none") return [{ key: "all", label: "", items: [...items] }];
+export function groupCatalogItems<T>(items: readonly T[], valueOf?: (item: T) => string, compare = (left: string, right: string) => left.localeCompare(right)): CatalogGroup<T>[] {
+  if (!valueOf) return [{ key: "all", label: "", items: [...items] }];
   const groups = new Map<string, CatalogGroup<T>>();
   for (const item of items) {
-    const label = by === "genre" ? item.mainGenre?.trim() ?? "" : item.year ? (by === "decade" ? decadeOf(item.year) : String(item.year)) : "";
-    const key = by === "genre" ? label.toLowerCase() : label;
-    const group = groups.get(key) ?? { key: key || "__none__", label, items: [] };
+    const label = valueOf(item).trim();
+    const key = label.toLocaleLowerCase();
+    const group = groups.get(key) ?? { key, label, items: [] };
     group.items.push(item);
     groups.set(key, group);
   }
   const named = [...groups.values()].filter((group) => group.label);
-  named.sort((left, right) => (by === "genre" ? left.label.localeCompare(right.label) : right.label.localeCompare(left.label)));
+  named.sort((left, right) => compare(left.label, right.label));
   return [...named, ...[...groups.values()].filter((group) => !group.label)];
 }
 
@@ -78,16 +72,18 @@ function stopPropertyScroll(container: HTMLElement) {
   container.querySelector(".catalog-property-text")?.removeAttribute("data-scrolling");
 }
 
-function PropertyLine({ values, note, warn, className }: {
+function PropertyLine({ values, note, warn, className, id, focusable = true }: {
   values: readonly string[];
   note?: string;
   warn?: boolean;
   className?: string;
+  id?: string;
+  focusable?: boolean;
 }) {
   if (!values.length && !note) return null;
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to focus the scrollable line.
-    <small className={cx("catalog-property-line block min-w-0 text-xs text-[var(--muted)]", className)} tabIndex={0} onFocus={(event) => startPropertyScroll(event.currentTarget)} onBlur={(event) => stopPropertyScroll(event.currentTarget)}>
+    <small id={id} className={cx("catalog-property-line block min-w-0 text-xs text-[var(--muted)]", className)} tabIndex={focusable ? 0 : undefined} onFocus={(event) => startPropertyScroll(event.currentTarget)} onBlur={(event) => stopPropertyScroll(event.currentTarget)}>
       <span className="catalog-property-text block truncate">
         {values.join(" · ")}
         {note ? <span className={warn ? "text-[var(--warn)]" : undefined}>{values.length ? " · " : ""}{note}</span> : null}
@@ -130,7 +126,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, properties
   );
 }
 
-export function CatalogRow({ title, meta, note, noteTone = "muted", selecting, picked, onPick, action }: {
+export function CatalogRow({ title, meta, note, noteTone = "muted", selecting, picked, onPick, edit }: {
   title: string;
   meta: readonly string[];
   note?: string;
@@ -138,22 +134,42 @@ export function CatalogRow({ title, meta, note, noteTone = "muted", selecting, p
   selecting?: boolean;
   picked?: boolean;
   onPick?: (on: boolean) => void;
-  action?: ReactNode;
+  edit?: { label: string; onOpen: () => void };
 }) {
-  const selectionId = useId();
-  return (
-    <div onPointerEnter={(event) => startPropertyScroll(event.currentTarget)} onPointerLeave={(event) => stopPropertyScroll(event.currentTarget)} className="flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left sm:gap-4 sm:px-4 sm:py-3.5">
-      {selecting ? <input id={selectionId} type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
+  const detailsId = useId();
+  const editable = !selecting && Boolean(edit);
+  const rowClass = "flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left sm:gap-4 sm:px-4 sm:py-3.5";
+  const hoverClass = "cursor-pointer transition-colors hover:bg-[var(--wash)]/40";
+  const pointerEvents = {
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => startPropertyScroll(event.currentTarget),
+    onPointerLeave: (event: PointerEvent<HTMLElement>) => stopPropertyScroll(event.currentTarget),
+  };
+  const content = (
+    <>
       <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
-      <div className="min-w-0 flex-1">
-        {selecting ? (
-          <label htmlFor={selectionId} className="block cursor-pointer truncate text-[15px] sm:text-base">
-            {title}
-          </label>
-        ) : <strong className="block truncate text-[15px] font-normal sm:text-base">{title}</strong>}
-        <PropertyLine values={meta} note={note} warn={noteTone === "warn"} className="mt-0.5 sm:mt-1 sm:text-[13px] sm:leading-5" />
-      </div>
-      {selecting ? null : action}
-    </div>
+      <span className="min-w-0 flex-1">
+        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}</strong>
+        <PropertyLine id={editable ? detailsId : undefined} focusable={!editable} values={meta} note={note} warn={noteTone === "warn"} className="mt-0.5 sm:mt-1 sm:text-[13px] sm:leading-5" />
+      </span>
+    </>
   );
+  if (selecting) {
+    return (
+      <label className={cx(rowClass, hoverClass)} {...pointerEvents}>
+        <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} />
+        {content}
+      </label>
+    );
+  }
+  if (edit) {
+    return (
+      <StateButton type="button" aria-label={edit.label} aria-describedby={meta.length || note ? detailsId : undefined} aria-haspopup="dialog"
+        className={cx(rowClass, hoverClass, "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus)]")}
+        onClick={edit.onOpen} onFocus={(event) => startPropertyScroll(event.currentTarget)} onBlur={(event) => stopPropertyScroll(event.currentTarget)} {...pointerEvents}
+      >
+        {content}
+      </StateButton>
+    );
+  }
+  return <div className={rowClass} {...pointerEvents}>{content}</div>;
 }

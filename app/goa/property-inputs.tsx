@@ -100,22 +100,20 @@ export function editableProperties(properties: LibraryProperty[]): LibraryProper
   return properties.filter((property) => !property.hidden && property.key !== "title");
 }
 
-export function valuesFromItem(
-  properties: LibraryProperty[],
-  item: Pick<CatalogItem, "author" | "year" | "mainGenre" | "pageCount" | "runtimeMinutes" | "attributes">,
-): PropertyValues {
-  const values: PropertyValues = {};
-  for (const property of properties) {
-    if (property.storage === "native") {
-      const native = NATIVE_FIELD[property.key];
-      const raw = native ? item[native.field as "year"] : undefined;
-      values[property.key] = raw === null || raw === undefined ? "" : String(raw);
-    } else {
-      const saved = item.attributes?.find((attribute) => attribute.key === property.attributeKey);
-      values[property.key] = saved === undefined ? "" : String(saved.value);
-    }
+type ItemProperties = Pick<CatalogItem, "author" | "year" | "mainGenre" | "pageCount" | "runtimeMinutes" | "attributes">;
+
+export function valueFromItem(property: LibraryProperty, item: ItemProperties): string {
+  if (property.storage === "attribute") {
+    const saved = item.attributes?.find((attribute) => attribute.key === property.attributeKey);
+    return saved === undefined ? "" : String(saved.value);
   }
-  return values;
+  const native = NATIVE_FIELD[property.key];
+  const raw = native ? item[native.field as "year"] : undefined;
+  return raw == null ? "" : String(raw);
+}
+
+export function valuesFromItem(properties: LibraryProperty[], item: ItemProperties): PropertyValues {
+  return Object.fromEntries(properties.map((property) => [property.key, valueFromItem(property, item)]));
 }
 
 /**

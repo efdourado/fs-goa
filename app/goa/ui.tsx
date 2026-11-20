@@ -629,6 +629,14 @@ export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel
   );
 }
 
+export function ListMoreButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <StateButton type="button" onClick={onClick} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+      {children}
+    </StateButton>
+  );
+}
+
 /** The small plain icon buttons at the end of a numbered row (up, down, remove). */
 export const rowIconClass = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 

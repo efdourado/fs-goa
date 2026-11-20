@@ -6,6 +6,8 @@ import { renderWithIntl } from "./helpers/intl";
 
 import { COVER_TONES, coverToneOf } from "../app/goa/catalog-cover";
 import { CatalogRow, decadeOf, groupCatalogItems } from "../app/goa/catalog-views";
+import { valueFromItem } from "../app/goa/property-inputs";
+import type { LibraryProperty } from "../app/goa/types";
 
 test("a title always gets the same cover colour, and the same title in any case or spacing agrees", () => {
   assert.equal(coverToneOf("Solaris"), coverToneOf("  SOLARIS "));
@@ -23,10 +25,19 @@ test("grouping keeps the sort inside each section, orders sections, and sends it
     { t: "e", year: 1972, mainGenre: "Sci-fi" },
   ];
   const ids = (groups: ReturnType<typeof groupCatalogItems<(typeof items)[number]>>) => groups.map((group) => [group.label, group.items.map((item) => item.t).join("")]);
-  assert.deepEqual(ids(groupCatalogItems(items, "none")), [["", "abcde"]]);
-  assert.deepEqual(ids(groupCatalogItems(items, "genre")), [["Drama", "ac"], ["sci-fi", "be"], ["", "d"]], "genres A→Z, matched without regard to case");
-  assert.deepEqual(ids(groupCatalogItems(items, "decade")), [["2020s", "ac"], ["1970s", "be"], ["", "d"]], "decades newest first");
-  assert.deepEqual(ids(groupCatalogItems(items, "year")), [["2023", "c"], ["2021", "a"], ["1979", "b"], ["1972", "e"], ["", "d"]]);
+  const newestFirst = (left: string, right: string) => parseInt(right, 10) - parseInt(left, 10);
+  assert.deepEqual(ids(groupCatalogItems(items)), [["", "abcde"]]);
+  assert.deepEqual(ids(groupCatalogItems(items, (item) => item.mainGenre ?? "")), [["Drama", "ac"], ["sci-fi", "be"], ["", "d"]], "genres A→Z, matched without regard to case");
+  assert.deepEqual(ids(groupCatalogItems(items, (item) => item.year == null ? "" : decadeOf(item.year), newestFirst)), [["2020s", "ac"], ["1970s", "be"], ["", "d"]], "decades newest first");
+  assert.deepEqual(ids(groupCatalogItems(items, (item) => item.year == null ? "" : String(item.year), newestFirst)), [["2023", "c"], ["2021", "a"], ["1979", "b"], ["1972", "e"], ["", "d"]]);
+});
+
+test("custom properties group by the stored attribute key and retain zero and false", () => {
+  const priority: LibraryProperty = { key: "definition-1", attributeKey: "priority", type: "number", storage: "attribute", label: "Prioridade", hidden: false, position: 1, canHide: true };
+  const done: LibraryProperty = { ...priority, key: "definition-2", attributeKey: "done", type: "boolean", label: "Feito" };
+  const item = { attributes: [{ key: "priority", type: "number" as const, value: 0, label: "Prioridade" }, { key: "done", type: "boolean" as const, value: false, label: "Feito" }] };
+  assert.deepEqual(groupCatalogItems([item, {}], (row) => valueFromItem(priority, row)).map(({ label }) => label), ["0", ""]);
+  assert.deepEqual(groupCatalogItems([item, {}], (row) => valueFromItem(done, row)).map(({ label }) => label), ["false", ""]);
 });
 
 test("decadeOf floors a year to its decade", () => {

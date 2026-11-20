@@ -14,9 +14,11 @@ import { canOrganise, OrganiseDialog, organiseFromItems } from "./organize-panel
 import { useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
 import { itemIdForEntry, formatRuntime } from "./utils";
-import { AddRow, Button, ChevronIcon, Field, inputClass, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
+import { AddRow, Button, ChevronIcon, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
 
 type Stage = ChallengeDetail["checkpoints"][number];
+const ITEM_BATCH_SIZE = 12;
+const STAGE_PICKER_INITIAL_ITEMS = 6;
 export interface ChallengeItemTools {
   scope: CatalogScope;
   members?: Member[];
@@ -85,14 +87,27 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     });
   }
   function itemRows(list: ChallengeItem[], key = "unassigned") {
-    const limit = visibleItems[key] ?? 12;
-    return <><ul className="divide-y divide-[var(--line)]">{list.slice(0, limit).map((item) => <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
-      <StateButton type="button" className="min-w-0 flex-1 cursor-pointer py-1 text-left transition-opacity hover:opacity-75" onClick={() => setEditingItem(item)}>
-        <span className="block text-sm font-medium">{item.title}</span>
-        <span className="block text-xs text-[var(--muted)]">{[item.catalogItem?.author, item.catalogItem?.year, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</span>
-      </StateButton>
-      {!locked && !autoDays && stages.length ? <StateButton type="button" className={rowIconClass} aria-label={t("moveItem", {title: item.title})} onClick={() => setMovingItem(item)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
-    </li>)}</ul>{list.length > limit ? <Button variant="secondary" className="mt-3 w-full" onClick={() => setVisibleItems((current) => ({...current, [key]:limit + 12}))}>{ta("showMoreItems", {count:Math.min(12,list.length-limit)})}</Button> : null}</>;
+    const limit = visibleItems[key] ?? ITEM_BATCH_SIZE;
+    return (
+      <ul className="divide-y divide-[var(--line)]">
+        {list.slice(0, limit).map((item) => (
+          <li key={item.id} className="flex min-h-14 items-center gap-3 py-2">
+            <StateButton type="button" className="min-w-0 flex-1 cursor-pointer py-1 text-left transition-opacity hover:opacity-75" onClick={() => setEditingItem(item)}>
+              <span className="block text-sm font-medium">{item.title}</span>
+              <span className="block text-xs text-[var(--muted)]">{[item.catalogItem?.author, item.catalogItem?.year, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</span>
+            </StateButton>
+            {!locked && !autoDays && stages.length ? <StateButton type="button" className={rowIconClass} aria-label={t("moveItem", { title: item.title })} onClick={() => setMovingItem(item)}><SlidersIcon className="h-4 w-4" /></StateButton> : null}
+          </li>
+        ))}
+        {list.length > limit ? (
+          <li>
+            <ListMoreButton onClick={() => setVisibleItems((current) => ({ ...current, [key]: limit + ITEM_BATCH_SIZE }))}>
+              {ta("showMoreItems", { count: Math.min(ITEM_BATCH_SIZE, list.length - limit) })}
+            </ListMoreButton>
+          </li>
+        ) : null}
+      </ul>
+    );
   }
   const stageIds = new Set(stages.map((stage) => stage.id));
   const loose = items.filter((item) => !item.checkpointId || !stageIds.has(item.checkpointId));
@@ -132,11 +147,10 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
         const list = items.filter((item) => item.checkpointId === stage.id);
         const expanded = open.has(stage.id);
         const when = stage.opensAt || stage.dueAt ? f.dateRange(stage.opensAt, stage.dueAt) : null;
-        const runtime = formatRuntime(list.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
         return <section key={stage.id} className="rounded-[20px] border border-[var(--line)] px-5 sm:px-6">
           <div className="flex items-center gap-2">
             <StateButton type="button" aria-expanded={expanded} onClick={() => setOpen((current) => {const next = new Set(current); if (next.has(stage.id)) next.delete(stage.id); else next.add(stage.id); return next;})} className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 text-left">
-              <span className="text-xs tabular-nums text-[var(--muted)]">{index + 1}</span><span className="min-w-0 flex-1"><strong className="block text-sm font-medium">{stage.title}</strong><span className="block text-xs text-[var(--muted)]">{[when, t("itemsTally", {count: list.length}), runtime].filter(Boolean).join(" · ")}</span></span><ChevronIcon dir={expanded ? "up" : "down"} />
+              <span className="text-xs tabular-nums text-[var(--muted)]">{index + 1}</span><span className="min-w-0 flex-1"><strong className="block text-sm font-medium">{stage.title}</strong><span className="block text-xs text-[var(--muted)]">{[when, t("itemsTally", {count: list.length})].filter(Boolean).join(" · ")}</span></span><ChevronIcon dir={expanded ? "up" : "down"} />
             </StateButton>
             {!locked && !autoDays ? <>
               <StateButton className={rowIconClass} type="button" disabled={busy || index === 0} onClick={() => reorderStage(index, -1)} aria-label={t("moveUp")}><ChevronIcon dir="up" /></StateButton>
@@ -146,8 +160,10 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
           </div>
           {expanded ? <div className="border-t border-[var(--line)] pb-4">
             {stage.description ? <p className="my-3 text-sm text-[var(--muted)]">{stage.description}</p> : null}
-            {list.length ? itemRows(list, stage.id) : <p className="py-3 text-sm text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
-            {!locked && !autoDays ? <Button variant="secondary" className="mt-2 w-full" onClick={() => setAssigning(stage)}>{t("chooseItems")}</Button> : null}
+            {list.length ? itemRows(list, stage.id) : null}
+            {!locked && !autoDays ? (
+              <Button variant="secondary" className="mt-3 w-full !rounded-full" onClick={() => setAssigning(stage)}>{t("chooseItems")}</Button>
+            ) : null}
           </div> : null}
         </section>;
       })}
@@ -184,22 +200,50 @@ function StageEditor({stage, hasDeadline, onCancel, onSave, onRemove}: {stage?: 
   return <FormDialog title={stage ? stage.title : t("addCheckpoint")} dirty={dirty} busy={busy} error={error} onCancel={onCancel} submitDisabled={!title.trim() || Boolean(starts && ends && ends < starts) || !dirty} onSubmit={async () => {setBusy(true); setError(null); try {await onSave({...(stage ? {id: stage.id} : {}), title: title.trim(), kind: stage?.kind ?? "session", description: description.trim() || null, startsAt: starts === initialStart ? stage?.opensAt ?? null : starts || null, dueAt: ends === initialEnd ? stage?.dueAt ?? null : ends || null});} catch (cause) {setError(f.error(cause)); setBusy(false);}}} onDelete={onRemove ? {body: t("removeStageBody"), onConfirm: onRemove} : undefined}>
     <Field label={t("cpTitle")}><input className={inputClass} value={title} maxLength={160} required onChange={(event) => setTitle(event.target.value)} /></Field>
     <Field label={t("cpDescription")}><textarea className={inputClass} value={description} maxLength={2000} rows={3} onChange={(event) => setDescription(event.target.value)} /></Field>
-    {hasDeadline || initialStart || initialEnd ? <div className="grid gap-4 sm:grid-cols-2"><Field label={t("cpStarts")}><input className={inputClass} type="date" value={starts} onChange={(event) => setStarts(event.target.value)} /></Field><Field label={t("cpDue")}><input className={inputClass} type="date" min={starts || undefined} value={ends} onChange={(event) => setEnds(event.target.value)} /></Field></div> : <p className="text-xs text-[var(--muted)]">{t("undatedHint")}</p>}
+    {hasDeadline || initialStart || initialEnd ? <div className="grid gap-4 sm:grid-cols-2"><Field label={t("cpStarts")}><input className={inputClass} type="date" value={starts} onChange={(event) => setStarts(event.target.value)} /></Field><Field label={t("cpDue")}><input className={inputClass} type="date" min={starts || undefined} value={ends} onChange={(event) => setEnds(event.target.value)} /></Field></div> : null}
   </FormDialog>;
 }
 
 function StageItemsDialog({stage, stages, items, onCancel, onSave}: {stage: Stage; stages: Stage[]; items: ChallengeItem[]; onCancel: () => void; onSave: (ids: Set<Id>) => Promise<void>}) {
   const t = useTranslations("checkpointPlanner");
+  const ta = useTranslations("adminChallenge");
   const f = useGoaFormat();
   const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(STAGE_PICKER_INITIAL_ITEMS);
   const [selected, setSelected] = useState(new Set(items.filter((item) => item.checkpointId === stage.id).map((item) => item.id)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = items.some((item) => selected.has(item.id) !== (item.checkpointId === stage.id));
-  return <FormDialog title={t("itemsForStage", {title: stage.title})} dirty={dirty} busy={busy} error={error} onCancel={onCancel} submitDisabled={!dirty} onSubmit={async () => {setBusy(true); try {await onSave(selected);} catch (cause) {setError(f.error(cause)); setBusy(false);}}}>
+  const search = query.trim().toLocaleLowerCase();
+  const matches = items.filter((item) => item.title.toLocaleLowerCase().includes(search));
+  return <FormDialog title={t("itemsForStage", {title: stage.title})} dirty={dirty} busy={busy} error={error} onCancel={onCancel} submitDisabled={!dirty} stickyActions onSubmit={async () => {setBusy(true); try {await onSave(selected);} catch (cause) {setError(f.error(cause)); setBusy(false);}}}>
     <p className="text-sm text-[var(--muted)]">{t("chooseItemsHint")}</p>
-    <Field label={t("searchItems")}><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} /></Field>
-    <div className="space-y-2">{items.filter((item) => item.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map((item) => <label key={item.id} aria-label={item.title} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[var(--line)] p-3"><input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => {const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next;})} /><span className="min-w-0"><strong className="block text-sm font-medium">{item.title}</strong><small className="text-[var(--muted)]">{stages.find((candidate) => candidate.id === item.checkpointId)?.title ?? t("unassigned")}</small></span></label>)}</div>
+    <Field label={t("searchItems")}><input className={inputClass} type="search" value={query} onChange={(event) => { setQuery(event.target.value); setLimit(STAGE_PICKER_INITIAL_ITEMS); }} /></Field>
+    <ul className="space-y-2">
+      {matches.slice(0, limit).map((item) => (
+        <li key={item.id}>
+          <label aria-label={item.title} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[var(--line)] p-3">
+            <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => {
+              const checked = event.target.checked;
+              setSelected((current) => {
+                const next = new Set(current);
+                if (checked) next.add(item.id);
+                else next.delete(item.id);
+                return next;
+              });
+            }} />
+            <span className="min-w-0"><strong className="block text-sm font-medium">{item.title}</strong><small className="text-[var(--muted)]">{stages.find((candidate) => candidate.id === item.checkpointId)?.title ?? t("unassigned")}</small></span>
+          </label>
+        </li>
+      ))}
+      {matches.length > limit ? (
+        <li className="border-t border-[var(--line)]">
+          <ListMoreButton onClick={() => setLimit((current) => current + ITEM_BATCH_SIZE)}>
+            {ta("showMoreItems", { count: Math.min(ITEM_BATCH_SIZE, matches.length - limit) })}
+          </ListMoreButton>
+        </li>
+      ) : null}
+    </ul>
   </FormDialog>;
 }
 function MoveItemDialog({item, stages, onCancel, onSave}: {item: ChallengeItem; stages: Stage[]; onCancel: () => void; onSave: (id: Id | null) => Promise<void>}) {

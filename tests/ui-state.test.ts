@@ -585,7 +585,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.doesNotMatch(header, /Meu espaço/, "Meu espaço agora é parte do Início, sem link próprio");
 });
 
-test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de duração e a distribuição", () => {
+test("planejador de etapas: mostra a distribuição e omite o total de duração", () => {
   const challenge = {
     id: "c1",
     status: "draft",
@@ -609,7 +609,7 @@ test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de dur
   }));
   assert.match(html, /Semana 1/);
   assert.match(html, /Semana 3/);
-  assert.match(html, /1h40/, "soma a duração dos filmes da semana");
+  assert.doesNotMatch(html, /1h40/, "a duração do filme atribuído não aparece no cabeçalho da etapa");
   assert.match(html, /Distribuir em ordem/, "oferece a distribuição sequencial");
   assert.match(html, /Sortear dentro de cada/);
   assert.match(html, /Sem etapa/, "há um balde para itens sem etapa");
@@ -811,10 +811,10 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
     entryTypes: [],
     fields: [],
     items: [
-      { id: "i1", title: "Parasita", position: 0, checkpointId: "w1", catalogItem: { year: 2019 } },
+      { id: "i1", title: "Parasita", position: 0, checkpointId: "w1", catalogItem: { year: 2019, runtimeMinutes: 100 } },
     ],
     checkpoints: [
-      { id: "w1", checkpointId: "w1", title: "Semana 1", kind: "week", position: 0, timeframe: "past", itemCount: 1 },
+      { id: "w1", checkpointId: "w1", title: "Semana 1", kind: "week", position: 0, timeframe: "past", itemCount: 1, totalRuntimeMinutes: 100 },
     ],
     metrics: [],
     ruleSections: [{ title: "Uma sessão por semana", description: "Sem spoilers no grupo." }],
@@ -839,6 +839,7 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
   assert.match(html, /Cine clube/, "o cabeçalho traz o título");
   assert.match(html, /Sem spoilers no grupo\./, "as regras aparecem");
   assert.match(html, /Semana 1/, "o cronograma aparece");
+  assert.doesNotMatch(html, /\| 1h40/, "o cronograma omite o total de duração da etapa");
   assert.match(html, /Nota média/, "o Resultado (vitrine) aparece");
   assert.match(html, /Copiar/, "o CTA de cópia entra no lugar do 'Gerenciar'");
   assert.doesNotMatch(html, /<form/, "nenhum formulário de registro no preview");

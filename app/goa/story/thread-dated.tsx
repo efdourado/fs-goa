@@ -12,6 +12,7 @@ const LANE = 46;
 const TOP = 30;
 const LABEL = 92;
 const MIN_DAY = 9;
+const PLOT_PADDING = 12;
 
 /**
  * Everyone's days as a thread across the calendar: solid where they kept going, broken where they
@@ -33,10 +34,14 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
 
   if (story.lanes.length === 1) return <SoloRhythm story={story} input={input} run={run} />;
   const total = daysBetween(story.from, story.to) + 1;
-  const plotWidth = fit ? Math.max(1, width - LABEL - 12) : Math.max(width - LABEL - 12, total * MIN_DAY);
+  // Leave room for the first bead and streak outline past the label divider.
+  const plotStart = LABEL + PLOT_PADDING;
+  const available = width - plotStart - PLOT_PADDING;
+  const plotWidth = fit ? Math.max(1, available) : Math.max(available, total * MIN_DAY);
   const dayWidth = plotWidth / total;
-  const contentWidth = plotWidth + LABEL + 12;
-  const x = (day: string) => LABEL + daysBetween(story.from, day) * dayWidth + dayWidth / 2;
+  const plotEnd = plotStart + plotWidth;
+  const contentWidth = plotEnd + PLOT_PADDING;
+  const x = (day: string) => plotStart + daysBetween(story.from, day) * dayWidth + dayWidth / 2;
   const height = TOP + story.lanes.length * LANE + 8;
   const ids = input.people.map((person) => person.id);
   const maxValue = Math.max(1, ...story.lanes.flatMap((lane) => lane.days.map((row) => row.value ?? 0)));
@@ -53,12 +58,15 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
       <div key={run} className="story-sweep relative" style={{ width: contentWidth || "100%", height }}>
         <svg width={contentWidth} height={height} className="block" role="img" aria-label={t("lanesAria", { count: story.lanes.length, days: total })}>
-          {ruler.map((day) => (
-            <g key={day}>
-              <line x1={x(day) - dayWidth / 2} x2={x(day) - dayWidth / 2} y1={TOP - 8} y2={height} stroke="currentColor" strokeOpacity={0.08} />
-              <text x={x(day) - dayWidth / 2 + 3} y={TOP - 14} fontSize="10" fill="currentColor" fillOpacity={0.45}>{f.dateTime(new Date(`${day}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" })}</text>
-            </g>
-          ))}
+          {ruler.map((day) => {
+            const tick = day === story.from ? LABEL : x(day) - dayWidth / 2;
+            return (
+              <g key={day}>
+                <line x1={tick} x2={tick} y1={TOP - 8} y2={height} stroke="currentColor" strokeOpacity={0.08} />
+                <text x={tick + 3} y={TOP - 14} fontSize="10" fill="currentColor" fillOpacity={0.45}>{f.dateTime(new Date(`${day}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" })}</text>
+              </g>
+            );
+          })}
           {story.lanes.map((lane, laneIndex) => {
             const tone = personTone(ids, lane.person.id);
             const mid = TOP + laneIndex * LANE + LANE / 2;
@@ -67,7 +75,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
             const runs = lane.runs;
             return (
               <g key={lane.person.id} style={{ opacity: dim ? 0.12 : 1, transition: "opacity 250ms" }}>
-                <line x1={LABEL} x2={contentWidth - 12} y1={mid} y2={mid} stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2 4" />
+                <line x1={plotStart} x2={plotEnd} y1={mid} y2={mid} stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2 4" />
                 {runs.map((segment) => (
                   <line key={segment.from} x1={x(segment.from)} x2={x(segment.to)} y1={mid} y2={mid} stroke={tone} strokeWidth={4} strokeLinecap="round" />
                 ))}

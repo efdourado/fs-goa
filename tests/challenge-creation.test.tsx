@@ -440,12 +440,14 @@ test('dashboard group creation unlocks only for a nonblank name', async () => {
 test('catalogue property lines scroll only when the text overflows', async () => {
   const ui = await setup();
   try {
-    await act(async () => ui.root.render(withIntl(<CatalogRow title="Solaris" meta={['Stanisław Lem', '1961', '204']} />)));
+    await act(async () => ui.root.render(withIntl(<CatalogRow title="Solaris" meta={['Stanisław Lem', '1961', '204']} edit={{ label: 'Editar item: Solaris', onOpen: () => undefined }} />)));
     const line = document.querySelector<HTMLElement>('.catalog-property-line')!;
     const text = line.firstElementChild as HTMLElement;
     let scrollWidth = 100;
     Object.defineProperties(text, { clientWidth: { value: 100 }, scrollWidth: { get: () => scrollWidth } });
-    const row = line.closest('.flex')!;
+    const row = line.closest('button')!;
+    assert.equal(row.getAttribute('aria-describedby'), line.id);
+    assert.equal(line.hasAttribute('tabindex'), false);
     await act(async () => row.dispatchEvent(new window.MouseEvent('pointerover', { bubbles: true })));
     assert.equal(text.hasAttribute('data-scrolling'), false);
     await act(async () => row.dispatchEvent(new window.MouseEvent('pointerout', { bubbles: true })));
@@ -454,14 +456,14 @@ test('catalogue property lines scroll only when the text overflows', async () =>
     assert.equal(text.style.getPropertyValue('--property-distance'), '-140px');
     await act(async () => row.dispatchEvent(new window.MouseEvent('pointerout', { bubbles: true })));
     assert.equal(text.hasAttribute('data-scrolling'), false);
-    await act(async () => line.focus());
+    await act(async () => row.focus());
     assert.equal(text.hasAttribute('data-scrolling'), true);
-    await act(async () => line.blur());
+    await act(async () => row.blur());
     assert.equal(text.hasAttribute('data-scrolling'), false);
   } finally { await ui.cleanup(); }
 });
 
-test('the catalogue title stays on the list and its settings button keeps item editing available', async () => {
+test('the catalogue row opens its item editor and selects the item in bulk mode', async () => {
   const ui = await setup();
   try {
     clearCache();
@@ -475,12 +477,18 @@ test('the catalogue title stays on the list and its settings button keeps item e
     await act(async () => ui.root.render(withIntl(<GoaApp />)));
     const title = [...document.querySelectorAll('strong')].find((node) => node.textContent === 'Solaris');
     assert.ok(title);
+    assert.equal(title.closest('button'), ui.button('Editar item: Solaris'));
     await act(async () => title.click());
-    assert.equal(window.location.pathname, '/catalog');
-    assert.equal(document.querySelector('dialog'), null);
-    await act(async () => ui.button('Editar item: Solaris').click());
     assert.ok(document.querySelector('dialog input[value="Solaris"]'));
     assert.equal(window.location.pathname, '/catalog');
+    await act(async () => ui.button('Fechar').click());
+    await act(async () => ui.button('Selecionar').click());
+    const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][aria-label="Solaris"]')!;
+    const selectionRow = checkbox.closest('label')!;
+    assert.ok(selectionRow.querySelector('.catalog-property-line'));
+    await act(async () => selectionRow.click());
+    assert.equal(checkbox.checked, true);
+    assert.equal(document.querySelector('dialog'), null);
   } finally { await ui.cleanup(); }
 });
 

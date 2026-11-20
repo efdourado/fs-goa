@@ -12,7 +12,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { ArrowField, Button, CircleMinusIcon, Field, inputClass, Select, StatusMessage } from "./ui";
+import { ArrowField, Button, CircleMinusIcon, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
@@ -435,9 +435,9 @@ export function LibraryPropertiesDialog({
             ))}
             {more > 0 || (showAll && (properties?.length ?? 0) > VISIBLE_PROPERTIES) ? (
               <li>
-                <StateButton type="button" onClick={() => setShowAll((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                <ListMoreButton onClick={() => setShowAll((open) => !open)}>
                   {showAll ? t("showFewer") : t("showAll", { count: more })}
-                </StateButton>
+                </ListMoreButton>
               </li>
             ) : null}
             {canEdit ? (

@@ -105,11 +105,46 @@ test('choosing items moves from other stages and unassigns deselected ones witho
   await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(values);}} />);
   const open = [...document.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find((button) => button.textContent!.includes('Phase 1'))!;
   await act(async () => open.click());
-  await act(async () => ui.button('Escolher itens').click());
+  const addItem = ui.button('+ Item');
+  assert.ok(addItem.classList.contains('!rounded-full'));
+  await act(async () => addItem.click());
   const checks = [...document.querySelectorAll<HTMLInputElement>('dialog input[type=checkbox]')];
   await act(async () => {checks[0].click(); checks[1].click();});
   await act(async () => ui.button('Salvar').click());
   assert.deepEqual(saved[0], [{itemId:'one',position:0,checkpointId:null},{itemId:'two',position:1,checkpointId:'a'},{itemId:'three',position:2,checkpointId:null}]);
+ } finally {await ui.cleanup();}
+});
+
+test('the stage picker reveals matching items in batches and keeps hidden selections', async () => {
+ const ui = await setup();
+ const items = Array.from({length: 25}, (_, index) => ({id: `item-${index}`, title: `Item ${index + 1}`, position: index}));
+ const saved: Array<{itemId: string; checkpointId: string | null}> = [];
+ const checks = () => [...document.querySelectorAll<HTMLInputElement>('dialog input[type=checkbox]')];
+ try {
+  await ui.render(<CheckpointPlanner challenge={{...challenge, items}} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(...values);}} />);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find((button) => button.textContent?.includes('Phase 1'))!.click());
+  await act(async () => ui.button('+ Item').click());
+  assert.equal(checks().length, 6);
+  const save = ui.button('Salvar');
+  assert.equal(save.disabled, true);
+  assert.ok(save.closest('.sticky.bottom-0'));
+  await act(async () => checks()[0].click());
+  await act(async () => ui.button('Mostrar mais (+12)').click());
+  assert.equal(checks().length, 18);
+
+  const search = document.querySelector<HTMLInputElement>('dialog input[type=search]')!;
+  await ui.fill(search, 'Item 25');
+  assert.equal(checks().length, 1);
+  await act(async () => checks()[0].click());
+  await ui.fill(search, '');
+  assert.equal(checks().length, 6);
+  assert.equal(checks()[0].checked, true);
+  await act(async () => ui.button('Mostrar mais (+12)').click());
+  await act(async () => ui.button('Mostrar mais (+7)').click());
+  assert.equal(checks().length, 25);
+  assert.equal(checks().at(-1)?.checked, true);
+  await act(async () => save.click());
+  assert.deepEqual(saved.filter((row) => row.checkpointId === 'a').map((row) => row.itemId), ['item-0', 'item-24']);
  } finally {await ui.cleanup();}
 });
 
@@ -269,7 +304,7 @@ test('closed challenges retain readable item details and expose no editing contr
  const ui = await setup();
  try {
   await ui.render(<CheckpointPlanner challenge={{...challenge,status:'closed'}} onSaveCheckpoints={noop} onAssign={noop} />);
-  assert.doesNotMatch(document.body.textContent!, /Adicionar etapa|Escolher itens/);
+  assert.doesNotMatch(document.body.textContent!, /Adicionar etapa|\+ Item/);
   const open = [...document.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find((button) => button.textContent!.includes('Phase 1'))!;
   await act(async () => open.click()); await act(async () => ui.button('One').click());
   assert.match(document.querySelector('dialog')!.textContent!, /Kept detail/);
@@ -456,11 +491,17 @@ test('long item lists render twelve rows at a time without losing remaining item
  const value={...challenge,checkpoints:[],items:Array.from({length:25},(_,i)=>({id:`item-${i}`,title:`Item ${i}`,position:i}))} as ChallengeDetail;
  try {
   await ui.render(<CheckpointPlanner challenge={value} onSaveCheckpoints={noop} onAssign={noop} />);
-  assert.equal(document.querySelectorAll('section ul li').length,12);
-  await act(async()=>ui.button('Ver mais 12').click());
-  assert.equal(document.querySelectorAll('section ul li').length,24);
-  await act(async()=>ui.button('Ver mais 1').click());
-  assert.equal(document.querySelectorAll('section ul li').length,25);
+  const more = ui.button('Mostrar mais (+12)');
+  assert.ok(more.matches('ul > li:last-child > button'));
+  assert.ok(more.classList.contains('text-xs'));
+  const list = more.closest('ul')!;
+  const itemCount = () => [...list.querySelectorAll('li')].filter((row) => row.textContent?.startsWith('Item')).length;
+  assert.equal(itemCount(), 12);
+  await act(async () => more.click());
+  assert.equal(itemCount(), 24);
+  await act(async () => ui.button('Mostrar mais (+1)').click());
+  assert.equal(itemCount(), 25);
+  assert.doesNotMatch(list.textContent!, /Mostrar mais/);
  } finally {await ui.cleanup();}
 });
 

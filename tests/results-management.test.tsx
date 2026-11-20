@@ -7,6 +7,7 @@ import { AdminMetrics, MetricEditorDialog } from "../app/goa/admin-metrics";
 import { metricUpdatePayload } from "../app/goa/metric-editor";
 import { useAlmanacPages } from "../app/goa/story/almanac";
 import { buildStory, type StoryInput } from "../app/goa/story/model";
+import { DatedThread } from "../app/goa/story/thread-dated";
 import { StoryView } from "../app/goa/story/view";
 import type { ChallengeDetail, Metric } from "../app/goa/types";
 import { renderWithIntl } from "./helpers/intl";
@@ -60,6 +61,30 @@ test("the overview can be hidden while metrics still render without story data",
   const html = renderWithIntl(createElement(StoryView, { input: empty, story: buildStory(empty), metrics: [metric] }));
   assert.match(html, /Overall rating/);
   assert.doesNotMatch(html, /The thread|O fio/);
+});
+
+test("the first thread beads and streak outlines clear the label divider", () => {
+  const dated: StoryInput = {
+    ...input,
+    people: [{ id: "ana", name: "Ana" }, { id: "bia", name: "Bia" }],
+    ratings: [],
+    days: [
+      { personId: "ana", day: "2026-11-01", value: 20 },
+      { personId: "ana", day: "2026-11-02", value: 10 },
+      { personId: "bia", day: "2026-11-02", value: 15 },
+    ],
+  };
+  const story = buildStory(dated);
+  assert.equal(story.kind, "dated");
+  for (const fit of [false, true]) {
+    const html = renderWithIntl(createElement(DatedThread, { story, input: dated, focus: null, run: 0, fit }));
+    const divider = html.match(/<line x1="([\d.]+)" x2="\1"[^>]*stroke-opacity="0.08"/);
+    const outlines = [...html.matchAll(/<rect x="([\d.]+)"[^>]*stroke-opacity="0.55"/g)];
+    const beads = [...html.matchAll(/<circle cx="([\d.]+)" cy="[\d.]+" r="([\d.]+)"[^>]*stroke="var\(--spotlight\)"/g)];
+    assert.ok(divider && outlines.length && beads.length);
+    assert.ok(outlines.every(([, x]) => Number(x) - 0.6 > Number(divider[1])));
+    assert.ok(beads.every(([, cx, radius]) => Number(cx) - Number(radius) - 0.5 > Number(divider[1])));
+  }
 });
 
 test("visibility updates preserve combined ratings, scope and sampling", () => {

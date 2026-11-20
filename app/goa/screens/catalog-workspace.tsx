@@ -8,7 +8,7 @@ import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } fr
 import { API_PATHS, apiRequest } from "../api";
 import { BottomSheet } from "../bottom-sheet";
 import { AddCatalogItemDialog, EditCatalogItemDialog } from "../catalog-item-dialogs";
-import { CatalogRow, type CatalogGroupBy, groupCatalogItems, useCatalogPropertyText } from "../catalog-views";
+import { CatalogRow, decadeOf, groupCatalogItems, useCatalogPropertyText } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -18,16 +18,22 @@ import {
   useCatalogLibraries,
   useLibraryName,
 } from "../libraries";
-import { useLibraryProperties } from "../property-inputs";
-import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
+import { editableProperties, useLibraryProperties, useNativePropertyName, valueFromItem } from "../property-inputs";
+import type { CatalogItem, CatalogLibrary, Id, LibraryProperty, Member } from "../types";
+import { BackButton, Button, CheckCircle, cx, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
 
 type Sort = "recent" | "title" | "date";
 
 /** How many rows a library shows at first, and how many more each "Show more" adds. */
 const PAGE_SIZE = 30;
-/** A filter list (genres) shows this many before its own "+ N more". */
+/** A filter shows this many values before its own "+ N more". */
 const FACET_SIZE = 6;
+
+function propertyOrder(type: LibraryProperty["type"]) {
+  if (type === "number") return (left: string, right: string) => Number(right) - Number(left);
+  if (type === "date") return (left: string, right: string) => right.localeCompare(left);
+  return (left: string, right: string) => left.localeCompare(right);
+}
 
 // A computer's index can fold away for a wider list; the choice is remembered on this device. Read through an
 // external store (like the check-in log's view) so the server render and the first client render agree.
@@ -104,7 +110,6 @@ const SearchIcon = () => (
 export function CatalogWorkspaceScreen({
   scope,
   title,
-  subtitle,
   backLabel,
   canManage,
 
@@ -112,7 +117,6 @@ export function CatalogWorkspaceScreen({
 }: {
   scope: CatalogScope;
   title: string;
-  subtitle?: string;
   backLabel: string;
   canManage: boolean;
   members: Member[];
@@ -125,13 +129,14 @@ export function CatalogWorkspaceScreen({
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const libraryName = useLibraryName();
+  const propertyName = useNativePropertyName();
   const { data: libraries, error: librariesError, reload: reloadLibraries } = useCatalogLibraries(scope);
   const [items, setItems] = useState<CatalogItem[] | null>(null);
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [genres, setGenres] = useState<string[]>([]);
+  const [propertyFilter, setPropertyFilter] = useState<{ propertyKey: string; values: string[] } | null>(null);
   const [shown, setShown] = useState(PAGE_SIZE);
   const [openFacets, setOpenFacets] = useState<string[]>([]);
   const indexOpen = useSyncExternalStore(subscribeIndex, readIndexOpen, () => true);
@@ -139,7 +144,7 @@ export function CatalogWorkspaceScreen({
   // On a phone the index lives in two sheets: the library switcher and the filters.
   const [sheet, setSheet] = useState<"libraries" | "filters" | null>(null);
   const [sort, setSort] = useState<Sort>("recent");
-  const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
+  const [groupBy, setGroupBy] = useState("none");
   const [dialog, setDialog] = useState<"add" | "new" | "properties" | null>(null);
   // The library the settings dialog is about — not always the one on screen.
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
@@ -188,11 +193,15 @@ export function CatalogWorkspaceScreen({
   const library = tabs.find((entry) => entry.kind === kind) ?? null;
   const dialogLibrary = tabs.find((entry) => entry.kind === dialogKind) ?? null;
   const scoped = useMemo(() => (items ?? []).filter((item) => item.kind === kind), [items, kind]);
-  const isBuiltIn = kind === "film" || kind === "book";
   const loading = items === null || libraries === null;
   // A property someone hid stops showing on lists too — the values stay saved.
   const { properties: libraryProperties } = useLibraryProperties(library ? { id: library.id, kind: library.kind } : null, itemsNonce);
   const hidden = useMemo(() => (libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key), [libraryProperties]);
+  const visibleProperties = useMemo(() => editableProperties(libraryProperties ?? []), [libraryProperties]);
+  const filterProperty = visibleProperties[0];
+  const groupProperty = visibleProperties.find((property) => property.key === groupBy);
+  const yearProperty = visibleProperties.find((property) => property.storage === "native" && property.key === "year");
+  const activeGroupBy = groupProperty || groupBy === "title" || (groupBy === "decade" && yearProperty) ? groupBy : "none";
 
   function openLibraryDialog(entry: CatalogLibrary) {
     setNotice(null);
@@ -209,23 +218,27 @@ export function CatalogWorkspaceScreen({
   }
 
   function clearFilters() {
-    setGenres([]);
+    setPropertyFilter(null);
     setUnusedOnly(false);
   }
 
   const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
-  // The library's genres, for the genre filter (gone when the library hides its genre).
-  const genreNames = useMemo(() => (hidden.includes("main_genre") ? [] : [...new Set(scoped.map((item) => item.mainGenre?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b))), [scoped, hidden]);
-  const activeGenres = useMemo(() => genres.filter((genre) => genreNames.includes(genre)), [genres, genreNames]);
+  const propertyGroups = useMemo(() => filterProperty
+    ? groupCatalogItems(scoped, (item) => valueFromItem(filterProperty, item), propertyOrder(filterProperty.type)).filter((group) => group.label)
+    : [], [scoped, filterProperty]);
+  const activePropertyGroups = useMemo(() => propertyGroups.length > 1 && propertyFilter && propertyFilter.propertyKey === filterProperty?.key
+    ? propertyGroups.filter((group) => propertyFilter.values.includes(group.key))
+    : [], [propertyGroups, propertyFilter, filterProperty]);
+  const propertyMatches = useMemo(() => new Set(activePropertyGroups.flatMap((group) => group.items.map((item) => item.id))), [activePropertyGroups]);
   const needle = query.trim().toLocaleLowerCase();
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
-    if (activeGenres.length && !activeGenres.includes(item.mainGenre?.trim() ?? "")) return false;
+    if (propertyMatches.size && !propertyMatches.has(item.id)) return false;
     if (needle && ![item.title, item.author, item.mainGenre].some((field) => field?.toLocaleLowerCase().includes(needle))) return false;
     return true;
-  }), [scoped, onlyUnused, activeGenres, needle]);
+  }), [scoped, onlyUnused, propertyMatches, needle]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const activeSort: Sort = sort === "date" && !hasDates ? "recent" : sort;
@@ -239,7 +252,13 @@ export function CatalogWorkspaceScreen({
         : left.title.localeCompare(right.title),
   ), [filtered, activeSort]);
   // Only the first rows are drawn; "Show more" brings the next page.
-  const groups = useMemo(() => groupCatalogItems(sorted.slice(0, shown), groupBy), [sorted, groupBy, shown]);
+  const groups = useMemo(() => {
+    const page = sorted.slice(0, shown);
+    if (groupProperty) return groupCatalogItems(page, (item) => valueFromItem(groupProperty, item), propertyOrder(groupProperty.type));
+    if (activeGroupBy === "title") return groupCatalogItems(page, (item) => Array.from(item.title.trim())[0]?.toLocaleUpperCase() ?? "");
+    if (activeGroupBy === "decade") return groupCatalogItems(page, (item) => item.year == null ? "" : decadeOf(item.year), (left, right) => parseInt(right, 10) - parseInt(left, 10));
+    return groupCatalogItems(page);
+  }, [sorted, shown, activeGroupBy, groupProperty]);
   const hiddenCount = Math.max(0, sorted.length - shown);
 
 
@@ -269,21 +288,40 @@ export function CatalogWorkspaceScreen({
     reloadAll();
   }
 
-  const groupOptions: Array<{ value: CatalogGroupBy; label: string }> = [
+  const titleProperty = libraryProperties?.find((property) => property.key === "title");
+  const groupOptions = [
     { value: "none", label: t("group.none") },
-    { value: "genre", label: t("group.genre") },
-    { value: "decade", label: t("group.decade") },
-    { value: "year", label: t("group.year") },
+    { value: "title", label: titleProperty ? propertyName(titleProperty) : tl("native.title") },
+    ...visibleProperties.map((property) => ({ value: property.key, label: propertyName(property) })),
+    ...(yearProperty ? [{ value: "decade", label: t("group.decade") }] : []),
   ];
   const sortOptions: Array<{ value: Sort; label: string }> = [
     { value: "recent", label: t("sortRecent") },
     { value: "title", label: t("sortTitle") },
     ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
   ];
-  const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
+  function propertyValueLabel(value: string, property: LibraryProperty) {
+    if (property.type === "boolean") return tc(value === "true" ? "yes" : "no");
+    if (property.type === "date") return f.date(value);
+    return value;
+  }
+  function groupLabel(label: string) {
+    if (label) return groupProperty ? propertyValueLabel(label, groupProperty) : label;
+    if (activeGroupBy === "decade" || (groupProperty && groupProperty === yearProperty) || groupProperty?.type === "date") return t("undated");
+    if (groupProperty?.storage === "native" && groupProperty.key === "main_genre" && !groupProperty.label) return t("noGenre");
+    return t("missingPropertyValue");
+  }
+  const activePropertyValues = activePropertyGroups.map((group) => group.key);
+  function setPropertyValues(values: string[]) {
+    if (filterProperty) setPropertyFilter({ propertyKey: filterProperty.key, values });
+  }
   // What narrows the list, each removable on its own from the toolbar.
   const activeChips: Array<{ key: string; label: string; remove: () => void }> = [
-    ...activeGenres.map((genre) => ({ key: `genre:${genre}`, label: genre, remove: () => setGenres(activeGenres.filter((entry) => entry !== genre)) })),
+    ...activePropertyGroups.map((group) => ({
+      key: `property:${group.key}`,
+      label: propertyValueLabel(group.label, filterProperty),
+      remove: () => setPropertyValues(activePropertyValues.filter((key) => key !== group.key)),
+    })),
     ...(onlyUnused ? [{ key: "unused", label: t("unusedOnly"), remove: () => setUnusedOnly(false) }] : []),
   ];
   const narrowed = Boolean(activeChips.length || needle);
@@ -352,27 +390,22 @@ export function CatalogWorkspaceScreen({
   }
   const facets = (
     <div className="flex flex-col gap-7">
-      {genreNames.length > 1 ? (
+      {filterProperty && propertyGroups.length > 1 ? (
         <div>
-          <p className={facetHeading}>{t("group.genre")}</p>
-          {facetRows("genre", genreNames, (genre) => {
-            const on = activeGenres.includes(genre);
-            return <IndexRow key={genre} box label={genre} on={on} count={scoped.filter((item) => item.mainGenre?.trim() === genre).length} onClick={() => setGenres(on ? activeGenres.filter((entry) => entry !== genre) : [...activeGenres, genre])} />;
+          <p className={facetHeading}>{propertyName(filterProperty)}</p>
+          {facetRows(`${kind}:${filterProperty.key}`, propertyGroups, (group) => {
+            const on = activePropertyValues.includes(group.key);
+            return <IndexRow key={group.key} box label={propertyValueLabel(group.label, filterProperty)} on={on} count={group.items.length} onClick={() => setPropertyValues(on ? activePropertyValues.filter((key) => key !== group.key) : [...activePropertyValues, group.key])} />;
           })}
         </div>
       ) : null}
-      <div>
-        <p className={facetHeading}>{t("showOnly")}</p>
-        {canManage && unusedCount > 0 ? (
-          <IndexRow box label={t("unusedOnly")} count={unusedCount} on={onlyUnused} onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }} />
-        ) : null}
-      </div>
-      {isBuiltIn ? (
-        <div>
-          <p className={facetHeading}>{t("groupByLabel")}</p>
-          {groupOptions.map((option) => <IndexRow key={option.value} label={option.label} on={groupBy === option.value} onClick={() => setGroupBy(option.value)} />)}
-        </div>
+      {canManage && unusedCount > 0 ? (
+        <IndexRow box label={t("unusedOnly")} count={unusedCount} on={onlyUnused} onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }} />
       ) : null}
+      <div>
+        <p className={facetHeading}>{t("groupByLabel")}</p>
+        {groupOptions.map((option) => <IndexRow key={option.value} label={option.label} on={activeGroupBy === option.value} onClick={() => setGroupBy(option.value)} />)}
+      </div>
     </div>
   );
 
@@ -383,7 +416,6 @@ export function CatalogWorkspaceScreen({
 
       {/* A computer reads the page's name as its title; a phone keeps it small above the library switcher. */}
       <h1 className="text-xs text-[var(--muted)] lg:mb-8 lg:text-4xl lg:font-medium lg:tracking-[-0.045em] lg:text-[var(--ink)]">{title}</h1>
-      {subtitle ? <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-[var(--muted)] lg:block">{subtitle}</p> : null}
 
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
@@ -392,7 +424,7 @@ export function CatalogWorkspaceScreen({
       ) : !tabs.length ? (
         // The same quiet, unboxed empty state as Updates: no actions compete with the page heading.
         <div className="mt-6">
-          <FaceEmptyState title={t("emptyTitle")} />
+          <FaceEmptyState title={t("emptyTitle")} compact />
         </div>
       ) : library ? (
         <div className="lg:flex lg:items-start lg:gap-14">
@@ -510,17 +542,14 @@ export function CatalogWorkspaceScreen({
 
             <div className="mt-3">
               {!scoped.length ? (
-                <EmptyState
-                  title={tl("emptyLibrary", { name: libraryName(library) })}
-                  onClick={canManage ? () => setDialog("add") : undefined}
-                />
+                <FaceEmptyState title={tl("emptyLibrary", { name: libraryName(library) })} compact />
               ) : !sorted.length ? (
                 <FaceEmptyState title={t("noMatches")} />
               ) : (
                 <div className="space-y-10">
                   {groups.map((group) => (
-                    <section key={group.key} aria-label={groupBy === "none" ? undefined : groupLabel(group.label)}>
-                      {groupBy !== "none" ? (
+                    <section key={group.key} aria-label={activeGroupBy === "none" ? undefined : groupLabel(group.label)}>
+                      {activeGroupBy !== "none" ? (
                         <h2 className="mb-2 mt-4 flex items-baseline gap-2.5 text-lg font-light tracking-[-0.02em]">
                           {groupLabel(group.label)}
                           <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
@@ -539,11 +568,7 @@ export function CatalogWorkspaceScreen({
                                 selecting={selecting}
                                 picked={picked.has(item.id)}
                                 onPick={(on) => togglePicked([item.id], on)}
-                                action={canManage ? (
-                                  <StateButton type="button" onClick={() => setEditingItem(item)} aria-label={`${tItem("edit")}: ${item.title}`} title={tItem("edit")} className="grid size-9 flex-none cursor-pointer place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)]">
-                                    <SlidersIcon className="size-4" />
-                                  </StateButton>
-                                ) : undefined}
+                                edit={canManage ? { label: `${tItem("edit")}: ${item.title}`, onOpen: () => setEditingItem(item) } : undefined}
                               />
                             </li>
                           );
