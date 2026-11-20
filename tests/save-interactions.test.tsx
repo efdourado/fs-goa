@@ -80,14 +80,14 @@ test("expectation and optional rating share one Save; a guess can be saved befor
     const types: string[] = [];
     await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={[]} user={{ id: "me" } as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item, _values, _entry, _date, type) => { types.push(type!); }} />)));
     assert.equal([...document.querySelectorAll("button")].filter((button) => /Salvar/.test(button.textContent ?? "")).length, 1);
-    assert.equal(document.querySelector('button[aria-label="Cancelar"]'),null,"empty answers have no header lock");
+    assert.equal(document.querySelector('button[aria-label="Cancelar"]'),null,"empty answers have no header edit control");
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
     await act(async () => ui.button("Salvar").click());
     assert.deepEqual(types, ["expectation"], "blank actual rating is neither required nor created");
   } finally { await ui.cleanup(); }
 });
 
-test("unlocking a saved expectation shows only Save with a lock and blocks unchanged answers", async () => {
+test("editing a saved expectation shows Save and blocks unchanged answers", async () => {
   const ui = setup();
   try {
     const saved: Array<{type: string | undefined; values: Record<string, unknown>}> = [];
@@ -97,14 +97,14 @@ test("unlocking a saved expectation shows only Save with a lock and blocks uncha
     assert.equal([...document.querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Cancelar").length,0);
     assert.equal(ui.button("Salvar").disabled,true);
     const save = ui.button("Salvar");
-    assert.equal(save.querySelectorAll('[data-lock-state]').length,1);
+    assert.equal(document.querySelector('button [data-lock-state]'), null);
     assert.equal(document.querySelector('#entry-type-expectation button[aria-label="Editar resposta"]'),null);
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
     assert.equal(save.disabled,false);
     await act(async () => ui.button("Cancelar").click());
-    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false,"Save is hidden while locked");
+    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false,"Save is hidden outside edit mode");
     await act(async () => ui.button("Editar resposta").click());
-    assert.equal(ui.button("Salvar").disabled,true,"closing the lock restores saved answers");
+    assert.equal(ui.button("Salvar").disabled,true,"canceling restores saved answers");
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
     await act(async () => ui.button("Salvar").click());
     assert.deepEqual(saved,[{type:"expectation",values:{guess:4}}]);
@@ -144,7 +144,7 @@ test("rating can be saved first without filling expectation", async () => {
   } finally {await ui.cleanup();}
 });
 
-test("a saved answer gains a header lock and clearing it removes the lock while Save stays visible", async () => {
+test("a saved answer gains an edit control and clearing it removes the control while Save stays visible", async () => {
   const ui=setup(); let deletes=0;
   const value={...cinema,entryTypes:[cinema.entryTypes[0]]};
   const entry={id:"guess-entry",userId:"me",itemId:"film",entryTypeId:"expectation",values:{guess:3}} as Entry;

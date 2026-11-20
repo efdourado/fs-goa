@@ -12,6 +12,7 @@ import {
   normalizeEntries,
 } from "./goa/api";
 import { useGoaFormat } from "./goa/format";
+import { AppLocaleProvider } from "./goa/app-locale";
 import { AboutScreen } from "./goa/screens/about";
 import { QuickCreateScreen } from "./goa/screens/quick-create";
 import { AccountScreen } from "./goa/screens/account";
@@ -68,6 +69,10 @@ const DOCK_ROOTS: Record<DockTab, Screen> = {
 const DOCK_ROOT_KINDS = new Set<Screen["kind"]>(Object.values(DOCK_ROOTS).map((root) => root.kind));
 
 export default function GoaApp() {
+  return <AppLocaleProvider><GoaAppContent /></AppLocaleProvider>;
+}
+
+function GoaAppContent() {
   const t = useTranslations("app");
   const tCreate = useTranslations("createChallenge");
   const tc = useTranslations("common");

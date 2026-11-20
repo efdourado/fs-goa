@@ -10,6 +10,7 @@ process.env.GOA_RATE_LIMITS = "off";
 
 const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route");
 const { dateKeyInTimeZone } = await import("../../lib/goa/domain/shared");
+const { LIMITS } = await import("../../lib/limits");
 const adminPool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
 
 type ClientSession = { cookie: string; csrf: string; user: { id: string; name: string; username: string } };
@@ -932,7 +933,7 @@ test("recusa entrar no grupo além do limite de pessoas, por username e por conv
   }
 });
 
-test("limita quantos grupos uma conta pode participar, por aceite e por link", async () => {
+test("limita quantos grupos uma conta pode participar, inclusive por criação e restauração", async () => {
   const previousCap = process.env.MAX_GROUPS_PER_MEMBER;
   process.env.MAX_GROUPS_PER_MEMBER = "1";
   try {
@@ -940,8 +941,16 @@ test("limita quantos grupos uma conta pode participar, por aceite e por link", a
     const hostA = await register("Anfitriã A", "anfitria_a_limite");
     const hostB = await register("Anfitrião B", "anfitriao_b_limite");
 
-    const ownGroup = await call("POST", "/api/groups", { session: joiner, body: { name: "Meu único grupo" } });
+    const concurrent = await Promise.all(["Meu único grupo", "Grupo em paralelo"].map((name) =>
+      call("POST", "/api/groups", { session: joiner, body: { name } }),
+    ));
+    assert.deepEqual(concurrent.map(({ response }) => response.status).sort(), [201, 403]);
+    const ownGroup = concurrent.find(({ response }) => response.status === 201)!;
     assert.equal(ownGroup.response.status, 201, JSON.stringify(ownGroup.body));
+    const ownGroupId = (ownGroup.body as { id: string }).id;
+    const createOverLimit = await call("POST", "/api/groups", { session: joiner, body: { name: "Grupo extra" } });
+    assert.equal(createOverLimit.response.status, 403, JSON.stringify(createOverLimit.body));
+    assert.equal((createOverLimit.body as { error: string }).error, "group_membership_limit");
 
     const groupA = (await call("POST", "/api/groups", { session: hostA, body: { name: "Grupo A" } })).body as { id: string };
     await call("POST", `/api/groups/${groupA.id}/members`, { session: hostA, body: { username: joiner.user.username } });
@@ -964,6 +973,15 @@ test("limita quantos grupos uma conta pode participar, por aceite e por link", a
     });
     assert.equal(linkOverLimit.response.status, 403, JSON.stringify(linkOverLimit.body));
     assert.equal((linkOverLimit.body as { error: string }).error, "group_membership_limit");
+
+    assert.equal((await call("DELETE", `/api/groups/${ownGroupId}`, { session: joiner })).response.status, 200);
+    assert.equal((await call("POST", `/api/member-requests/${requestA.rows[0]?.id}/accept`, { session: joiner, body: {} })).response.status, 200);
+    const restore = () => call("POST", "/api/personal/trash/restore", { session: joiner, body: { kind: "group", id: ownGroupId } });
+    const restoreOverLimit = await restore();
+    assert.equal(restoreOverLimit.response.status, 403, JSON.stringify(restoreOverLimit.body));
+    assert.equal((restoreOverLimit.body as { error: string }).error, "group_membership_limit");
+    assert.equal((await call("POST", `/api/groups/${groupA.id}/leave`, { session: joiner, body: {} })).response.status, 200);
+    assert.equal((await restore()).response.status, 200);
   } finally {
     if (previousCap === undefined) delete process.env.MAX_GROUPS_PER_MEMBER;
     else process.env.MAX_GROUPS_PER_MEMBER = previousCap;
@@ -1340,16 +1358,18 @@ test("o cronograma pode ser escondido da página de resultado sem apagar os chec
 
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
+  const groupLimit = LIMITS.groupsPerOwner;
+  const challengeLimit = LIMITS.challengesPerGroup;
 
   const groupIds: string[] = [];
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < groupLimit; index += 1) {
     const created = await call("POST", "/api/groups", { session: owner, body: { name: `Grupo ${index + 1}` } });
     assert.equal(created.response.status, 201, JSON.stringify(created.body));
     groupIds.push((created.body as { id: string }).id);
   }
 
-  const overflowGroup = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo 7" } });
-  assert.equal(overflowGroup.response.status, 403, "o 7º grupo do mesmo dono deve ser recusado");
+  const overflowGroup = await call("POST", "/api/groups", { session: owner, body: { name: `Grupo ${groupLimit + 1}` } });
+  assert.equal(overflowGroup.response.status, 403, "um grupo além do limite do dono deve ser recusado");
   assert.equal((overflowGroup.body as { error: string }).error, "group_limit");
 
   const groupId = groupIds[0];
@@ -1358,7 +1378,7 @@ test("aplica limites de criação por dono e por grupo", async () => {
     participantIds: [owner.user.id], items: [{ title: "Item único" }],
     fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
   });
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < challengeLimit; index += 1) {
     const created = await call("POST", `/api/groups/${groupId}/challenges`, {
       session: owner, body: challengeBody(`Desafio ${index + 1}`),
     });
@@ -1366,9 +1386,9 @@ test("aplica limites de criação por dono e por grupo", async () => {
   }
 
   const overflowChallenge = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner, body: challengeBody("Desafio 7"),
+    session: owner, body: challengeBody(`Desafio ${challengeLimit + 1}`),
   });
-  assert.equal(overflowChallenge.response.status, 403, "o 7º desafio do mesmo grupo deve ser recusado");
+  assert.equal(overflowChallenge.response.status, 403, "um desafio além do limite do grupo deve ser recusado");
   assert.equal((overflowChallenge.body as { error: string }).error, "challenge_limit");
 
   const copySource = await call("POST", `/api/groups/${groupIds[1]}/challenges`, {
@@ -1386,22 +1406,23 @@ test("aplica limites de criação por dono e por grupo", async () => {
     "SELECT count(*)::int AS count FROM challenges WHERE group_id=$1 AND deleted_at IS NULL",
     [groupId],
   );
-  assert.equal(fullGroupCount.rows[0]?.count, 6, "falha de limite não deixa cópia parcial");
+  assert.equal(fullGroupCount.rows[0]?.count, challengeLimit, "falha de limite não deixa cópia parcial");
 
   // A binned group keeps its slot — the bin never expires (docs/architecture.md › Lixeira e recuperação).
-  assert.equal((await call("DELETE", `/api/groups/${groupIds[5]}`, { session: owner })).response.status, 200);
+  const binnedGroupId = groupIds[groupLimit - 1];
+  assert.equal((await call("DELETE", `/api/groups/${binnedGroupId}`, { session: owner })).response.status, 200);
   const stillCapped = await call("POST", "/api/groups", { session: owner, body: { name: "Ainda cheio" } });
   assert.equal(stillCapped.response.status, 403, "grupo na lixeira continua ocupando a vaga");
 
   const bootstrapAfter = await call("GET", "/api/bootstrap", { session: owner });
   const visibleGroups = (bootstrapAfter.body as { groups: Array<{ id: string }> }).groups.map((group) => group.id);
-  assert.ok(!visibleGroups.includes(groupIds[5]), "grupo na lixeira não aparece no bootstrap");
+  assert.ok(!visibleGroups.includes(binnedGroupId), "grupo na lixeira não aparece no bootstrap");
 
   // Permanently deleting it frees the slot.
-  const preview = await call("POST", "/api/personal/trash/preview", { session: owner, body: { kind: "group", id: groupIds[5] } });
+  const preview = await call("POST", "/api/personal/trash/preview", { session: owner, body: { kind: "group", id: binnedGroupId } });
   assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
   const purge = await call("POST", "/api/personal/trash/purge", {
-    session: owner, body: { kind: "group", id: groupIds[5], confirmation: "Grupo 6" },
+    session: owner, body: { kind: "group", id: binnedGroupId, confirmation: `Grupo ${groupLimit}` },
   });
   assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
   const afterPurge = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo pós-purga" } });

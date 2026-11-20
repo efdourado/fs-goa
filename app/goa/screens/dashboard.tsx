@@ -3,7 +3,7 @@
 import { StateButton } from "../state-button";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog, ModalActions } from "../dialog";
@@ -67,13 +67,14 @@ export { applyColorFilter };
 function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
   const t = useTranslations("dashboard");
   const f = useGoaFormat();
+  const [groupName, setGroupName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const name = groupName.trim();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
-    if (!name) return;
+    if (busy || !name) return;
     setBusy(true);
     setError(null);
     try {
@@ -89,11 +90,11 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
     <Dialog title={t("createGroup")} busy={busy} onClose={onClose}>
       <form className="space-y-5" onSubmit={submit}>
         <Field label={t("groupNameLabel")}>
-          <input className={inputClass} name="name" placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
+          <input className={inputClass} name="name" value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
         </Field>
         <StatusMessage error={error} />
         <ModalActions className="border-t border-[var(--line)] pt-4">
-          <Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>
+          <Button type="submit" disabled={busy || !name}>{busy ? t("creating") : t("create")}</Button>
         </ModalActions>
       </form>
     </Dialog>
@@ -295,6 +296,44 @@ function ArchiveChallengeRow({
   );
 }
 
+const CHALLENGE_SHELF_BATCH = 24;
+
+function ChallengeShelf({ title, challenges, actions, empty, renderCard }: {
+  title: string;
+  challenges: ChallengeSummary[];
+  actions?: ReactNode;
+  empty?: ReactNode;
+  renderCard: (challenge: ChallengeSummary) => ReactNode;
+}) {
+  const t = useTranslations("personalCatalog");
+  const [shown, setShown] = useState(CHALLENGE_SHELF_BATCH);
+  const end = useRef<HTMLSpanElement>(null);
+  const more = shown < challenges.length;
+
+  useEffect(() => {
+    if (!more || !end.current || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      setShown((current) => Math.max(current, shown + CHALLENGE_SHELF_BATCH));
+    });
+    observer.observe(end.current);
+    return () => observer.disconnect();
+  }, [more, shown]);
+
+  return (
+    <Shelf title={title} count={challenges.length} actions={<>
+      {actions}
+      {more ? <Button variant="secondary" onClick={() => setShown(shown + CHALLENGE_SHELF_BATCH)}>
+        {t("showMore", { count: Math.min(CHALLENGE_SHELF_BATCH, challenges.length - shown) })}
+      </Button> : null}
+    </>}>
+      {challenges.length ? challenges.slice(0, shown).map(renderCard) : empty}
+      {more ? <span ref={end} aria-hidden="true" className="w-px shrink-0" /> : null}
+    </Shelf>
+  );
+}
+
 
 // ── the screen ──────────────────────────────────────────────────────────
 
@@ -379,7 +418,7 @@ export function DashboardScreen({
 
   const standardGroups = groups.filter((group) => group.kind !== "personal");
   const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
-  const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
+  const atGroupLimit = ownedGroups >= limits.groupsPerOwner || standardGroups.length >= limits.groupsPerMember;
   const groupName = new Map(standardGroups.map((group) => [group.id, group.name]));
 
   const { shelves, colorFilter, setColorFilter, error, cardProps } = useChallengeOrganizer({
@@ -408,8 +447,8 @@ export function DashboardScreen({
   // Brand new = nothing anywhere: no challenge of their own, no group.
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
-  function renderRail(list: ChallengeSummary[], labelled: boolean): ReactNode {
-    return list.map((challenge) => (
+  function renderCard(challenge: ChallengeSummary, labelled = false): ReactNode {
+    return (
       <ActiveChallengeCard
         key={challenge.id}
         challenge={challenge}
@@ -417,7 +456,7 @@ export function DashboardScreen({
         context={labelled ? contextOf(challenge) : undefined}
         {...cardProps(onOpenAdmin)}
       />
-    ));
+    );
   }
 
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
@@ -506,17 +545,13 @@ export function DashboardScreen({
         <>
           {filtered.pinned.length ? (
             <div className="mb-12">
-              <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
-                {renderRail(filtered.pinned, true)}
-              </Shelf>
+              <ChallengeShelf title={t("shelf.pinned")} challenges={filtered.pinned} renderCard={(challenge) => renderCard(challenge, true)} />
             </div>
           ) : null}
 
           {showPersonalSide ? (
             <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
-              <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={newPersonalActions}>
-                {filtered.personal.length ? renderRail(filtered.personal, false) : emptyRail(th("personalEmpty"))}
-              </Shelf>
+              <ChallengeShelf title={th("personalRunning")} challenges={filtered.personal} actions={newPersonalActions} empty={emptyRail(th("personalEmpty"))} renderCard={(challenge) => renderCard(challenge)} />
               {personalLibrary}
             </HomeSectionBlock>
           ) : null}
@@ -524,9 +559,7 @@ export function DashboardScreen({
           {hasGroups ? (
             <HomeSectionBlock first={!showPersonalSide && !filtered.pinned.length} title={th("sectionGroups")}>
               {shelves.group.length ? (
-                <Shelf title={t("shelf.running")} count={filtered.group.length}>
-                  {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
-                </Shelf>
+                <ChallengeShelf title={t("shelf.running")} challenges={filtered.group} renderCard={(challenge) => renderCard(challenge)} />
               ) : null}
               {groupsShelf}
             </HomeSectionBlock>
@@ -534,11 +567,9 @@ export function DashboardScreen({
 
           {filtered.archive.length ? (
             <div className="mt-12">
-              <Shelf title={t("archiveTitle")} count={filtered.archive.length}>
-                {filtered.archive.map((challenge) => (
-                  <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
-                ))}
-              </Shelf>
+              <ChallengeShelf title={t("archiveTitle")} challenges={filtered.archive} renderCard={(challenge) => (
+                <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
+              )} />
             </div>
           ) : null}
 

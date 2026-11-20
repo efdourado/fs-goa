@@ -1,6 +1,7 @@
 "use client";
 
 import { StateButton } from "../state-button";
+import { SettingsMenu } from "../SettingsMenu";
 
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
@@ -9,7 +10,7 @@ import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { cleanFields, FieldRows } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
-import { type CatalogScope, libraryChoices, useCatalogLibraries } from "../libraries";
+import { type CatalogScope, useCatalogLibraries } from "../libraries";
 import { ChallengeSource } from "../challenge-source";
 import { ResponseFields } from "../response-fields";
 import { initialResponseFields, challengeRecording, type ChallengeLibrary } from "../challenge-creation";
@@ -78,8 +79,8 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
     return () => window.removeEventListener("beforeunload", warn);
   }, [started]);
   const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
-  const { data: libraries } = useCatalogLibraries(scope);
-  const pickedLibrary = linked ? chosenLibrary ?? libraryChoices(libraries ?? []).find((library) => library.kind === pickedKind) ?? null : null;
+  const libraries = useCatalogLibraries(linked ? scope : null);
+  const pickedLibrary = linked && pickedKind !== null ? libraries.data?.find((library) => library.kind === pickedKind) ?? chosenLibrary : null;
   const itemLibraries = pickedLibrary ? [pickedLibrary] : [];
   const itemInputs = linked ? cineRowsToInput(cineItems) : [];
   const stepKeys: StepKey[] = ["setup", ...(linked ? ["checkpoints" as const] : []), "fields", ...(personal ? [] : ["people" as const])];
@@ -91,9 +92,25 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
   const lockedExtras = additionalResponses.length > 0 && (!linked || dated);
   const totalFields = fields.length + additionalResponses.reduce((total, response) => total + response.fields.length, 0);
   function pickLibrary(library: ChallengeLibrary) {
-    if (pickedKind && pickedKind !== library.kind) { setCineItems([]); setItemProblem(null); }
-    const changed = pickedKind !== library.kind || pickedLibrary?.id !== library.id;
+    const previous = pickedLibrary ?? chosenLibrary;
+    const previousKind = pickedKind ?? previous?.kind ?? cineItems[0]?.libraryKind;
+    if (previousKind && previousKind !== library.kind) { setCineItems([]); setItemProblem(null); }
+    const changed = previousKind !== library.kind || (previous?.id ?? cineItems[0]?.libraryId) !== library.id;
     setChosenLibrary(library); setPickedKind(library.kind); if (changed) setLegacyProgress(false);
+  }
+  function clearLibrary() {
+    // Keep the previous library and its draft items available if it is selected again.
+    setChosenLibrary(pickedLibrary);
+    setPickedKind(null);
+  }
+  function removeDraftLibrary(library: ChallengeLibrary) {
+    const draftLibraryKind = pickedKind ?? chosenLibrary?.kind ?? cineItems[0]?.libraryKind;
+    if (draftLibraryKind !== library.kind) return;
+    setPickedKind(null);
+    setChosenLibrary(null);
+    setCineItems([]);
+    setItemProblem(null);
+    setLegacyProgress(false);
   }
   function problemForStep(key: StepKey): string | null {
     if (key === "setup") {
@@ -145,14 +162,17 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
   function discardAndLeave() { if (!leaving) return; finished.current = true; if (initialDraft) onClearDraft?.(); const proceed = leaving; setLeaving(null); proceed(); }
   return <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
     <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
-    <PageHeading title={personal ? t("personalTitle") : ts("title")} description={ts("subtitle")} />
+    <div className="relative max-sm:pr-12">
+      <PageHeading title={personal ? t("personalTitle") : ts("title")} description={ts("subtitle")} />
+      <div className="absolute right-0 top-0 sm:hidden"><SettingsMenu /></div>
+    </div>
     <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
       {stepKeys.map((key, index) => <StateButton key={key} type="button" disabled={stepKeys.slice(0, index).some((previous) => problemForStep(previous))} onClick={() => { setError(null); setStep(index + 1); }} className={cx("min-h-11 rounded-xl px-2 text-sm", visibleStep === index + 1 ? "bg-[var(--paper)] shadow-[var(--elevate-1)]" : "text-[var(--muted)]", "disabled:opacity-45")} aria-current={visibleStep === index + 1 ? "step" : undefined}>{key === "fields" ? ts("questions") : key === "checkpoints" ? ts("itemsStep") : key === "setup" ? ts("setupStep") : t(`steps.${key}`)}</StateButton>)}
     </nav>
     <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
       {stepKey === "setup" ? (<div>
         <label className="mb-6 block"><span className={labelClass}>{ts("name")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required placeholder={ts("namePlaceholder")} /></label>
-        <ChallengeSource scope={scope} linked={linked} libraryKind={pickedKind} dated={dated} onLinked={(next) => { setLinked(next); if (!next) { setDated(true); setItemProblem(null); } if (next !== linked) setLegacyProgress(false); }} onLibrary={pickLibrary} onDated={(next) => { setDated(next); if (next !== dated) setLegacyProgress(false); }} />
+        <ChallengeSource scope={scope} libraries={libraries} linked={linked} libraryKind={pickedKind} dated={dated} onLinked={(next) => { setLinked(next); if (!next) { setDated(true); setItemProblem(null); } if (next !== linked) setLegacyProgress(false); }} onLibrary={pickLibrary} onDated={(next) => { setDated(next); if (next !== dated) setLegacyProgress(false); }} onLibraryCleared={clearLibrary} onLibraryDeleted={removeDraftLibrary} />
         {legacyProgress ? <p className="mt-4 text-sm text-[var(--muted)]">{ts("legacyDraft")}</p> : null}
             <h3 className="mt-8 mb-5 border-t border-[var(--line)] pt-6 text-lg font-light">{ts("detailsTitle")}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -163,9 +183,7 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
                   <StateButton className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{ts("withoutDeadline")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "none" ? "text-white/75" : "text-[var(--muted)]")}>{t("scheduleNoneHint")}</span></StateButton>
                 </div>
               </fieldset>
-              {scheduleMode === "period"
-                ? <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
-                : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{ts("noPeriodHint")}</p>}
+              {scheduleMode === "period" ? <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} /> : null}
 
               <div className="sm:col-span-2">
                 {optionalOpen ? (
@@ -234,13 +252,12 @@ export function CreateChallengeScreen({ group, personal = false, onBack, backLab
           <div>
             <h2 className="text-xl font-light">{t("peopleTitle")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">{t("peopleSubtitle")}</p>
-                {group?.members?.length ? (
-              <fieldset className="mt-5 grid gap-3 sm:grid-cols-2">
+            {group?.members?.length ? (
+              <fieldset className="mt-5 grid gap-3 sm:grid-cols-2 sm:[&>label:last-child:nth-of-type(odd)]:col-span-2">
                 <legend className="sr-only">{t("peopleLegend")}</legend>
                 {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title={t("noMembersTitle")} />}
-            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: totalFields })} · {t("summaryItems", { count: itemInputs.length })} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
           </div>
         ) : null}
 

@@ -9,7 +9,7 @@ import { API_PATHS, ApiError, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
 import { DeleteButton, DeleteConfirm, Dialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
-import { type CatalogScope, useLibraryName } from "./libraries";
+import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
 import { ArrowField, Button, CircleMinusIcon, Field, inputClass, Select, StatusMessage, Toggle } from "./ui";
@@ -37,9 +37,10 @@ export function NewLibraryDialog({
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const name = label.trim();
 
   async function submit() {
-    const name = label.trim();
+    if (busy) return;
     if (!name) { setError(t("nameRequired")); return; }
     setBusy(true);
     setError(null);
@@ -57,11 +58,12 @@ export function NewLibraryDialog({
   return (
     <FormDialog
       title={t("newTitle")}
-      dirty={Boolean(label.trim())}
+      dirty={Boolean(name)}
       busy={busy}
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
+      submitDisabled={!name}
       submitLabel={t("create")}
       busyLabel={tc("saving")}
     >
@@ -148,7 +150,7 @@ export function LibraryPropertiesDialog({
   scope,
   library,
   canEdit,
-  itemCount = 0,
+  itemCount,
   onClose,
   onChanged,
   onDeleted,
@@ -160,7 +162,7 @@ export function LibraryPropertiesDialog({
   itemCount?: number;
   onClose: () => void;
   onChanged: () => void;
-  /** Present where the library can be deleted from here (never Screens or Pages). */
+  /** Present where the library can be deleted from here. */
   onDeleted?: (name: string) => void;
 }) {
   const t = useTranslations("libraries");
@@ -188,6 +190,25 @@ export function LibraryPropertiesDialog({
   const [showAll, setShowAll] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [loadedItemCount, setLoadedItemCount] = useState<number | null>(null);
+  const deleteCount = itemCount ?? loadedItemCount;
+  const shelfPath = API_PATHS.catalogWorkspace(scope).shelf;
+
+  useEffect(() => {
+    if (!deleting || itemCount !== undefined) return;
+    const controller = new AbortController();
+    apiRequest<Pick<CatalogShelfData, "counts">>(shelfPath, { signal: controller.signal })
+      .then(({ counts }) => {
+        if (!controller.signal.aborted) setLoadedItemCount(counts[library.kind] ?? 0);
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setDeleting(false);
+        setError(f.error(cause));
+      });
+    return () => controller.abort();
+  }, [deleting, itemCount, shelfPath, library.kind, f]);
 
   async function commitName() {
     const next = name.trim();
@@ -209,6 +230,7 @@ export function LibraryPropertiesDialog({
   }
 
   async function deleteLibrary() {
+    setDeleteBusy(true);
     try {
       await apiRequest(`${API_PATHS.catalogLibrary(library.id)}?deleteItems=1`, { method: "DELETE", csrfToken: csrf });
     } catch (cause) {
@@ -218,6 +240,8 @@ export function LibraryPropertiesDialog({
         if (names.length) throw new Error(t("deleteBusy", { names: names.join(", ") }));
       }
       throw cause;
+    } finally {
+      setDeleteBusy(false);
     }
     onDeleted?.(currentName);
   }
@@ -392,7 +416,7 @@ export function LibraryPropertiesDialog({
   );
 
   return (
-    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || adding || coverBusy || nameBusy}>
+    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || adding || coverBusy || nameBusy || deleteBusy}>
       <StatusMessage error={error} success={success} />
 
       {canEdit ? (
@@ -506,10 +530,16 @@ export function LibraryPropertiesDialog({
 
       {canEdit && onDeleted ? (
         <div className="mt-6 border-t border-[var(--line)] pt-4">
-          <div className="flex"><DeleteButton open={deleting} onClick={() => setDeleting((open) => !open)} /></div>
+          <div className="flex"><DeleteButton open={deleting} disabled={deleteBusy} onClick={() => {
+            setLoadedItemCount(null);
+            setError(null);
+            setDeleting(!deleting);
+          }} /></div>
           {deleting ? (
             <div className="mt-3">
-              <DeleteConfirm body={itemCount ? t("deleteBodyItems", { count: itemCount }) : t("deleteBodyEmpty")} onConfirm={deleteLibrary} />
+              {deleteCount === null ? <p role="status" className="text-sm text-[var(--muted)]">{t("loading")}</p> : (
+                <DeleteConfirm body={deleteCount ? t("deleteBodyItems", { count: deleteCount }) : t("deleteBodyEmpty")} onConfirm={deleteLibrary} />
+              )}
             </div>
           ) : null}
         </div>

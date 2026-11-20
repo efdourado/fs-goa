@@ -8,6 +8,7 @@ import { normalizeUsername } from "../../security";
 import { purgeMemberFromGroup } from "../purge";
 import { moveToTrash } from "../trash";
 import { writeAudit } from "./audit";
+import { assertUnderMembershipCap, lockGroupMemberships } from "./group-membership-cap";
 import { publicId } from "./shared";
 
 /**
@@ -58,33 +59,6 @@ export async function assertGroupHasCapacity(
   );
 }
 
-/**
- * Caps how many groups one account belongs to (any role). Enforced on every
- * join path — accepting a link invite or a directed member request — so a
- * hostile flow cannot pile an account into unbounded groups.
- */
-export async function assertUnderMembershipCap(
-  client: PoolClient,
-  userId: string,
-): Promise<void> {
-  const counted = await oneOrNull<{ count: number }>(
-    client,
-    // A group its owner binned is gone from every member's app — it must not
-    // keep occupying their slot, since only the owner can restore or destroy it
-    // and the member has no screen that lists it.
-    `SELECT count(*)::int AS count FROM group_members gm
-       JOIN groups g ON g.id = gm.group_id AND g.kind = 'standard' AND g.deleted_at IS NULL
-      WHERE gm.user_id = $1 AND gm.removed_at IS NULL`,
-    [userId],
-  );
-  assertUnder(
-    counted?.count ?? 0,
-    LIMITS.groupsPerMember,
-    "group_membership_limit",
-    `Você já participa de ${LIMITS.groupsPerMember} grupos, o máximo permitido.`,
-  );
-}
-
 /** Bounds the pile of unanswered directed invites a single account can receive. */
 async function assertUnderPendingInviteCap(
   client: PoolClient,
@@ -107,6 +81,8 @@ export async function createGroup(session: SessionContext, body: Record<string, 
   const name = stringValue(body, "name", { min: 1, max: 120 })!;
   const description = stringValue(body, "description", { max: 1_000, optional: true }) ?? null;
   return inTransaction(async (client) => {
+    const userIds = [session.user.id];
+    await lockGroupMemberships(client, userIds);
     const owned = await oneOrNull<{ count: number }>(
       client,
       // A binned group still occupies its slot (docs/architecture.md › Lixeira e recuperação — the bin has no
@@ -122,6 +98,7 @@ export async function createGroup(session: SessionContext, body: Record<string, 
       "group_limit",
       `Você atingiu o limite de ${LIMITS.groupsPerOwner} grupos. Apague um grupo para criar outro.`,
     );
+    await assertUnderMembershipCap(client, userIds);
 
     const id = publicId();
     await client.query(
@@ -299,8 +276,10 @@ export async function respondToMemberRequest(
       return { status: "declined" as const, groupId: request.group_id, groupName: request.group_name };
     }
 
-    await assertUnderMembershipCap(client, session.user.id);
     await assertGroupHasCapacity(client, request.group_id, session.user.id);
+    const userIds = [session.user.id];
+    await lockGroupMemberships(client, userIds);
+    await assertUnderMembershipCap(client, userIds, { existingGroupId: request.group_id });
 
     const prior = await oneOrNull<{ role: GroupRole; removed_at: Date | null }>(
       client,

@@ -69,7 +69,13 @@ export function ArrowRightIcon({ className = "h-4 w-4" }: { className?: string }
   );
 }
 
-export { LockStateIcon } from "./state-button";
+export function PencilIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m10 4 2 2M3 13l.5-3L11 2.5a1.4 1.4 0 0 1 2 2L5.5 12z" />
+    </svg>
+  );
+}
 
 /** Creation uses the same readiness contract as every other action. */
 export function CreationButton(props: Parameters<typeof Button>[0]) {
@@ -112,7 +118,6 @@ export function Button({
       type={type}
       disabled={disabled}
       readiness={variant === "primary"}
-      tone={variant}
       onClick={onClick}
     >
       {variant === "primary" ? Children.toArray(children).filter((child) => !isValidElement(child) || child.type !== ArrowRightIcon) : children}
@@ -538,10 +543,12 @@ export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLa
 
 /** One more row for a numbered list: a dashed ＋ circle the size of the numbers, and a word, under the last row. */
 /** A round choice in a row of them: solid green once picked, dashed with a plus while it only offers to make something. */
-export function choicePillClass({ active = false, dashed = false }: { active?: boolean; dashed?: boolean } = {}) {
+export function choicePillClass({ active = false, dashed = false, split = false }: { active?: boolean; dashed?: boolean; split?: boolean } = {}) {
   return cx(
-    "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-    active ? "border-[var(--main)] bg-[var(--main)] text-white"
+    "inline-flex min-h-9 rounded-full border text-sm transition",
+    split ? "max-w-full items-stretch" : "cursor-pointer items-center gap-2 px-4",
+    split ? "border-[var(--line)]"
+      : active ? "border-[var(--main)] bg-[var(--main)] text-white"
       : dashed ? "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]"
         : "border-[var(--line)] hover:border-[var(--main-line)]",
   );

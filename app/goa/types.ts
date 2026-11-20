@@ -587,9 +587,9 @@ export interface BootstrapData {
 }
 
 export const DEFAULT_LIMITS: Limits = {
-  groupsPerOwner: 6,
-  challengesPerGroup: 6,
-  groupsPerMember: 186,
+  groupsPerOwner: 90,
+  challengesPerGroup: 30,
+  groupsPerMember: 90,
   pendingInvitesPerUser: 31,
 };
 

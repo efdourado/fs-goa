@@ -1,12 +1,13 @@
 "use client";
 
 import { StateButton } from "../state-button";
+import { SettingsMenu } from "../SettingsMenu";
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { cleanFields } from "../fields";
 import { useGoaFormat } from "../format";
-import { type CatalogScope } from "../libraries";
+import { type CatalogScope, useCatalogLibraries } from "../libraries";
 import { CineItemsEditor, cineRowsToInput, type CineRow } from "../cine-items";
 import { ChallengeSource } from "../challenge-source";
 import { ResponseFields } from "../response-fields";
@@ -64,6 +65,7 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scope: CatalogScope | null = where ? where.kind === "personal" ? "personal" : { groupId: where.groupId } : null;
+  const libraries = useCatalogLibraries(linked && !setupReady ? scope : null);
   const selectedLibrary = linked ? library : null;
   const fieldsValid = fields.length > 0 && fields.length <= 30 && fields.every((field) => field.label.trim());
   const items = selectedLibrary ? cineRowsToInput(rows) : [];
@@ -100,7 +102,10 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
   }
   return <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
     <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
-    <PageHeading title={ts("chatTitle")} description={ts("subtitle")} />
+    <div className="relative max-sm:pr-12">
+      <PageHeading title={ts("chatTitle")} description={ts("subtitle")} />
+      <div className="absolute right-0 top-0 sm:hidden"><SettingsMenu /></div>
+    </div>
     <div className="space-y-6">
       <div className="space-y-3"><Ask>{t("q2")}</Ask>
         {where ? <Answered onEdit={changeWhere} editLabel={t("change")}>{where.kind === "personal" ? t("justMe") : where.name}</Answered> : <div className="ml-10 space-y-3">
@@ -115,7 +120,7 @@ export function QuickCreateScreen({ currentUserId, groups, into, onBack, backLab
       {where && scope ? <div className="space-y-3"><Ask>{ts("setupQuestion")}</Ask>
         {setupReady ? <Answered onEdit={() => { setSetupReady(false); setItemsReady(false); }} editLabel={t("change")}>{title} · {ts(dated ? "daily" : "list")}{selectedLibrary ? ` · ${selectedLibrary.label || ts("library")}` : ""}</Answered> : <form className="ml-10 space-y-5" onSubmit={(event) => { event.preventDefault(); if (setupValid) { setSetupReady(true); setError(null); } }}>
           <label className="block"><span className={labelClass}>{ts("name")}</span><input className={inputClass} aria-label={ts("name")} placeholder={ts("namePlaceholder")} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} /></label>
-          <ChallengeSource scope={scope} linked={linked} dated={dated} libraryKind={library?.kind ?? null} onLinked={(next) => { setLinked(next); if (!next) setItemProblem(null); }} onDated={setDated} onLibrary={(next) => { if (library?.kind !== next.kind) { setRows([]); setItemProblem(null); } setLibrary(next); }} />
+          <ChallengeSource scope={scope} libraries={libraries} linked={linked} dated={dated} libraryKind={library?.kind ?? null} onLinked={(next) => { setLinked(next); if (!next) setItemProblem(null); }} onDated={setDated} onLibrary={(next) => { if (library?.kind !== next.kind) { setRows([]); setItemProblem(null); } setLibrary(next); }} />
           <fieldset className="space-y-3"><legend className={labelClass}>{ts("deadline")}</legend>
             <SelectableCards value={scheduleMode} onChange={setScheduleMode} options={[
               { value: "none", label: ts("withoutDeadline"), hint: tr("scheduleNoneHint") },

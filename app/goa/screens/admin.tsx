@@ -240,7 +240,7 @@ function AdminGeneral({
           <div className="mt-4">
           <BoxSection title={t("participantsTitle")} hint={t("participantsSubtitle")}>
             {group?.members?.length ? (
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid gap-2 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
               {group.members.map((member) => {
                 const checked = selected.includes(member.id);
                 const disabled = locked || saving;

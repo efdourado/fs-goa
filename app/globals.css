@@ -5,8 +5,8 @@
 }
 
 /*
- * Green-tinted surfaces and shadows support the pine accent. Bronze marks a
- * deadline or secondary highlight. Status and challenge tags keep their own hues.
+ * The pine accent sits on green-tinted light surfaces and charcoal dark surfaces.
+ * Bronze marks a deadline or secondary highlight. Status and challenge tags keep their own hues.
  * Keep the two dark selectors in sync for system and explicit theme choices.
  */
 :root {
@@ -15,7 +15,9 @@
   --ink: #26342f;
   --ink-strong: #192a24;
   --muted: #53655d;
+  --catalog-trigger-ink: #27282a;
   --canvas: #edf1eb;
+  --canvas-glow: var(--main);
   --paper: #f7f9f5;
   --line: #cbd8d0;
   --wash: #e5ede6;
@@ -69,18 +71,20 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --ink: #e2ebe5;
-    --ink-strong: #f2f6f1;
-    --muted: #b3c3b9;
-    --canvas: #202b27;
-    --paper: #293631;
-    --line: #40554b;
-    --wash: #32423b;
-    --wash-strong: #3a4c43;
+    --ink: #e7e7e8;
+    --ink-strong: #f5f5f5;
+    --muted: #bdbec1;
+    --catalog-trigger-ink: #fff;
+    --canvas: #232425;
+    --canvas-glow: #606367;
+    --paper: #2d2e30;
+    --line: #444649;
+    --wash: #36383a;
+    --wash-strong: #404245;
 
     --main: #2a7560;
     --main-strong: #9cd4bd;
-    --main-soft: #30483d;
+    --main-soft: #303c38;
     --main-line: #527b69;
     --main-2: #dfae8c;
     --main-2-fill: #8a5738;
@@ -96,23 +100,23 @@
     --danger-soft: #4a3633;
     --danger-line: #82564e;
 
-    --spotlight: #233630;
-    --spotlight-ink: #eff4eb;
-    --edge: rgb(181 219 195 / 17%);
-    --hover: rgb(166 213 184 / 9%);
-    --hover-strong: rgb(166 213 184 / 14%);
-    --scrim: rgb(11 25 20 / 61%);
+    --spotlight: #292b2d;
+    --spotlight-ink: #f0f0f1;
+    --edge: rgb(218 220 224 / 17%);
+    --hover: rgb(218 220 224 / 9%);
+    --hover-strong: rgb(218 220 224 / 14%);
+    --scrim: rgb(12 12 13 / 61%);
 
     --focus: #93c9b1;
-    --control-line: #81998c;
+    --control-line: #85878b;
 
-    --button-blocked-bg: #37473e;
-    --button-blocked-ink: #b8c9be;
-    --button-blocked-line: #506257;
+    --button-blocked-bg: #383a3c;
+    --button-blocked-ink: #c1c2c5;
+    --button-blocked-line: #505256;
 
-    --elevate-1: 0 1px 3px rgb(9 24 18 / 32%);
-    --elevate-card: 0 2px 6px rgb(9 24 18 / 35%), 0 12px 28px -12px rgb(9 24 18 / 53%);
-    --elevate-2: 0 16px 48px rgb(9 24 18 / 53%);
+    --elevate-1: 0 1px 3px rgb(9 9 10 / 32%);
+    --elevate-card: 0 2px 6px rgb(9 9 10 / 35%), 0 12px 28px -12px rgb(9 9 10 / 53%);
+    --elevate-2: 0 16px 48px rgb(9 9 10 / 53%);
 
     --tag-green: #83b998;
     --tag-blue: #89add1;
@@ -126,18 +130,20 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ink: #e2ebe5;
-  --ink-strong: #f2f6f1;
-  --muted: #b3c3b9;
-  --canvas: #202b27;
-  --paper: #293631;
-  --line: #40554b;
-  --wash: #32423b;
-  --wash-strong: #3a4c43;
+  --ink: #e7e7e8;
+  --ink-strong: #f5f5f5;
+  --muted: #bdbec1;
+  --catalog-trigger-ink: #fff;
+  --canvas: #232425;
+  --canvas-glow: #606367;
+  --paper: #2d2e30;
+  --line: #444649;
+  --wash: #36383a;
+  --wash-strong: #404245;
 
   --main: #2a7560;
   --main-strong: #9cd4bd;
-  --main-soft: #30483d;
+  --main-soft: #303c38;
   --main-line: #527b69;
   --main-2: #dfae8c;
   --main-2-fill: #8a5738;
@@ -153,23 +159,23 @@
   --danger-soft: #4a3633;
   --danger-line: #82564e;
 
-  --spotlight: #233630;
-  --spotlight-ink: #eff4eb;
-  --edge: rgb(181 219 195 / 17%);
-  --hover: rgb(166 213 184 / 9%);
-  --hover-strong: rgb(166 213 184 / 14%);
-  --scrim: rgb(11 25 20 / 61%);
+  --spotlight: #292b2d;
+  --spotlight-ink: #f0f0f1;
+  --edge: rgb(218 220 224 / 17%);
+  --hover: rgb(218 220 224 / 9%);
+  --hover-strong: rgb(218 220 224 / 14%);
+  --scrim: rgb(12 12 13 / 61%);
 
   --focus: #93c9b1;
-  --control-line: #81998c;
+  --control-line: #85878b;
 
-  --button-blocked-bg: #37473e;
-  --button-blocked-ink: #b8c9be;
-  --button-blocked-line: #506257;
+  --button-blocked-bg: #383a3c;
+  --button-blocked-ink: #c1c2c5;
+  --button-blocked-line: #505256;
 
-  --elevate-1: 0 1px 3px rgb(9 24 18 / 32%);
-  --elevate-card: 0 2px 6px rgb(9 24 18 / 35%), 0 12px 28px -12px rgb(9 24 18 / 53%);
-  --elevate-2: 0 16px 48px rgb(9 24 18 / 53%);
+  --elevate-1: 0 1px 3px rgb(9 9 10 / 32%);
+  --elevate-card: 0 2px 6px rgb(9 9 10 / 35%), 0 12px 28px -12px rgb(9 9 10 / 53%);
+  --elevate-2: 0 16px 48px rgb(9 9 10 / 53%);
 
   --tag-green: #83b998;
   --tag-blue: #89add1;
@@ -186,7 +192,7 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 8% -5%, color-mix(in srgb, var(--main) 9%, transparent), transparent 25rem),
+    radial-gradient(circle at 8% -5%, color-mix(in srgb, var(--canvas-glow) 9%, transparent), transparent 25rem),
     var(--canvas);
   background-repeat: no-repeat;
   color: var(--ink);
@@ -425,23 +431,6 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   height:24px;
 }
 
-/* Primary confirmation actions share readiness; editing/navigation keep their own styling. */
-.goa-button-content { display: contents; }
-.goa-readiness-marker { display: none; flex: none; }
-.goa-state-button[data-readiness="true"]:not([data-compact="true"]) { column-gap: .25rem; }
-.goa-state-button[data-readiness="true"] > .goa-readiness-marker { display: inline-flex; vertical-align: middle; }
-/* The same shackle slides to the right while its left end stays over the body. */
-.goa-lock-shackle {
-  transform: translate(5.5px, -1px);
-  transition: transform 220ms cubic-bezier(.2, .85, .35, 1.12);
-}
-.goa-readiness-icon[data-lock-state="locked"] .goa-lock-shackle,
-.goa-state-button:disabled > .goa-readiness-marker .goa-lock-shackle {
-  transform: translate(0, 0);
-}
-@media (prefers-reduced-motion: reduce) {
-  .goa-lock-shackle { transition: none; }
-}
 .goa-state-button[data-readiness="true"]:disabled {
   background: var(--button-blocked-bg) !important;
   color: var(--button-blocked-ink) !important;
@@ -451,12 +440,4 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   transform: none !important;
   cursor: not-allowed !important;
 }
-.goa-state-button[data-compact="true"] { position: relative; }
-.goa-state-button[data-compact="true"] > .goa-readiness-marker {
-  position: absolute; right: 0; bottom: 0; margin: 0; padding: 1px;
-  border-radius: 50%; background: inherit;
-}
-.goa-state-button[data-compact="true"] > .goa-readiness-marker svg { width: 11px; height: 11px; }
-.goa-state-button[data-replace-icon="true"]:not([data-choice="true"])[data-readiness="true"] > .goa-button-content { display: none; }
-.goa-state-button[data-replace-icon="true"]:not([data-choice="true"])[data-readiness="true"] > .goa-readiness-marker { position: static; margin: 0; background: none; }
-.goa-state-button[data-replace-icon="true"]:not([data-choice="true"])[data-readiness="true"] > .goa-readiness-marker svg { width: 16px; height: 16px; }
+.goa-state-button[data-choice="true"] { position: relative; }

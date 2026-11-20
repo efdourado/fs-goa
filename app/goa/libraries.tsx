@@ -10,7 +10,7 @@ import { CACHE_KEYS, readCache, writeCache } from "./cache";
 import { useGoaFormat } from "./format";
 import { RecipeIcon, type RecipeIconName } from "./recipe-icons";
 import type { CatalogItem, CatalogLibrary, Id } from "./types";
-import { choicePillClass, cx } from "./ui";
+import { CheckCircle, choicePillClass, cx } from "./ui";
 
 /** Where a catalogue lives: the caller's own space, or one group's. */
 export type CatalogScope = "personal" | { groupId: Id };
@@ -156,8 +156,8 @@ export function useCatalogShelf(scope: CatalogScope): CatalogShelfData | null {
 
 const pickLibraries = (raw: { libraries: CatalogLibrary[] }) => raw.libraries;
 
-export function useCatalogLibraries(scope: CatalogScope): Loaded<CatalogLibrary[]> {
-  return useScopedList(API_PATHS.catalogWorkspace(scope).libraries, pickLibraries);
+export function useCatalogLibraries(scope: CatalogScope | null): Loaded<CatalogLibrary[]> {
+  return useScopedList(scope === null ? "" : API_PATHS.catalogWorkspace(scope).libraries, pickLibraries);
 }
 
 /** A row of pill buttons for choosing which library something belongs to, with an optional "new library" tail. */
@@ -166,7 +166,9 @@ export function LibraryPills({
   kind,
   selectedKinds,
   onPick,
+  onUnpick,
   onNew,
+  onEdit,
   label,
   suggestions = [],
 }: {
@@ -178,7 +180,9 @@ export function LibraryPills({
   /** …or every chosen one, for a picker that combines several. */
   selectedKinds?: readonly string[];
   onPick: (choice: LibraryChoice) => void;
+  onUnpick?: () => void;
   onNew?: () => void;
+  onEdit?: (id: Id) => void;
   label: string;
 }) {
   const t = useTranslations("libraries");
@@ -188,7 +192,9 @@ export function LibraryPills({
       {[...choices, ...suggestions].map((choice) => {
         const active = selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind;
         const suggested = !active && suggestions.includes(choice);
-        return (
+        const name = libraryName(choice);
+        const id = choice.id;
+        if (!onEdit || id === null) return (
           <StateButton
             key={choice.kind}
             type="button"
@@ -197,8 +203,29 @@ export function LibraryPills({
             className={choicePillClass({ active, dashed: suggested })}
           >
             {suggested ? <span aria-hidden="true">＋</span> : null}
-            {libraryName(choice)}
+            {name}
           </StateButton>
+        );
+        const settingsLabel = t("libraryActions");
+        return (
+          <div key={choice.kind} className={choicePillClass({ split: true })}>
+            <label className="grid flex-none cursor-pointer place-items-center pl-4">
+              <input
+                type="checkbox"
+                aria-label={name}
+                checked={active}
+                onChange={(event) => {
+                  if (event.target.checked || selectedKinds) onPick(choice);
+                  else onUnpick?.();
+                }}
+                className="peer sr-only"
+              />
+              <CheckCircle on={active} className="size-[1em] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2" />
+            </label>
+            <StateButton type="button" aria-label={`${settingsLabel}: ${name}`} aria-haspopup="dialog" title={settingsLabel} onClick={() => onEdit(id)} className="inline-flex min-w-0 flex-1 cursor-pointer items-center rounded-r-full pr-4 pl-2">
+              <span className="truncate">{name}</span>
+            </StateButton>
+          </div>
         );
       })}
       {onNew ? (

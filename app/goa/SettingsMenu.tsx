@@ -8,22 +8,19 @@ import { useRouter } from "next/navigation";
 
 import { locales } from "@/i18n/config";
 import { setUserLocale } from "@/i18n/locale";
+import { useAppLocaleSwitch } from "./app-locale";
 import { Segmented } from "./Segmented";
 import { ThemeToggle } from "./ThemeToggle";
 import { cx } from "./ui";
 
-/**
- * PT / EN as a `Segmented`, matching the theme switch above it. Writes the
- * locale cookie and refreshes the layout; an optimistic value keeps the pill
- * from snapping back while the refresh lands.
- */
 export function LanguageSegmented({ className }: { className?: string }) {
   const t = useTranslations("language");
   const active = useLocale();
+  const appLocale = useAppLocaleSwitch();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useState<(typeof locales)[number] | null>(null);
-  const value = optimistic ?? (active as (typeof locales)[number]);
+  const value = appLocale?.pendingLocale ?? optimistic ?? (active as (typeof locales)[number]);
 
   return (
     <Segmented
@@ -31,6 +28,10 @@ export function LanguageSegmented({ className }: { className?: string }) {
       ariaLabel={t("legend")}
       value={value}
       onChange={(next) => {
+        if (appLocale) {
+          void appLocale.changeLocale(next);
+          return;
+        }
         if (pending || next === value) return;
         setOptimistic(next);
         startTransition(async () => {

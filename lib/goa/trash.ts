@@ -4,6 +4,7 @@ import { requireGroupRole } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import { challengeAccess } from "./domain/access";
+import { assertUnderMembershipCap, lockGroupMemberships } from "./domain/group-membership-cap";
 import { normalizeTitle, publicId } from "./domain/shared";
 import { writeAudit, writeSystemAudit } from "./domain/audit";
 import { purgeChallengeRows, purgeGroupRows } from "./purge";
@@ -698,6 +699,7 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
   return inTransaction(async (client) => {
     const row = await locate(client, kind, id);
     await authorize(client, session, row, "restore");
+    if (kind === "group") await client.query("SELECT id FROM groups WHERE id=$1 FOR UPDATE", [row.groupId]);
     const isBin = BIN_KINDS.includes(kind as BinKind);
     if (isBin) {
       const inBin = await oneOrNull<{ id: string }>(client, "SELECT id FROM trash_items WHERE entity_kind=$1 AND entity_id=$2", [kind, id]);
@@ -718,6 +720,15 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     }
     const conflict = await identityConflict(client, row, rename);
     if (conflict) throw new ApiError(409, conflict.code, conflict.message);
+    if (kind === "group" && row.groupKind === "standard") {
+      const members = await client.query<{ user_id: string }>(
+        "SELECT user_id FROM group_members WHERE group_id=$1 AND removed_at IS NULL",
+        [row.groupId],
+      );
+      const userIds = members.rows.map(({ user_id }) => user_id);
+      await lockGroupMemberships(client, userIds);
+      await assertUnderMembershipCap(client, userIds, { restoring: true });
+    }
     if (rename && kind === "catalog_item") {
       // Same match key the creation path builds, or the renamed row would not
       // collide with a future duplicate the way a normally-created one does.

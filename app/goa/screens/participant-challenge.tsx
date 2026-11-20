@@ -1,6 +1,6 @@
 "use client";
 
-import { StateButton, LockStateIcon } from "../state-button";
+import { StateButton } from "../state-button";
 
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
@@ -56,6 +56,7 @@ import {
   FaceEmptyState,
   inputClass,
   labelClass,
+  PencilIcon,
   sectionLabelClass,
   SearchField,
   Select,
@@ -79,6 +80,15 @@ import {
 
 // Loaded when first opened: it brings the PDF's own fonts and print sheet.
 const ExportModal = dynamic(() => import("../export/export-modal").then((module) => module.ExportModal), { ssr: false });
+
+function ResponseEditIcon({ editing }: { editing: boolean }) {
+  if (!editing) return <PencilIcon />;
+  return (
+    <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m4 4 8 8m0-8-8 8" />
+    </svg>
+  );
+}
 
 function ratingChoices(config?: FieldConfig): number[] {
   const min = config?.min ?? 0;
@@ -223,7 +233,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   hideOwnSaveButton?: boolean;
   // A parent response panel can own editing and the bottom actions.
   editingOverride?: boolean;
-  hideEditLock?: boolean;
+  hideEditButton?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onReadyChange?: (ready: boolean) => void;
   // Reports every change of the open/collapsed state — the combined button
@@ -244,7 +254,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   alwaysEditable = false,
   hideOwnSaveButton = false,
   editingOverride,
-  hideEditLock = false,
+  hideEditButton = false,
   onDirtyChange,
   onReadyChange,
   onEditingChange,
@@ -402,9 +412,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
-  // Only a saved, nonempty response has a header lock. Save appears while
+  // Only a saved, nonempty response has a header edit button. Save appears while
   // editing and becomes available for a changed, valid response.
-  const canReopen = !hideEditLock && canEdit && hasAnswer(baseline);
+  const canReopen = !hideEditButton && canEdit && hasAnswer(baseline);
   const interactive = canEdit && editing;
   const showsButtons = canEdit && editing;
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
@@ -428,7 +438,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
               aria-label={editing ? tc("cancel") : t("editAnswer")}
               onClick={() => editing ? reset() : setEditing(true)}
             >
-              <LockStateIcon locked={!editing} />
+              <ResponseEditIcon editing={editing} />
             </StateButton>
           ) : null}
         </div>
@@ -443,7 +453,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
           aria-label={editing ? tc("cancel") : t("editAnswer")}
           onClick={() => editing ? reset() : setEditing(true)}
         >
-          <LockStateIcon locked={!editing} />
+          <ResponseEditIcon editing={editing} />
         </StateButton>
       ) : null}
       {note}
@@ -887,7 +897,7 @@ function ItemEntryPanel({
   }
   return (
     <div className="space-y-6">
-      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit && savedTypes.size > 0 ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]"><LockStateIcon locked={!editingAll} /></StateButton> : null}</div> : null}
+      {types.length ? <div className="flex items-center justify-between gap-2"><h3 className={sectionLabelClass}>{types.some((type) => type.cardinality === "once_per_item_day" || type.cardinality === "once_per_day") ? (!occurredOn || occurredOn === today ? t("yourResponseToday") : occurredOn === shiftDateKey(today,{days:-1}) ? t("yourResponseYesterday") : t("yourResponseOnDate", {date:f.date(occurredOn,{day:"numeric",month:"long"})})) : t("yourResponseTitle")}</h3>{canEdit && savedTypes.size > 0 ? <StateButton type="button" disabled={savingAll} aria-label={editingAll ? tc("cancel") : tEntry("editAnswer")} onClick={() => editingAll ? cancelAll() : setEditingAll(true)} className="ml-auto rounded-full p-1.5 text-[var(--muted)]"><ResponseEditIcon editing={editingAll} /></StateButton> : null}</div> : null}
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -904,7 +914,7 @@ function ItemEntryPanel({
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
               hideOwnSaveButton
-              hideEditLock
+              hideEditButton
               editingOverride={editingAll}
               onDirtyChange={(dirty) => markDirty(type.id, dirty)}
               onReadyChange={(ready) => markReady(type.id, ready)}

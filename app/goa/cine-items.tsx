@@ -405,7 +405,7 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
             type="button"
             aria-expanded={showCatalog}
             onClick={() => { if (!showCatalog) setCatalog(null); setShowCatalog(!showCatalog); }}
-            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg text-sm font-medium text-[var(--main-strong)] hover:underline"
+            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg text-sm font-medium text-[var(--catalog-trigger-ink)] hover:underline"
           >
             {collectionCount ? t("fromCatalogCount", { count: collectionCount }) : t("fromCatalog")}
             <ChevronIcon dir={showCatalog ? "up" : "down"} />

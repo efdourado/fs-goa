@@ -7,22 +7,15 @@ function positiveIntEnv(name: string, fallback: number): number {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/**
- * Creation caps kept deliberately low while Goa is effectively single-tenant.
- * All are per owner / per group / per member (not global) and can be raised via env.
- */
+/** Per-account and per-group caps, with optional environment overrides. */
 export const LIMITS = {
   get groupsPerOwner(): number {
-    return positiveIntEnv("MAX_GROUPS_PER_OWNER", 6);
+    return positiveIntEnv("MAX_GROUPS_PER_OWNER", 90);
   },
   get challengesPerGroup(): number {
-    return positiveIntEnv("MAX_CHALLENGES_PER_GROUP", 6);
+    return positiveIntEnv("MAX_CHALLENGES_PER_GROUP", 30);
   },
-  /**
-   * Solo challenges live in the caller's hidden personal workspace. There is no
-   * sharing blast radius there, and "a reading goal, a film marathon" adds up
-   * over years — so this is far more generous than a shared group.
-   */
+  /** The caller's personal workspace has its own challenge cap. */
   get challengesPerPersonalSpace(): number {
     return positiveIntEnv("MAX_CHALLENGES_PER_PERSONAL_SPACE", 30);
   },
@@ -35,7 +28,7 @@ export const LIMITS = {
    * radius of a hostile flow adding someone everywhere and keeps bootstrap cheap.
    */
   get groupsPerMember(): number {
-    return positiveIntEnv("MAX_GROUPS_PER_MEMBER", 186);
+    return positiveIntEnv("MAX_GROUPS_PER_MEMBER", 90);
   },
   /** Open incoming member requests one account can accumulate before new ones are refused. */
   get pendingInvitesPerUser(): number {
