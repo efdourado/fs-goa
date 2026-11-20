@@ -4,6 +4,7 @@ import { act } from "react";
 import { JSDOM } from "jsdom";
 import GoaApp from "../app/GoaApp";
 import { clearCache } from "../app/goa/cache";
+import { CatalogRow } from "../app/goa/catalog-views";
 import { CreateChallengeScreen } from "../app/goa/screens/create-challenge";
 import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
 import { DashboardScreen } from "../app/goa/screens/dashboard";
@@ -209,6 +210,7 @@ test('editing a library from manual creation preserves the draft and the selecte
     const cover = { coverTopProperty: null, coverBadgeHidden: false };
     let otherLibrary = { ...library, ...cover, id: 'other', kind: 'lib_other', label: 'Other items', position: 1 };
     let libraryReads = 0;
+    const renamedProperties: string[] = [];
     const fetchFixture = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       if (input === '/api/personal/catalog/libraries') {
@@ -219,6 +221,10 @@ test('editing a library from manual creation preserves the draft and the selecte
         const { label } = JSON.parse(String(init.body));
         otherLibrary = { ...otherLibrary, label };
         return Response.json(otherLibrary);
+      }
+      if (input === '/api/catalog/libraries/other/properties/title' && init?.method === 'PATCH') {
+        renamedProperties.push(JSON.parse(String(init.body)).label);
+        return Response.json({});
       }
       return fetchFixture(input, init);
     };
@@ -237,13 +243,21 @@ test('editing a library from manual creation preserves the draft and the selecte
     assert.equal(ui.libraryOption('Other items').closest('label')?.nextElementSibling, otherName);
     await act(async () => otherName.click());
     assert.equal(document.querySelector('dialog h2')?.textContent, 'Other items');
+    assert.doesNotMatch(document.querySelector('dialog')?.textContent ?? '', /Clique para renomear|Capas|No topo da capa|Nota na capa/);
+    await act(async () => ui.button('Name').click());
+    const saveProperty = ui.button('Salvar');
+    assert.equal(saveProperty.textContent, '');
+    assert.ok(saveProperty.querySelector('svg[aria-hidden="true"]'));
+    await ui.fill(saveProperty.closest('form')!.querySelector('input')!, 'Item name');
+    await act(async () => saveProperty.click());
+    assert.deepEqual(renamedProperties, ['Item name']);
     const name = document.querySelector<HTMLInputElement>('dialog input[aria-label="Nome"]')!;
     await act(async () => name.focus());
     await ui.fill(name, 'Renamed items');
     await act(async () => name.blur());
     await act(async () => ui.button('Fechar').click());
     assert.equal(otherLibrary.label, 'Renamed items');
-    assert.equal(libraryReads, 2);
+    assert.equal(libraryReads, 3);
     assert.equal(ui.libraryOption('Renamed items').checked, false);
     assert.equal(ui.libraryOption('My items').checked, true);
     assert.equal(title.value, 'Reading journal');
@@ -405,7 +419,6 @@ test('dashboard group creation unlocks only for a nonblank name', async () => {
         onCreateManually={async () => undefined}
         onOpenTemplate={noop}
         onOpenPersonalCatalog={noop}
-        onOpenPersonalCatalogItem={noop}
       />,
     )));
     await act(async () => ui.button('+Novo grupo').click());
@@ -421,6 +434,53 @@ test('dashboard group creation unlocks only for a nonblank name', async () => {
     await ui.fill(input, '  Our group  ');
     await act(async () => create.click());
     assert.deepEqual(names, ['Our group']);
+  } finally { await ui.cleanup(); }
+});
+
+test('catalogue property lines scroll only when the text overflows', async () => {
+  const ui = await setup();
+  try {
+    await act(async () => ui.root.render(withIntl(<CatalogRow title="Solaris" meta={['Stanisław Lem', '1961', '204']} />)));
+    const line = document.querySelector<HTMLElement>('.catalog-property-line')!;
+    const text = line.firstElementChild as HTMLElement;
+    let scrollWidth = 100;
+    Object.defineProperties(text, { clientWidth: { value: 100 }, scrollWidth: { get: () => scrollWidth } });
+    const row = line.closest('.flex')!;
+    await act(async () => row.dispatchEvent(new window.MouseEvent('pointerover', { bubbles: true })));
+    assert.equal(text.hasAttribute('data-scrolling'), false);
+    await act(async () => row.dispatchEvent(new window.MouseEvent('pointerout', { bubbles: true })));
+    scrollWidth = 240;
+    await act(async () => row.dispatchEvent(new window.MouseEvent('pointerover', { bubbles: true })));
+    assert.equal(text.style.getPropertyValue('--property-distance'), '-140px');
+    await act(async () => row.dispatchEvent(new window.MouseEvent('pointerout', { bubbles: true })));
+    assert.equal(text.hasAttribute('data-scrolling'), false);
+    await act(async () => line.focus());
+    assert.equal(text.hasAttribute('data-scrolling'), true);
+    await act(async () => line.blur());
+    assert.equal(text.hasAttribute('data-scrolling'), false);
+  } finally { await ui.cleanup(); }
+});
+
+test('the catalogue title stays on the list and its settings button keeps item editing available', async () => {
+  const ui = await setup();
+  try {
+    clearCache();
+    window.history.replaceState(null, '', '/catalog');
+    const fetchFixture = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      if (input === '/api/bootstrap') return Response.json({ user: { id: 'me', name: 'Me', username: 'me' } });
+      if (input === '/api/personal/catalog') return Response.json({ items: [{ id: 'item', kind: library.kind, title: 'Solaris', year: 1961 }] });
+      return fetchFixture(input, init);
+    };
+    await act(async () => ui.root.render(withIntl(<GoaApp />)));
+    const title = [...document.querySelectorAll('strong')].find((node) => node.textContent === 'Solaris');
+    assert.ok(title);
+    await act(async () => title.click());
+    assert.equal(window.location.pathname, '/catalog');
+    assert.equal(document.querySelector('dialog'), null);
+    await act(async () => ui.button('Editar item: Solaris').click());
+    assert.ok(document.querySelector('dialog input[value="Solaris"]'));
+    assert.equal(window.location.pathname, '/catalog');
   } finally { await ui.cleanup(); }
 });
 

@@ -7,8 +7,8 @@ import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } fr
 
 import { API_PATHS, apiRequest } from "../api";
 import { BottomSheet } from "../bottom-sheet";
-import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { CatalogRow, type CatalogGroupBy, groupCatalogItems, resolveCoverTop } from "../catalog-views";
+import { AddCatalogItemDialog, EditCatalogItemDialog } from "../catalog-item-dialogs";
+import { CatalogRow, type CatalogGroupBy, groupCatalogItems, useCatalogPropertyText } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -21,9 +21,8 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
-import { formatRuntime } from "../utils";
 
-type Sort = "recent" | "title" | "rating" | "date";
+type Sort = "recent" | "title" | "date";
 
 /** How many rows a library shows at first, and how many more each "Show more" adds. */
 const PAGE_SIZE = 30;
@@ -110,7 +109,6 @@ export function CatalogWorkspaceScreen({
   canManage,
 
   onBack,
-  onOpenItem,
 }: {
   scope: CatalogScope;
   title: string;
@@ -119,10 +117,10 @@ export function CatalogWorkspaceScreen({
   canManage: boolean;
   members: Member[];
   onBack: () => void;
-  onOpenItem: (itemId: Id) => void;
 }) {
   const t = useTranslations("personalCatalog");
   const tItem = useTranslations("catalog");
+  const propertyText = useCatalogPropertyText();
   const tl = useTranslations("libraries");
   const tc = useTranslations("common");
   const f = useGoaFormat();
@@ -134,7 +132,6 @@ export function CatalogWorkspaceScreen({
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
-  const [unratedOnly, setUnratedOnly] = useState(false);
   const [shown, setShown] = useState(PAGE_SIZE);
   const [openFacets, setOpenFacets] = useState<string[]>([]);
   const indexOpen = useSyncExternalStore(subscribeIndex, readIndexOpen, () => true);
@@ -145,6 +142,7 @@ export function CatalogWorkspaceScreen({
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
   const [dialog, setDialog] = useState<"add" | "new" | "properties" | null>(null);
   // The library the settings dialog is about — not always the one on screen.
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [dialogKind, setDialogKind] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
@@ -194,7 +192,7 @@ export function CatalogWorkspaceScreen({
   const loading = items === null || libraries === null;
   // A property someone hid stops showing on lists too — the values stay saved.
   const { properties: libraryProperties } = useLibraryProperties(library ? { id: library.id, kind: library.kind } : null, itemsNonce);
-  const hidden = useMemo(() => new Set((libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key)), [libraryProperties]);
+  const hidden = useMemo(() => (libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key), [libraryProperties]);
 
   function openLibraryDialog(entry: CatalogLibrary) {
     setNotice(null);
@@ -212,7 +210,6 @@ export function CatalogWorkspaceScreen({
 
   function clearFilters() {
     setGenres([]);
-    setUnratedOnly(false);
     setUnusedOnly(false);
   }
 
@@ -220,62 +217,33 @@ export function CatalogWorkspaceScreen({
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
   // The library's genres, for the genre filter (gone when the library hides its genre).
-  const genreNames = useMemo(() => (hidden.has("main_genre") ? [] : [...new Set(scoped.map((item) => item.mainGenre?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b))), [scoped, hidden]);
+  const genreNames = useMemo(() => (hidden.includes("main_genre") ? [] : [...new Set(scoped.map((item) => item.mainGenre?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b))), [scoped, hidden]);
   const activeGenres = useMemo(() => genres.filter((genre) => genreNames.includes(genre)), [genres, genreNames]);
   const needle = query.trim().toLocaleLowerCase();
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
-    if (unratedOnly && item.ratingAvg !== null && item.ratingAvg !== undefined) return false;
     if (activeGenres.length && !activeGenres.includes(item.mainGenre?.trim() ?? "")) return false;
     if (needle && ![item.title, item.author, item.mainGenre].some((field) => field?.toLocaleLowerCase().includes(needle))) return false;
     return true;
-  }), [scoped, onlyUnused, unratedOnly, activeGenres, needle]);
+  }), [scoped, onlyUnused, activeGenres, needle]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const activeSort: Sort = sort === "date" && !hasDates ? "recent" : sort;
   const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
   const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sorted = useMemo(() => [...filtered].sort((left, right) =>
-    activeSort === "rating"
-      ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1) || left.title.localeCompare(right.title)
-      : activeSort === "date"
-        ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
-        : activeSort === "recent"
-          ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
-          : left.title.localeCompare(right.title),
+    activeSort === "date"
+      ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
+      : activeSort === "recent"
+        ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
+        : left.title.localeCompare(right.title),
   ), [filtered, activeSort]);
   // Only the first rows are drawn; "Show more" brings the next page.
   const groups = useMemo(() => groupCatalogItems(sorted.slice(0, shown), groupBy), [sorted, groupBy, shown]);
   const hiddenCount = Math.max(0, sorted.length - shown);
 
-  const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
-  const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
 
-  /** What sets an item apart, minus whatever the cover's top slot already carries (year by default). */
-  function detailsFor(item: CatalogItem): string[] {
-    const topSlot = library?.coverTopProperty ?? "none";
-    const custom = (item.attributes ?? [])
-      .filter((attribute) => attribute.key !== topSlot)
-      .map((attribute) => attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
-    return [
-      topSlot === "scheduled_at" ? null : item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
-      hidden.has("author") || topSlot === "author" ? null : item.author,
-      hidden.has("year") || topSlot === "year" || item.year === null || item.year === undefined ? null : String(item.year),
-      hidden.has("main_genre") || topSlot === "main_genre" ? null : item.mainGenre,
-      hidden.has("runtime_minutes") || topSlot === "runtime_minutes" ? null : formatRuntime(item.runtimeMinutes),
-      ...custom,
-    ].filter((part): part is string => Boolean(part));
-  }
   const challengesOf = (item: CatalogItem) => item.challengeCount ?? item.roundCount ?? 0;
-  const ratingLabel = (item: CatalogItem) => (item.ratingAvg === null || item.ratingAvg === undefined ? tItem("notRated") : tItem("ratedAria", { value: item.ratingAvg }));
-  /** The server resolves an unconfigured cover to the first numeric property. */
-  const topOf = (item: CatalogItem) => resolveCoverTop(item, library?.coverTopProperty, f);
-  /** Everything shown under an item's name, most telling first: a phone keeps the first two, wider screens all of it. */
-  function metaFor(item: CatalogItem): string[] {
-    return [
-      ...detailsFor(item),
-    ].filter((part): part is string => Boolean(part));
-  }
 
   function togglePicked(ids: Id[], on: boolean) {
     setPicked((current) => {
@@ -310,14 +278,12 @@ export function CatalogWorkspaceScreen({
   const sortOptions: Array<{ value: Sort; label: string }> = [
     { value: "recent", label: t("sortRecent") },
     { value: "title", label: t("sortTitle") },
-    { value: "rating", label: t("sortRating") },
     ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
   ];
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
   // What narrows the list, each removable on its own from the toolbar.
   const activeChips: Array<{ key: string; label: string; remove: () => void }> = [
     ...activeGenres.map((genre) => ({ key: `genre:${genre}`, label: genre, remove: () => setGenres(activeGenres.filter((entry) => entry !== genre)) })),
-    ...(unratedOnly ? [{ key: "unrated", label: t("notRatedFilter"), remove: () => setUnratedOnly(false) }] : []),
     ...(onlyUnused ? [{ key: "unused", label: t("unusedOnly"), remove: () => setUnusedOnly(false) }] : []),
   ];
   const narrowed = Boolean(activeChips.length || needle);
@@ -397,7 +363,6 @@ export function CatalogWorkspaceScreen({
       ) : null}
       <div>
         <p className={facetHeading}>{t("showOnly")}</p>
-        <IndexRow box label={t("notRatedFilter")} on={unratedOnly} onClick={() => setUnratedOnly(!unratedOnly)} />
         {canManage && unusedCount > 0 ? (
           <IndexRow box label={t("unusedOnly")} count={unusedCount} on={onlyUnused} onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }} />
         ) : null}
@@ -529,7 +494,6 @@ export function CatalogWorkspaceScreen({
             {scoped.length ? (
               <p className="mt-5 text-sm text-[var(--muted)]" aria-live="polite">
                 <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
-                {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
               </p>
             ) : null}
 
@@ -569,17 +533,17 @@ export function CatalogWorkspaceScreen({
                             <li key={item.id}>
                               <CatalogRow
                                 title={item.title}
-                                year={topOf(item)}
-                                avg={item.ratingAvg}
-                                badgeHidden={library.coverBadgeHidden}
-                                ratingLabel={ratingLabel(item)}
-                                meta={metaFor(item)}
+                                meta={propertyText(item, hidden)}
                                 note={unused ? t("notInChallenge") : t("rounds", { count: challengesOf(item) })}
                                 noteTone={unused && canManage ? "warn" : "muted"}
                                 selecting={selecting}
                                 picked={picked.has(item.id)}
                                 onPick={(on) => togglePicked([item.id], on)}
-                                onOpen={() => onOpenItem(item.id)}
+                                action={canManage ? (
+                                  <StateButton type="button" onClick={() => setEditingItem(item)} aria-label={`${tItem("edit")}: ${item.title}`} title={tItem("edit")} className="grid size-9 flex-none cursor-pointer place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)]">
+                                    <SlidersIcon className="size-4" />
+                                  </StateButton>
+                                ) : undefined}
                               />
                             </li>
                           );
@@ -613,6 +577,20 @@ export function CatalogWorkspaceScreen({
         </BottomSheet>
       ) : null}
 
+      {editingItem && canManage && libraries ? (
+        <EditCatalogItemDialog
+          scope={scope}
+          item={editingItem}
+          libraries={libraries}
+          onCancel={() => setEditingItem(null)}
+          onSaved={() => { setEditingItem(null); reloadAll(); }}
+          onRemove={async () => {
+            await apiRequest(API_PATHS.catalogWorkspace(scope).item(editingItem.id), { method: "DELETE", csrfToken: csrf });
+            setEditingItem(null);
+            reloadAll();
+          }}
+        />
+      ) : null}
       {dialog === "add" ? (
         <AddCatalogItemDialog
           scope={scope}

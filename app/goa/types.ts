@@ -651,9 +651,7 @@ export type Screen =
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
   | { kind: "group-catalog"; groupId: Id }
-  | { kind: "catalog-item"; groupId: Id; itemId: Id }
   | { kind: "personal-catalog" }
-  | { kind: "personal-catalog-item"; itemId: Id }
   | { kind: "personal-trash" }
   | { kind: "group-trash"; groupId: Id }
   | { kind: "account-deactivated" }

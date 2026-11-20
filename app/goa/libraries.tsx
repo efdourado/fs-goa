@@ -98,6 +98,7 @@ export interface CatalogShelfData {
   /** Items per library, by its `kind` — the whole count, not just the ones in `items`. */
   counts: Record<string, number>;
   items: CatalogItem[];
+  hiddenProperties?: Record<string, string[]>;
 }
 
 const shelfInflight = new Map<string, Promise<CatalogShelfData>>();

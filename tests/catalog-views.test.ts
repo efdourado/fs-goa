@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { CatalogItemPage } from "../app/goa/screens/catalog-item";
-import { ptFormat, renderWithIntl } from "./helpers/intl";
+import { CatalogShelfView } from "../app/goa/catalog-shelf";
+import { renderWithIntl } from "./helpers/intl";
 
 import { COVER_TONES, coverToneOf } from "../app/goa/catalog-cover";
-import { CatalogRow, decadeOf, groupCatalogItems, resolveCoverTop } from "../app/goa/catalog-views";
+import { CatalogRow, decadeOf, groupCatalogItems } from "../app/goa/catalog-views";
 
 test("a title always gets the same cover colour, and the same title in any case or spacing agrees", () => {
   assert.equal(coverToneOf("Solaris"), coverToneOf("  SOLARIS "));
@@ -34,49 +34,25 @@ test("decadeOf floors a year to its decade", () => {
   assert.equal(decadeOf(2000), "2000s");
 });
 
-test("numeric cover values include zero and custom properties can use year as their name", () => {
-  const item = { year: null, attributes: [{ key: "year", label: "Ano", type: "number" as const, value: 0 }] };
-  assert.equal(resolveCoverTop(item, "year", ptFormat), 0);
-  const html = renderWithIntl(createElement(CatalogRow, { title: "A", year: 0, ratingLabel: "", meta: [], onOpen: () => undefined }));
-  assert.match(html, /<strong[^>]*>A<\/strong>/);
-  assert.match(html, /<small[^>]*><span>0<\/span>/);
+test("catalogue rows keep every value on a single truncating line without an item link", () => {
+  const html = renderWithIntl(createElement(CatalogRow, { title: "Solaris", meta: ["Stanisław Lem", "1961", "204", "0", "Não"] }));
+  assert.match(html, /<strong[^>]*>Solaris<\/strong>/);
+  assert.match(html, /<small[^>]*><span[^>]*class="catalog-property-text block truncate"[^>]*>Stanisław Lem · 1961 · 204 · 0 · Não<\/span><\/small>/);
+  assert.doesNotMatch(html, /<button|<a\b/);
 });
 
-test("item details keep original label casing and place the rating between item details and history", () => {
-  const html = renderWithIntl(createElement(CatalogItemPage, {
-    item: { id: "book", kind: "book", title: "Um título longo para a página do item", ratingAvg: 4.2, ratingCount: 2,
-      attributes: [{ key: "nota", label: "Minhas Observações", type: "text", value: "Uma anotação extensa que precisa caber em telas pequenas sem perder o conteúdo." }],
-      rounds: [{ challengeId: "round", title: "O histórico continua com o título completo do desafio", status: "active", startsOn: null, endsOn: null, ratingAvg: 4.2, ratingCount: 2 }],
+test("catalogue shelves show unlabeled item values and respect hidden native properties", () => {
+  const html = renderWithIntl(createElement(CatalogShelfView, {
+    scope: "personal", canManage: true, onOpenCatalog: () => undefined,
+    data: {
+      libraries: [{ id: "lib", kind: "book", source: "pages", label: null, position: 0, coverTopProperty: "page_count", coverBadgeHidden: false }],
+      counts: { book: 1 },
+      hiddenProperties: { book: ["author"] },
+      items: [{ id: "book", kind: "book", title: "Solaris", author: "Hidden author", year: 1961, pageCount: 204, ratingAvg: 4.2,
+        attributes: [{ key: "copies", label: "Exemplares", type: "number", value: 0 }, { key: "read", label: "Lido", type: "boolean", value: false }] }],
     },
-    library: { id: "lib", kind: "book", source: "pages", label: "Livros da Família", position: 0, coverTopProperty: "none", coverBadgeHidden: false },
-    onBack: () => undefined, onOpenChallenge: () => undefined,
-    editAction: createElement("button", { "aria-label": "Editar item" }, "Editar"),
   }));
-  assert.match(html, /Livros da Família/);
-  assert.match(html, /Minhas Observações/);
-  assert.doesNotMatch(html, /uppercase/);
-  assert.match(html, /aria-label="Editar item"/);
-  assert.ok(html.indexOf("<h1") < html.indexOf('role="img"'));
-  assert.ok(html.indexOf("Minhas Observações") < html.indexOf('role="img"'));
-  assert.ok(html.indexOf('role="img"') < html.indexOf('class="catalog-item-history"'));
-  assert.match(html, /O histórico continua com o título completo do desafio/);
-});
-
-test("collection details respect property names and visibility and retain zero and false", () => {
-  const html = renderWithIntl(createElement(CatalogItemPage, {
-    item: { id: "book", kind: "book", title: "Solaris", author: "Hidden author", year: 1961, ratingAvg: null,
-      attributes: [{ key: "copies", label: "Exemplares", type: "number", value: 0 }, { key: "read", label: "Lido", type: "boolean", value: false }], rounds: [] },
-    library: null,
-    properties: [
-      { key: "author", storage: "native", label: "Escritor", type: "text", hidden: true, position: 1, canHide: true },
-      { key: "year", storage: "native", label: "Publicado em", type: "number", hidden: false, position: 2, canHide: true },
-    ],
-    onBack: () => undefined, onOpenChallenge: () => undefined,
-  }));
-  assert.match(html, /Publicado em/);
-  assert.doesNotMatch(html, /Hidden author|Escritor/);
-  assert.match(html, /<dt>Exemplares<\/dt><dd>0<\/dd>/);
-  assert.match(html, /<dt>Lido<\/dt><dd>Não<\/dd>/);
-  assert.doesNotMatch(html, /role="img"/);
-  assert.doesNotMatch(html, /catalog-item-history|Histórico/);
+  assert.match(html, /Solaris/);
+  assert.match(html, /1961 · 204 · 0 · Não/);
+  assert.doesNotMatch(html, /role="img"|>4\.2<|Hidden author|Exemplares:|Lido:|Páginas:/);
 });

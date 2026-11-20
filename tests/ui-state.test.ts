@@ -957,7 +957,6 @@ test("today's rating: the average of the rating fields — the named metric's, o
 test("doca do celular: quatro abas, a acesa segue a tela e some dentro de um desafio", () => {
   assert.equal(dockTabFor({ kind: "group", groupId: "g1" }), "home");
   assert.equal(dockTabFor({ kind: "template", challengeId: "c1" }), "you", "os modelos ficam debaixo de Você");
-  assert.equal(dockTabFor({ kind: "personal-catalog-item", itemId: "i1" }), "catalog");
   assert.equal(dockTabFor({ kind: "account" }), "you", "a conta fica debaixo de Você");
   assert.equal(dockTabFor({ kind: "challenge", challengeId: "c1", tab: "today" }), null, "o desafio tem a própria barra");
   assert.equal(dockTabFor({ kind: "admin", challengeId: "c1", tab: "overview" }), null);

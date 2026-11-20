@@ -40,10 +40,8 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
 
   test("catalogue, trash and the creation wizard return to their own owner", () => {
     assert.deepEqual(backTargetFor({ kind: "group-catalog", groupId: "g1" }, lookup())!.screen, { kind: "group", groupId: "g1" });
-    assert.deepEqual(backTargetFor({ kind: "catalog-item", groupId: "g1", itemId: "i" }, lookup())!.screen, { kind: "group-catalog", groupId: "g1" });
     assert.deepEqual(backTargetFor({ kind: "group-trash", groupId: "g1" }, lookup())!.screen, { kind: "group", groupId: "g1" });
     assert.deepEqual(backTargetFor({ kind: "create-challenge", groupId: "g1" }, lookup())!.label, { kind: "named", name: "Copa 2026" });
-    assert.deepEqual(backTargetFor({ kind: "personal-catalog-item", itemId: "i" }, lookup())!.screen, { kind: "personal-catalog" });
     assert.deepEqual(backTargetFor({ kind: "personal-catalog" }, lookup())!.screen, { kind: "dashboard" });
     assert.deepEqual(backTargetFor({ kind: "create-personal-challenge" }, lookup())!.screen, { kind: "dashboard" });
   });

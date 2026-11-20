@@ -66,14 +66,17 @@ test("o chat de criação abre solto, dentro de um grupo ou dentro do My space �
   assert.equal(urlForScreen({ kind: "quick-create", into: "personal" }), "/start?personal=1");
 });
 
+test("links antigos dos itens abrem a coleção correspondente", () => {
+  assert.deepEqual(screenFromUrl("/catalog/old-item"), { kind: "personal-catalog" });
+  assert.deepEqual(screenFromUrl("/groups/g1/catalog/old-item"), { kind: "group-catalog", groupId: "g1" });
+});
+
 test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo tipo", () => {
   const screens = [
     { kind: "dashboard" },
     { kind: "group", groupId: "g1" },
     { kind: "group-catalog", groupId: "g1" },
-    { kind: "catalog-item", groupId: "g1", itemId: "i1" },
     { kind: "personal-catalog" },
-    { kind: "personal-catalog-item", itemId: "i1" },
     { kind: "personal-trash" },
     { kind: "group-trash", groupId: "g1" },
     { kind: "create-challenge", groupId: "g1" },
@@ -102,8 +105,6 @@ test("todo deep-link tem um page.tsx no disco", async () => {
   const { existsSync } = await import("node:fs");
   const pages = [
     "app/page.tsx", "app/groups/[groupId]/page.tsx", "app/groups/[groupId]/trash/page.tsx",
-    "app/groups/[groupId]/catalog/page.tsx", "app/groups/[groupId]/catalog/[itemId]/page.tsx", "app/personal/page.tsx", "app/personal/trash/page.tsx",
-    "app/catalog/page.tsx", "app/catalog/[itemId]/page.tsx", "app/challenges/[challengeId]/page.tsx",
     "app/challenges/[challengeId]/manage/page.tsx", "app/challenges/new/page.tsx",
     "app/modelos/page.tsx", "app/modelos/[challengeId]/page.tsx", "app/sobre/page.tsx", "app/voce/page.tsx", "app/atividade/page.tsx",
     "app/invites/[token]/page.tsx", "app/results/[token]/page.tsx",

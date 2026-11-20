@@ -384,7 +384,6 @@ export function DashboardScreen({
   onCreateManually,
   onOpenTemplate,
   onOpenPersonalCatalog,
-  onOpenPersonalCatalogItem,
   onChanged,
 }: {
   user: User;
@@ -404,7 +403,6 @@ export function DashboardScreen({
   onCreateManually: (target: { personal: true } | { groupId: Id } | { newGroup: string }) => Promise<void>;
   onOpenTemplate: (id: Id) => void;
   onOpenPersonalCatalog: () => void;
-  onOpenPersonalCatalogItem: (itemId: Id) => void;
   onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
@@ -495,7 +493,7 @@ export function DashboardScreen({
   // A phone reaches the catalogue from the dock, so the preview is a computer's only.
   const personalLibrary = colorFilter ? null : (
     <div className="mt-8 hidden sm:block">
-      <CatalogShelfView scope="personal" canManage data={personalShelf} onOpenCatalog={onOpenPersonalCatalog} onOpenItem={onOpenPersonalCatalogItem} />
+      <CatalogShelfView scope="personal" canManage data={personalShelf} onOpenCatalog={onOpenPersonalCatalog} />
     </div>
   );
 

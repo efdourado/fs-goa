@@ -10,7 +10,7 @@ import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, ModalActions } from
 import { useGoaFormat } from "../format";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
-import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-views";
+import { catalogCardHeight, CatalogTile, useCatalogPropertyText } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import { NewChallengeButton } from "../welcome";
@@ -20,7 +20,7 @@ import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Fie
 
 /** A word of the line under the invite link that opens its select. */
 const summaryPart = "max-w-[60vw] rounded-md text-[13px] text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline focus-visible:text-[var(--ink)] focus-visible:underline aria-expanded:text-[var(--ink)]";
-import { canManage, formatRuntime } from "../utils";
+import { canManage } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
@@ -35,7 +35,6 @@ export function GroupScreen({
   onCreateChallenge,
   onQuickCreate,
   onOpenChallenge,
-  onOpenCatalogItem,
   onOpenCatalog,
   onCreateInvite,
   onInviteByUsername,
@@ -58,7 +57,6 @@ export function GroupScreen({
   /** The guided, question-by-question way to start a challenge here. */
   onQuickCreate: () => void;
   onOpenChallenge: (id: Id) => void;
-  onOpenCatalogItem: (itemId: Id) => void;
   onOpenCatalog: () => void;
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number; challengeId?: Id }) => Promise<{ token?: string; url?: string }>;
   onInviteByUsername: (username: string) => Promise<GroupInviteResult>;
@@ -74,7 +72,6 @@ export function GroupScreen({
 }) {
   const t = useTranslations("group");
   const canCreateChallenge = canManage(group.role) && challenges.length < challengeLimit;
-  const tCat = useTranslations("catalog");
   const tl = useTranslations("libraries");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
@@ -97,6 +94,7 @@ export function GroupScreen({
   const [catalogKind, setCatalogKind] = useState<string | null>(null);
   // One request brings the libraries, how many items each holds and the newest few of each; the last answer
   // paints at once when the page is opened again.
+  const propertyText = useCatalogPropertyText();
   const shelfData = useCatalogShelf({ groupId: group.id });
   const catalog = shelfData ? shelfData.items : null;
   const catalogCounts = shelfData?.counts ?? {};
@@ -430,12 +428,7 @@ export function GroupScreen({
                       key={item.id}
                       className={shelfCardWidth}
                       title={item.title}
-                      year={resolveCoverTop(item, activeCatalogLibrary?.coverTopProperty, f)}
-                      avg={item.ratingAvg}
-                      badgeHidden={activeCatalogLibrary?.coverBadgeHidden}
-                      ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
-                      caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
-                      onOpen={() => onOpenCatalogItem(item.id)}
+                      properties={propertyText(item, shelfData?.hiddenProperties?.[item.kind])}
                     />
                   ))}
                   {remainingCatalog > 0 ? (

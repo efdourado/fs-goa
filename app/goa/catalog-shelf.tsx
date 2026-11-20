@@ -4,13 +4,10 @@ import { StateButton } from "./state-button";
 
 import { useTranslations } from "next-intl";
 
-import { catalogCardHeight, CatalogTile, resolveCoverTop } from "./catalog-views";
-import { useGoaFormat } from "./format";
-import { type CatalogScope, type CatalogShelfData, useCatalogShelf } from "./libraries";
+import { catalogCardHeight, CatalogTile, useCatalogPropertyText } from "./catalog-views";
+import { type CatalogScope, type CatalogShelfData } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
-import type { Id } from "./types";
 import { ArrowRightIcon, cx, EmptyState } from "./ui";
-import { formatRuntime } from "./utils";
 
 /** A page shows only the head of the catalogue; the rest is one tap away. */
 const PREVIEW_COUNT = 10;
@@ -32,39 +29,21 @@ export function CatalogShelfSkeleton({ title }: { title: string }) {
   );
 }
 
-/**
- * The catalogue as a preview on a page: the newest items of every library together, as one rail of cards with a
- * "N more" card at the end — no library tabs; the catalogue page is where they're told apart.
- * One request brings all of it (the server sends only the newest few of each library, plus the counts), and
- * the last answer is painted straight away when the page is opened again.
- */
-export function CatalogShelf(props: {
-  scope: CatalogScope;
-  canManage: boolean;
-  onOpenCatalog: () => void;
-  onOpenItem: (itemId: Id) => void;
-}) {
-  return <CatalogShelfView {...props} data={useCatalogShelf(props.scope)} />;
-}
-
 /** The shelf drawn from an answer the page already holds (Home reads it to know whether there's anything at all). */
-export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, data }: {
+export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
   scope: CatalogScope;
   canManage: boolean;
   onOpenCatalog: () => void;
-  onOpenItem: (itemId: Id) => void;
   data: CatalogShelfData | null;
 }) {
   const t = useTranslations("group");
-  const tCat = useTranslations("catalog");
-  const f = useGoaFormat();
+  const propertyText = useCatalogPropertyText();
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
   const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
 
-  // Every library together, newest first; each card still follows its own library's cover settings.
+  // Every library together, newest first.
   const counts = data?.counts ?? {};
   const all = data?.items ?? [];
-  const libraryOf = new Map((data?.libraries ?? []).map((library) => [library.kind, library]));
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const addedAt = (item: (typeof all)[number]) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sorted = [...all].sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
@@ -93,12 +72,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
                 key={item.id}
                 className={shelfCardWidth}
                 title={item.title}
-                year={resolveCoverTop(item, libraryOf.get(item.kind)?.coverTopProperty, f)}
-                avg={item.ratingAvg}
-                badgeHidden={libraryOf.get(item.kind)?.coverBadgeHidden}
-                ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
-                caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
-                onOpen={() => onOpenItem(item.id)}
+                properties={propertyText(item, data.hiddenProperties?.[item.kind])}
               />
             ))}
             {remaining > 0 ? (

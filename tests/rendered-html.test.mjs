@@ -67,6 +67,12 @@ test("o servidor de produção renderiza o shell acessível com metadados sociai
     assert.match(html, /property="og:title" content="Goa"/i);
     assert.match(html, new RegExp(`property="og:image" content="${BASE}/og\\.png"`, "i"));
     assert.match(html, /name="twitter:card" content="summary_large_image"/i);
+
+    for (const [oldUrl, catalogue] of [["/catalog/item", "/catalog"], ["/groups/g1/catalog/item", "/groups/g1/catalog"]]) {
+      const redirect = await fetch(`${BASE}${oldUrl}`, { redirect: "manual" });
+      assert.equal(redirect.status, 308);
+      assert.equal(redirect.headers.get("location"), catalogue);
+    }
   });
 });
 

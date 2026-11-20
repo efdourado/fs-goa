@@ -48,11 +48,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   // My space was folded into Home; old links still land somewhere sensible.
   if (parts[0] === "personal" && parts.length === 1) return { kind: "dashboard" };
   if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
-  if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
-  if (parts[0] === "catalog" && parts.length === 2) {
-    const itemId = decoded(parts[1]);
-    return itemId ? { kind: "personal-catalog-item", itemId } : null;
-  }
+  if (parts[0] === "catalog" && parts.length <= 2) return { kind: "personal-catalog" };
   if (parts[0] === "groups" && parts.length === 2) {
     const groupId = decoded(parts[1]);
     if (!groupId) return null;
@@ -60,14 +56,9 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
       ? { kind: "create-challenge", groupId }
       : { kind: "group", groupId };
   }
-  if (parts[0] === "groups" && parts[2] === "catalog" && parts.length === 3) {
+  if (parts[0] === "groups" && parts[2] === "catalog" && parts.length <= 4) {
     const groupId = decoded(parts[1]);
     return groupId ? { kind: "group-catalog", groupId } : null;
-  }
-  if (parts[0] === "groups" && parts[2] === "catalog" && parts.length === 4) {
-    const groupId = decoded(parts[1]);
-    const itemId = decoded(parts[3]);
-    return groupId && itemId ? { kind: "catalog-item", groupId, itemId } : null;
   }
   if (parts[0] === "groups" && parts[2] === "trash" && parts.length === 3) {
     const groupId = decoded(parts[1]);
@@ -108,9 +99,8 @@ export function isSameView(prev: Screen | null | undefined, next: Screen): boole
   const id = (screen: Screen): string | null =>
     "challengeId" in screen ? screen.challengeId
       : "groupId" in screen ? screen.groupId
-        : "itemId" in screen ? screen.itemId
-          : "token" in screen ? screen.token
-            : null;
+        : "token" in screen ? screen.token
+          : null;
   return id(prev) === id(next);
 }
 
@@ -122,12 +112,8 @@ export function urlForScreen(screen: Screen): string | null {
       return `/groups/${encodeURIComponent(screen.groupId)}`;
     case "group-catalog":
       return `/groups/${encodeURIComponent(screen.groupId)}/catalog`;
-    case "catalog-item":
-      return `/groups/${encodeURIComponent(screen.groupId)}/catalog/${encodeURIComponent(screen.itemId)}`;
     case "personal-catalog":
       return "/catalog";
-    case "personal-catalog-item":
-      return `/catalog/${encodeURIComponent(screen.itemId)}`;
     case "personal-trash":
       return "/personal/trash";
     case "group-trash":
@@ -228,15 +214,11 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "group-trash":
     case "create-challenge":
       return toGroup(screen.groupId);
-    case "catalog-item":
-      return { screen: { kind: "group-catalog", groupId: screen.groupId }, label: { kind: "catalogue" } };
     case "personal-catalog":
     case "create-personal-challenge":
       return HOME;
     case "personal-trash":
       return { screen: { kind: "you" }, label: { kind: "you" } };
-    case "personal-catalog-item":
-      return { screen: { kind: "personal-catalog" }, label: { kind: "myCatalogue" } };
     case "challenge": {
       const challenge = lookup.challenge(screen.challengeId);
       if (challenge?.groupId) return toGroup(challenge.groupId);

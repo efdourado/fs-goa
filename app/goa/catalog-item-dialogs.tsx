@@ -15,7 +15,7 @@ import {
   type PropertyValues,
   useLibraryProperties,
 } from "./property-inputs";
-import type { CatalogItemDetail, CatalogLibrary, Id } from "./types";
+import type { CatalogItem, CatalogLibrary, Id } from "./types";
 import { Button, Field, inputClass } from "./ui";
 
 interface PossibleMatch {
@@ -176,7 +176,7 @@ export function EditCatalogItemDialog({
   onRemove,
 }: {
   scope: CatalogScope;
-  item: CatalogItemDetail;
+  item: CatalogItem;
   libraries: CatalogLibrary[];
   onCancel: () => void;
   onSaved: () => void;

@@ -19,7 +19,6 @@ export function dockTabFor(screen: Screen): DockTab | null {
     case "dashboard":
     case "group":
     case "group-catalog":
-    case "catalog-item":
     case "group-trash":
     case "create-challenge":
     case "create-personal-challenge":
@@ -37,7 +36,6 @@ export function dockTabFor(screen: Screen): DockTab | null {
     case "template":
       return "you";
     case "personal-catalog":
-    case "personal-catalog-item":
       return "catalog";
     case "challenge":
     case "admin":

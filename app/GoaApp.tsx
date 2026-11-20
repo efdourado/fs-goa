@@ -23,7 +23,6 @@ import { CreateChallengeScreen, type LeaveGuard } from "./goa/screens/create-cha
 import { type ChallengeDraft, type ChallengeDraftForm, clearChallengeDraft, saveChallengeDraft, useChallengeDraft } from "./goa/challenge-draft";
 import { DraftResume } from "./goa/draft-resume";
 import { DashboardScreen } from "./goa/screens/dashboard";
-import { CatalogItemScreen } from "./goa/screens/catalog-item";
 import { GroupScreen } from "./goa/screens/group";
 import { InviteAcceptedScreen, InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
@@ -513,16 +512,6 @@ function GoaAppContent() {
     replaceScreen(groupId ? { kind: "group", groupId } : { kind: "dashboard" });
   }
 
-  async function deleteCatalogItem(
-    path: string,
-    back: { kind: "group-catalog"; groupId: Id } | { kind: "personal-catalog" },
-  ) {
-    if (!bootstrap) return;
-    await apiRequest(path, { method: "DELETE", csrfToken: bootstrap.csrfToken });
-    await refreshBootstrap();
-    replaceScreen(back);
-  }
-
   async function createChallenge(target: { groupId: Id } | { personal: true }, input: ChallengeCreationInput, options: { launch?: boolean } = {}) {
     if (!bootstrap) return;
     const body = challengeRequestBody(input);
@@ -677,7 +666,7 @@ function GoaAppContent() {
 
   const user = bootstrap.user;
   const selectedGroup = screen.kind === "group" || screen.kind === "create-challenge"
-    || screen.kind === "catalog-item" || screen.kind === "group-catalog" || screen.kind === "group-trash"
+    || screen.kind === "group-catalog" || screen.kind === "group-trash"
     ? bootstrap.groups.find((group) => group.id === screen.groupId)
     : selectedChallenge ? bootstrap.groups.find((group) => group.id === selectedChallenge.groupId) : undefined;
   const selectedRole = selectedChallenge?.viewerRole ?? selectedGroup?.role;
@@ -714,15 +703,11 @@ function GoaAppContent() {
   } else if (screen.kind === "quick-create") {
     content = <QuickCreateScreen currentUserId={user.id} groups={bootstrap.groups} into={screen.into} onBack={goUp} backLabel={backLabel} onCreateGroup={createGroupAndGetId} onSubmit={(target, input) => createChallenge(target, input, { launch: true })} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onQuickCreate={() => setScreen({ kind: "quick-create", into: { groupId: selectedGroup.id } })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} onSetMemberBan={canManage(selectedGroup.role) ? (userId, banned) => setMemberBan(selectedGroup.id, userId, banned) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onQuickCreate={() => setScreen({ kind: "quick-create", into: { groupId: selectedGroup.id } })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} onSetMemberBan={canManage(selectedGroup.role) ? (userId, banned) => setMemberBan(selectedGroup.id, userId, banned) : undefined} />;
   } else if (screen.kind === "group-catalog" && selectedGroup) {
-    content = <CatalogWorkspaceScreen key={selectedGroup.id} scope={{ groupId: selectedGroup.id }} title={t("groupCatalogTitle", { name: selectedGroup.name })} subtitle={t("groupCatalogSubtitle")} canManage={canManage(selectedGroup.role)} members={selectedGroup.members ?? []} onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} />;
-  } else if (screen.kind === "catalog-item" && selectedGroup) {
-    content = <CatalogItemScreen key={screen.itemId} scope={{ groupId: selectedGroup.id }} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={canManage(selectedGroup.role) ? { members: selectedGroup.members ?? [] } : undefined} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group-catalog", groupId: screen.groupId }) : undefined} />;
+    content = <CatalogWorkspaceScreen key={selectedGroup.id} scope={{ groupId: selectedGroup.id }} title={t("groupCatalogTitle", { name: selectedGroup.name })} subtitle={t("groupCatalogSubtitle")} canManage={canManage(selectedGroup.role)} members={selectedGroup.members ?? []} onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "personal-catalog") {
-    content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} canManage members={[]} onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
-  } else if (screen.kind === "personal-catalog-item") {
-    content = <CatalogItemScreen key={screen.itemId} scope="personal" detailPath={API_PATHS.personalCatalogItem(screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={{ members: [] }} onDelete={() => deleteCatalogItem(API_PATHS.personalCatalogItem(screen.itemId), { kind: "personal-catalog" })} />;
+    content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} canManage members={[]} onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={`${selectedGroup.id}${screen.resume ? ":draft" : ""}`} group={selectedGroup} onBack={goUp} backLabel={backLabel} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} {...draftProps({ groupId: selectedGroup.id }, Boolean(screen.resume))} registerLeaveGuard={registerLeaveGuard} />;
   } else if (screen.kind === "create-personal-challenge") {
@@ -745,7 +730,7 @@ function GoaAppContent() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onCreateManually={createManuallyFor} onOpenTemplate={(id) => setScreen({ kind: "template", challengeId: id })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenPersonalCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onCreateManually={createManuallyFor} onOpenTemplate={(id) => setScreen({ kind: "template", challengeId: id })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   const dockTab = user.deactivated ? null : dockTabFor(screen);

@@ -14,11 +14,13 @@ for (const disabled of [true, false]) {
     </>));
     try {
       const buttons = [...dom.window.document.querySelectorAll("button")];
-      assert.deepEqual(buttons.map((button) => button.textContent), ["Save", "Continue", "Add"]);
+      assert.deepEqual(buttons.map((button) => button.textContent), ["Save", "Continue", ""]);
+      assert.equal(buttons[2].getAttribute("aria-label"), "Add");
+      assert.equal(buttons[2].querySelectorAll("svg[aria-hidden='true']").length, 1);
       for (const button of buttons) {
         assert.equal(button.disabled, disabled);
         assert.equal(button.getAttribute("data-readiness"), "true");
-        assert.equal(button.querySelector("svg"), null);
+        assert.equal(button.querySelector("[data-lock-state]"), null);
       }
     } finally { dom.window.close(); }
   });

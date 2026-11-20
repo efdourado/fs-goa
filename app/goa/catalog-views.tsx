@@ -1,11 +1,13 @@
 "use client";
 
-import { StateButton } from "./state-button";
+import { useTranslations } from "next-intl";
+import { type ReactNode, useId } from "react";
 
 import { coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
-import type { GoaFormat } from "./format";
-import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
-import { CheckCircle, cx } from "./ui";
+import { useGoaFormat } from "./format";
+import type { CatalogItem } from "./types";
+import { cx } from "./ui";
+import { formatRuntime } from "./utils";
 
 export type CatalogGroupBy = "none" | "genre" | "decade" | "year";
 
@@ -42,150 +44,116 @@ export function groupCatalogItems<T extends Groupable>(items: readonly T[], by: 
   return [...named, ...[...groups.values()].filter((group) => !group.label)];
 }
 
-/**
- * What a library's `coverTopProperty` choice resolves to for one item — a native
- * field, a custom attribute (matched by its semantic key, the same string
- * `item.attributes[].key` already uses), `"none"` for blank, or `null` (the
- * server resolves an unconfigured library to its first numeric property).
- */
-export function resolveCoverTop(
-  item: {
-    year?: number | null; author?: string | null; mainGenre?: string | null;
-    runtimeMinutes?: number | null; pageCount?: number | null; scheduledAt?: EventSchedule | null;
-    attributes?: CatalogAttributeValue[];
-  },
-  coverTopProperty: CatalogLibrary["coverTopProperty"] | undefined,
-  f: GoaFormat,
-): string | number | null {
-  if (coverTopProperty === undefined || coverTopProperty === null) return null;
-  if (coverTopProperty === "none") return null;
-  const attribute = item.attributes?.find((entry) => entry.key === coverTopProperty);
-  if (attribute) {
-    if (attribute.type === "boolean") return attribute.value ? "✓" : null;
-    if (attribute.type === "date") return f.date(String(attribute.value));
-    return attribute.value as string | number;
-  }
-  switch (coverTopProperty) {
-    case "year": return item.year ?? null;
-    case "author": return item.author ?? null;
-    case "main_genre": return item.mainGenre ?? null;
-    case "runtime_minutes": return item.runtimeMinutes ?? null;
-    case "page_count": return item.pageCount ?? null;
-    case "scheduled_at": return item.scheduledAt ? f.eventWhen(item.scheduledAt) : null;
-    default: return null;
-  }
+export function useCatalogPropertyText() {
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+
+  return (item: CatalogItem, hidden: readonly string[] = []): string[] => {
+    const native: Array<[string, string | number | null | undefined]> = [
+      ["author", item.author], ["year", item.year], ["main_genre", item.mainGenre],
+      ["page_count", item.pageCount], ["runtime_minutes", formatRuntime(item.runtimeMinutes)],
+      ["scheduled_at", item.scheduledAt ? f.eventWhen(item.scheduledAt) : null],
+    ];
+    const parts = native.flatMap(([key, value]) => hidden.includes(key) || value == null || value === "" ? [] : [String(value)]);
+    for (const attribute of item.attributes ?? []) {
+      const value = attribute.type === "boolean" ? tc(attribute.value ? "yes" : "no")
+        : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value);
+      parts.push(value);
+    }
+    return parts;
+  };
 }
 
-/** The fixed height of a catalogue card (and a library card): one line of title, never taller. */
+function startPropertyScroll(container: HTMLElement) {
+  const line = container.querySelector<HTMLElement>(".catalog-property-text");
+  if (!line || line.hasAttribute("data-scrolling")) return;
+  const distance = line.scrollWidth - line.clientWidth;
+  if (distance <= 1) return;
+  line.style.setProperty("--property-distance", `-${distance}px`);
+  line.style.setProperty("--property-duration", `${Math.max(2, distance / 45)}s`);
+  line.setAttribute("data-scrolling", "");
+}
+
+function stopPropertyScroll(container: HTMLElement) {
+  container.querySelector(".catalog-property-text")?.removeAttribute("data-scrolling");
+}
+
+function PropertyLine({ values, note, warn, className }: {
+  values: readonly string[];
+  note?: string;
+  warn?: boolean;
+  className?: string;
+}) {
+  if (!values.length && !note) return null;
+  return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to focus the scrollable line.
+    <small className={cx("catalog-property-line block min-w-0 text-xs text-[var(--muted)]", className)} tabIndex={0} onFocus={(event) => startPropertyScroll(event.currentTarget)} onBlur={(event) => stopPropertyScroll(event.currentTarget)}>
+      <span className="catalog-property-text block truncate">
+        {values.join(" · ")}
+        {note ? <span className={warn ? "text-[var(--warn)]" : undefined}>{values.length ? " · " : ""}{note}</span> : null}
+      </span>
+    </small>
+  );
+}
+
+/** The fixed height of a catalogue card (and a library card). */
 export const catalogCardHeight = "h-16 sm:h-[4.75rem]";
 
-/**
- * One catalogue item as a card the width of a challenge card and one line tall: the title's own tint, the title
- * cut with "…" when it runs long, and — from `sm:` up — the library's top value (a year) and the rating ring on
- * the same line. A button that opens the item, or a checkbox while items are being picked. A caption (author,
- * genre, runtime) shows under it from `sm:` up; a note always does.
- */
-export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, caption, note, noteTone = "muted", className, selecting, picked, onPick, onOpen }: {
+/** A coloured item tile. Challenge results can add a year and rating. */
+export function CatalogTile({ title, year, avg, ratingLabel, caption, properties, className }: {
   title: string;
   year?: string | number | null;
   avg?: number | null;
-  /** Turns off the rating ring regardless of `avg` — the library's own choice, not "no rating yet". */
-  badgeHidden?: boolean;
-  ratingLabel: string;
-  caption: string;
-  note?: string;
-  noteTone?: "muted" | "warn";
-  /** Sizes the card inside a rail; a grid leaves it out. */
+  ratingLabel?: string;
+  caption?: string;
+  properties?: readonly string[];
   className?: string;
-  selecting?: boolean;
-  picked?: boolean;
-  onPick?: (on: boolean) => void;
-  /** Leave it out for a tile that only shows the item (a result page): no button, no hover. */
-  onOpen?: () => void;
 }) {
-  const rated = !badgeHidden && avg !== null && avg !== undefined;
-  const body = (
-    <>
+  const rated = avg !== null && avg !== undefined;
+  return (
+    <div title={title} onPointerEnter={(event) => startPropertyScroll(event.currentTarget)} onPointerLeave={(event) => stopPropertyScroll(event.currentTarget)} className={cx("flex min-w-0 flex-col gap-2 text-left", className)}>
       <span
-        className={cx(
-          "relative flex items-center gap-3 overflow-hidden rounded-[20px] bg-[var(--cover-bg)] px-4 text-[var(--cover-ink)] shadow-[var(--elevate-1)] transition duration-200",
-          catalogCardHeight,
-          picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]",
-        )}
+        className={cx("relative flex items-center gap-3 overflow-hidden rounded-[20px] bg-[var(--cover-bg)] px-4 text-[var(--cover-ink)] shadow-[var(--elevate-1)]", catalogCardHeight)}
         style={coverColors(coverToneOf(title))}
       >
         <span aria-hidden="true" className="pointer-events-none absolute -bottom-9 -right-7 h-20 w-20 rounded-full border-[12px] border-[var(--cover-deco)]" />
-        {selecting ? (
-          <CheckCircle on={Boolean(picked)} className="relative !h-6 !w-6" />
-        ) : null}
         <span className="relative min-w-0 flex-1 truncate text-[15px] font-light tracking-[-0.02em] sm:text-lg">{title}</span>
         {year !== null && year !== undefined && year !== "" ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
         {rated ? (
-          <ScoreRing value={avg} size={34} label={ratingLabel} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[var(--elevate-card)] sm:inline-grid" textClassName="text-[11px] font-medium" />
+          <ScoreRing value={avg} size={34} label={ratingLabel ?? ""} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[var(--elevate-card)] sm:inline-grid" textClassName="text-[11px] font-medium" />
         ) : null}
       </span>
-      {caption || note ? (
-        <span className={cx("flex-col gap-0.5 px-1 text-xs text-[var(--muted)] sm:flex sm:flex-row sm:items-baseline sm:justify-between sm:gap-2", note ? "flex" : "hidden")}>
-          <span className="hidden min-w-0 truncate sm:block">{caption}</span>
-          {note ? <span className={cx("flex-none", noteTone === "warn" && "text-[var(--warn)]")}>{note}</span> : null}
-        </span>
+      {properties ? <PropertyLine values={properties} className="mx-1" /> : caption ? (
+        <span className="hidden truncate px-1 text-xs text-[var(--muted)] sm:block">{caption}</span>
       ) : null}
-    </>
-  );
-  const shared = cx("group flex min-w-0 flex-col gap-2 text-left focus-visible:outline-none", className);
-  return selecting ? (
-    <label className={cx(shared, "cursor-pointer")}>
-      <input type="checkbox" className="peer sr-only" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} />
-      <span className="flex flex-col gap-2 rounded-[22px] peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--main)]/25">{body}</span>
-    </label>
-  ) : onOpen ? (
-    <StateButton type="button" onClick={onOpen} title={title} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</StateButton>
-  ) : (
-    // Not a "group": the hover lift belongs to tiles that open something.
-    <div title={title} className={cx("flex min-w-0 flex-col gap-2 text-left", className)}>{body}</div>
+    </div>
   );
 }
 
-/**
- * One item as a list row: a small round cover in the title's tint, the title, the rating ring, and
- * under the title its details. A phone keeps the first two on one line; from `sm:` up every detail shows, wrapping.
- */
-export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, note, noteTone = "muted", selecting, picked, onPick, onOpen }: {
+export function CatalogRow({ title, meta, note, noteTone = "muted", selecting, picked, onPick, action }: {
   title: string;
-  year?: string | number | null;
-  avg?: number | null;
-  /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
-  badgeHidden?: boolean;
-  ratingLabel: string;
-  /** The details, most telling first. */
   meta: readonly string[];
-  /** Always shown last (how many challenges hold the item). */
   note?: string;
   noteTone?: "muted" | "warn";
   selecting?: boolean;
   picked?: boolean;
   onPick?: (on: boolean) => void;
-  onOpen: () => void;
+  action?: ReactNode;
 }) {
-  const details = year !== null && year !== undefined && year !== "" && !meta.includes(String(year)) ? [String(year), ...meta] : meta;
-  const rating = badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />;
-  const body = (
-    <>
-      {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
+  const selectionId = useId();
+  return (
+    <div onPointerEnter={(event) => startPropertyScroll(event.currentTarget)} onPointerLeave={(event) => stopPropertyScroll(event.currentTarget)} className="flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left sm:gap-4 sm:px-4 sm:py-3.5">
+      {selecting ? <input id={selectionId} type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
       <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
-      <span className="min-w-0 flex-1">
-        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}</strong>
-        {details.length || note ? (
-          <small className="mt-0.5 block truncate text-xs text-[var(--muted)] sm:mt-1 sm:whitespace-normal sm:text-[13px] sm:leading-5">
-            {details.map((part, index) => <span key={index} className={index >= 2 ? "hidden sm:inline" : undefined}>{index ? " · " : ""}{part}</span>)}
-            {note ? <span className={noteTone === "warn" ? "text-[var(--warn)]" : undefined}>{details.length ? " · " : ""}{note}</span> : null}
-          </small>
-        ) : null}
-      </span>
-    </>
+      <div className="min-w-0 flex-1">
+        {selecting ? (
+          <label htmlFor={selectionId} className="block cursor-pointer truncate text-[15px] sm:text-base">
+            {title}
+          </label>
+        ) : <strong className="block truncate text-[15px] font-normal sm:text-base">{title}</strong>}
+        <PropertyLine values={meta} note={note} warn={noteTone === "warn"} className="mt-0.5 sm:mt-1 sm:text-[13px] sm:leading-5" />
+      </div>
+      {selecting ? null : action}
+    </div>
   );
-  const shared = "flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-4 sm:py-3.5";
-  return selecting
-    ? <label className={cx(shared, "cursor-pointer")}>{body}{rating}</label>
-    : <StateButton type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}{rating}</StateButton>;
 }

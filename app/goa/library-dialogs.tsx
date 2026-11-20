@@ -12,7 +12,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { ArrowField, Button, CircleMinusIcon, Field, inputClass, Select, StatusMessage, Toggle } from "./ui";
+import { ArrowField, Button, CircleMinusIcon, Field, inputClass, Select, StatusMessage } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
@@ -178,10 +178,6 @@ export function LibraryPropertiesDialog({
   const [newLabel, setNewLabel] = useState("");
   const [newType, setNewType] = useState<PropertyType>("text");
   const [adding, setAdding] = useState(false);
-  const [coverTopEdit, setCoverTopEdit] = useState<{ received: string | null; value: string } | null>(null);
-  const coverTop = coverTopEdit?.received === library.coverTopProperty ? coverTopEdit.value : library.coverTopProperty;
-  const [coverBadgeHidden, setCoverBadgeHidden] = useState(library.coverBadgeHidden);
-  const [coverBusy, setCoverBusy] = useState(false);
   // Its name, edited in place like a property's: saved on blur or Enter.
   const currentName = libraryName(library);
   const [name, setName] = useState(currentName);
@@ -368,42 +364,6 @@ export function LibraryPropertiesDialog({
     }
   }
 
-  async function saveCoverTop(next: string) {
-    setCoverBusy(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverTopProperty: next }, csrfToken: csrf });
-      setCoverTopEdit({ received: library.coverTopProperty, value: next });
-      onChanged();
-      setSuccess(t("coversSaved"));
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setCoverBusy(false);
-    }
-  }
-
-  async function saveCoverBadgeHidden(nextHidden: boolean) {
-    setCoverBusy(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverBadgeHidden: nextHidden }, csrfToken: csrf });
-      setCoverBadgeHidden(nextHidden);
-      onChanged();
-      setSuccess(t("coversSaved"));
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setCoverBusy(false);
-    }
-  }
-
-  const coverProperties = (properties ?? []).filter((property) => property.key !== "title");
-  const firstNumber = coverProperties.find((property) => property.type === "number");
-  const selectedCoverTop = coverTop && coverProperties.some((property) => (property.attributeKey ?? property.key) === coverTop)
-    ? coverTop : coverTop === "none" ? "none" : firstNumber ? firstNumber.attributeKey ?? firstNumber.key : "none";
   const sectionTitle = "mb-2.5 text-[13px] font-medium text-[var(--ink)]";
   const shown = properties ? (showAll ? properties : properties.slice(0, VISIBLE_PROPERTIES)) : [];
   const more = properties ? properties.length - shown.length : 0;
@@ -416,7 +376,7 @@ export function LibraryPropertiesDialog({
   );
 
   return (
-    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || adding || coverBusy || nameBusy || deleteBusy}>
+    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || adding || nameBusy || deleteBusy}>
       <StatusMessage error={error} success={success} />
 
       {canEdit ? (
@@ -438,7 +398,7 @@ export function LibraryPropertiesDialog({
       <section>
         <div className="mb-2.5 flex items-baseline justify-between gap-3">
           <h3 className="text-[13px] font-medium text-[var(--ink)]">{t("propertiesHeading")}</h3>
-          <span className="text-xs text-[var(--muted)]">{canEdit ? t("propertiesBody") : t("propertiesReadOnly")}</span>
+          {!canEdit ? <span className="text-xs text-[var(--muted)]">{t("propertiesReadOnly")}</span> : null}
         </div>
         {properties === null ? (
           <p className="text-sm text-[var(--muted)]">{t("loading")}</p>
@@ -500,33 +460,6 @@ export function LibraryPropertiesDialog({
           </ul>
         )}
       </section>
-
-      {canEdit && properties && properties.length ? (
-        <section className="mt-6">
-          <h3 className={sectionTitle}>{t("coversTitle")}</h3>
-          <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
-            <li className="flex min-h-14 items-center justify-between gap-3 px-3.5">
-              <span className="text-sm">{t("coverTopLabel")}</span>
-              <Select
-                look="bare"
-                className={propertySelectClass}
-                value={selectedCoverTop}
-                disabled={coverBusy}
-                ariaLabel={t("coverTopLabel")}
-                onChange={(next) => void saveCoverTop(next)}
-                options={[
-                  { value: "none", label: t("coverTopNone") },
-                  ...coverProperties.map((property) => ({ value: property.attributeKey ?? property.key, label: nameOf(property) })),
-                ]}
-              />
-            </li>
-            <li className="flex min-h-14 items-center justify-between gap-3 px-3.5">
-              <span className="text-sm">{t("coverBadgeLabel")}</span>
-              <Toggle checked={!coverBadgeHidden} disabled={coverBusy} onChange={(show) => void saveCoverBadgeHidden(!show)} />
-            </li>
-          </ul>
-        </section>
-      ) : null}
 
       {canEdit && onDeleted ? (
         <div className="mt-6 border-t border-[var(--line)] pt-4">

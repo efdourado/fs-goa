@@ -5887,9 +5887,9 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   const { screenFromUrl } = await import("../../app/goa/navigation");
   const routes: Array<[string, string]> = [
     ["/", "dashboard"], ["/personal", "dashboard"], ["/personal/trash", "personal-trash"],
-    ["/catalog", "personal-catalog"], ["/catalog/abc", "personal-catalog-item"],
+    ["/catalog", "personal-catalog"], ["/catalog/abc", "personal-catalog"],
     [`/groups/${groupId}`, "group"], [`/groups/${groupId}/trash`, "group-trash"],
-    [`/groups/${groupId}/catalog/xyz`, "catalog-item"],
+    [`/groups/${groupId}/catalog/xyz`, "group-catalog"],
     [`/challenges/${challengeId}`, "challenge"], [`/challenges/${challengeId}/manage`, "admin"],
     ["/challenges/new", "create-personal-challenge"], ["/modelos", "templates"], ["/modelos/x", "template"],
     ["/sobre", "about"], ["/invites/tok", "invite"],

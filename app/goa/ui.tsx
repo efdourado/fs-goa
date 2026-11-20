@@ -560,7 +560,7 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   placeholder?: string;
   /** What the field is, said to a screen reader. */
   label: string;
-  /** The visible submit action. */
+  /** Accessible name for the submit arrow. */
   submitLabel: string;
   disabled?: boolean;
   /** Something else the form needs is still missing (the arrow waits; the field stays editable). */
@@ -588,8 +588,8 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
 
 export function InlineSubmit({ label, disabled }: { label: string; disabled?: boolean }) {
   return (
-    <StateButton readiness type="submit" disabled={disabled} className="inline-flex min-h-9 max-w-[60%] flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[var(--main)] px-2.5 py-1 text-center text-xs font-medium leading-tight text-white transition hover:opacity-90 sm:px-3">
-      {label}
+    <StateButton readiness type="submit" aria-label={label} disabled={disabled} className="grid size-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90">
+      <ArrowRightIcon />
     </StateButton>
   );
 }

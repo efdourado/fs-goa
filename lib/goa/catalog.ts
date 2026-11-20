@@ -557,11 +557,17 @@ export const SHELF_ITEMS_PER_LIBRARY = 10;
  * draw ten covers; every extra request and every extra query was another wait on the database.
  */
 async function catalogShelf(db: Pick<PoolClient, "query">, workspaceId: string, viewerId: string) {
-  const [list, libraries, counts] = await Promise.all([
+  const [list, libraries, counts, hiddenProperties] = await Promise.all([
     listCatalogWithClient(db, workspaceId, viewerId, { perKind: SHELF_ITEMS_PER_LIBRARY }),
     listLibrariesWithClient(db, workspaceId),
     db.query<{ kind: string; total: number }>(
       "SELECT kind, count(*)::int AS total FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL GROUP BY kind",
+      [workspaceId],
+    ),
+    db.query<{ kind: string; keys: string[] }>(
+      `SELECT l.kind, array_agg(p.property_key) AS keys
+         FROM catalog_libraries l JOIN catalog_native_property_configs p ON p.library_id = l.id
+        WHERE l.group_id = $1 AND l.archived_at IS NULL AND p.hidden GROUP BY l.kind`,
       [workspaceId],
     ),
   ]);
@@ -569,6 +575,7 @@ async function catalogShelf(db: Pick<PoolClient, "query">, workspaceId: string, 
     libraries,
     counts: Object.fromEntries(counts.rows.map((row) => [row.kind, row.total])),
     items: list.items,
+    hiddenProperties: Object.fromEntries(hiddenProperties.rows.map(({ kind, keys }) => [kind, keys])),
   };
 }
 
