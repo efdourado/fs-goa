@@ -3,7 +3,7 @@
 import { StateButton } from "../state-button";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
 import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, InlineConfirmation, ModalActions } from "../dialog";
@@ -13,7 +13,7 @@ import { TasteMap } from "../taste-map";
 import { useCatalogShelf } from "../libraries";
 import { NewChallengeButton } from "../welcome";
 import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, ExitIcon, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, ListMoreButton, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -21,7 +21,7 @@ const summaryPart = "max-w-[60vw] rounded-md text-[13px] text-[var(--muted)] und
 import { canManage } from "../utils";
 import { ActiveChallengeCard, ChallengeShelf } from "./dashboard";
 
-const groupActionClass = "grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25";
+const groupActionClass = "grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25";
 const groupActionIconClass = "h-[18px] w-[18px]";
 const groupAvatarClass = "size-7 place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)]";
 const groupAvatarOverlap = "-ml-3 sm:-ml-2";
@@ -29,6 +29,7 @@ const groupAvatarCountClass = cx(groupAvatarClass, "grid bg-[var(--wash-strong)]
 const personRowClass = "flex w-full items-center justify-between gap-3 rounded-xl px-2 py-3 text-left";
 const personRowButtonClass = cx(personRowClass, "cursor-pointer transition hover:bg-[var(--hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]");
 const memberRoleClass = "flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]";
+const PEOPLE_PREVIEW_SIZE = 3;
 
 type SelectedPerson = { kind: "member"; id: Id } | { kind: "invite"; request: PendingGroupRequest };
 type PersonAction = { label: string; confirmation?: { label: string; body: string }; danger?: boolean; run: () => Promise<void> };
@@ -44,6 +45,28 @@ function PersonRowIdentity({ name, detail }: { name: string; detail: string }) {
         <small className="text-[var(--muted)]">{detail}</small>
       </span>
     </span>
+  );
+}
+
+function PeopleList<Person extends { id: Id }>({ people, renderPerson, className }: {
+  people: Person[];
+  renderPerson: (person: Person) => ReactNode;
+  className?: string;
+}) {
+  const t = useTranslations("group");
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? people : people.slice(0, PEOPLE_PREVIEW_SIZE);
+  const hiddenCount = people.length - visible.length;
+
+  return (
+    <ul className={cx("divide-y divide-[var(--line)]", className)}>
+      {visible.map((person) => <li key={person.id}>{renderPerson(person)}</li>)}
+      {hiddenCount > 0 ? (
+        <li>
+          <ListMoreButton onClick={() => setExpanded(true)}>{t("showMorePeople", { count: hiddenCount })}</ListMoreButton>
+        </li>
+      ) : null}
+    </ul>
   );
 }
 
@@ -115,6 +138,7 @@ export function GroupScreen({
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const catalogScope = { groupId: group.id };
   const shelfData = useCatalogShelf(catalogScope);
+  const groupActionRef = useRef(false);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -173,19 +197,19 @@ export function GroupScreen({
     }
   }
 
-  function toggleGroupEdit() {
-    if (!showGroupEdit) {
-      setGroupName(group.name);
-      setGroupDescription(group.description ?? "");
-      setGroupError(null);
-      setGroupSuccess(null);
-      setDeletingGroup(false);
-    }
-    setShowGroupEdit(!showGroupEdit);
+  function openGroupEdit() {
+    setGroupName(group.name);
+    setGroupDescription(group.description ?? "");
+    setGroupError(null);
+    setGroupSuccess(null);
+    setDeletingGroup(false);
+    setShowGroupEdit(true);
   }
 
   async function updateGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageGroup || groupActionRef.current) return;
+    groupActionRef.current = true;
     setGroupBusy(true);
     setGroupError(null);
     setGroupSuccess(null);
@@ -195,6 +219,7 @@ export function GroupScreen({
     } catch (cause) {
       setGroupError(f.error(cause));
     } finally {
+      groupActionRef.current = false;
       setGroupBusy(false);
     }
   }
@@ -340,14 +365,15 @@ export function GroupScreen({
         {canManageGroup || onLeaveGroup ? (
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {canManageGroup ? (
-              <StateButton type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className={groupActionClass}>
+              <StateButton type="button" onClick={openGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} aria-haspopup="dialog" className={cx(groupActionClass, "hover:text-[var(--ink)]")}>
                 <SlidersIcon className={groupActionIconClass} />
               </StateButton>
             ) : null}
             {onLeaveGroup ? (
-              <StateButton type="button" onClick={() => setLeaving(true)} aria-label={t("leaveToggle")} aria-haspopup="dialog" className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 text-xs text-[var(--danger)] opacity-85 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger-line)]">
-                <ExitIcon className={cx(groupActionIconClass, "shrink-0")} />
-                {t("leaveShort")}
+              <StateButton type="button" onClick={() => setLeaving(true)} aria-label={t("leaveToggle")} title={t("leaveToggle")} aria-haspopup="dialog" className={cx(groupActionClass, "hover:text-[var(--danger)]")}>
+                <svg viewBox="0 0 16 16" className={groupActionIconClass} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M9.5 3H12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9.5M5.25 11.25 2 8l3.25-3.25M2 8h8.5" />
+                </svg>
               </StateButton>
             ) : null}
           </div>
@@ -355,7 +381,18 @@ export function GroupScreen({
       </div>
 
       {leaving && onLeaveGroup ? (
-        <ConfirmDialog title={t("leaveTitle")} body={t("leaveConfirm")} confirmLabel={t("leaveToggle")} danger onClose={() => setLeaving(false)} onConfirm={onLeaveGroup} />
+        <ConfirmDialog
+          title={t("leaveTitle")}
+          body={t("leaveConfirm")}
+          confirmLabel={t("confirmLeave")}
+          busyLabel={tc("wait")}
+          danger
+          onClose={() => setLeaving(false)}
+          onConfirm={async () => {
+            await onLeaveGroup();
+            setLeaving(false);
+          }}
+        />
       ) : null}
 
       {canManageGroup && person ? (
@@ -399,18 +436,22 @@ export function GroupScreen({
         </Dialog>
       ) : null}
 
-      {showGroupEdit ? (
-        <Dialog title={t("editTitle")} onClose={() => setShowGroupEdit(false)} busy={groupBusy}>
+      {showGroupEdit && canManageGroup ? (
+        <Dialog title={t("editTitle")} onClose={() => setShowGroupEdit(false)} busy={groupBusy} stickyActions>
           <form className="space-y-5" onSubmit={updateGroup}>
-            <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></Field>
-            <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
+            <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} disabled={groupBusy} required maxLength={120} /></Field>
+            <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} disabled={groupBusy} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
             <StatusMessage error={groupError} success={groupSuccess} />
-            {/* Footer actions share the full available width equally. */}
-            <ModalActions className="border-t border-[var(--line)] pt-4">
-              {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : null}
+            {onDeleteGroup ? (
+              <section className="space-y-3 rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)]/40 p-4">
+                <h3 className="text-sm font-semibold text-[var(--danger-strong)]">{t("dangerTitle")}</h3>
+                <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} />
+                {deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
+              </section>
+            ) : null}
+            <ModalActions className="border-t border-[var(--line)] pt-4" sticky>
               <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
             </ModalActions>
-            {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
           </form>
         </Dialog>
       ) : null}
@@ -460,23 +501,20 @@ export function GroupScreen({
             <span className="text-xs text-[var(--muted)]">{memberCount}</span>
           </div>
           {group.members?.length ? (
-            <ul className="divide-y divide-[var(--line)]">
-              {group.members.map((member) => {
+            <PeopleList
+              people={group.members}
+              renderPerson={(member) => {
                 const content = (
                   <>
                     <PersonRowIdentity name={member.name} detail={`@${member.username}`} />
                     <span className={memberRoleClass}>{tr(member.role)}</span>
                   </>
                 );
-                return (
-                  <li key={member.id}>
-                    {canManageGroup ? (
-                      <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "member", id: member.id })}>{content}</StateButton>
-                    ) : <div className={personRowClass}>{content}</div>}
-                  </li>
-                );
-              })}
-            </ul>
+                return canManageGroup
+                  ? <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "member", id: member.id })}>{content}</StateButton>
+                  : <div className={personRowClass}>{content}</div>;
+              }}
+            />
           ) : <p className="text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
           {onSetMemberRole || onSetMemberBan ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
 
@@ -500,15 +538,11 @@ export function GroupScreen({
           {canManageGroup && pendingRequests.length ? (
             <div className="mt-6 border-t border-[var(--line)] pt-5">
               <h3 className="text-sm font-semibold">{t("pendingInvitesTitle")}</h3>
-              <ul className="mt-2 divide-y divide-[var(--line)]">
-                {pendingRequests.map((request) => (
-                  <li key={request.id}>
-                    <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "invite", request })}>
-                      <PersonRowIdentity name={request.name} detail={t("pendingInviteMeta", { username: request.username, date: f.date(request.createdAt) })} />
-                    </StateButton>
-                  </li>
-                ))}
-              </ul>
+              <PeopleList className="mt-2" people={pendingRequests} renderPerson={(request) => (
+                <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "invite", request })}>
+                  <PersonRowIdentity name={request.name} detail={t("pendingInviteMeta", { username: request.username, date: f.date(request.createdAt) })} />
+                </StateButton>
+              )} />
             </div>
           ) : null}
 

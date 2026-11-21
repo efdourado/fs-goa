@@ -56,8 +56,8 @@ export function Dialog({ title, children, onClose, busy = false, wide = false, s
 }
 
 /** Modal actions fill one row, with an equal-width column for every action. */
-export function ModalActions({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("grid w-full auto-cols-fr grid-flow-col gap-3 [&>*]:min-w-0 [&>*]:w-full", className)}>{children}</div>;
+export function ModalActions({ children, className, sticky = false }: { children: ReactNode; className?: string; sticky?: boolean }) {
+  return <div className={cx("grid w-full auto-cols-fr grid-flow-col gap-3 [&>*]:min-w-0 [&>*]:w-full", className, sticky && "sticky bottom-0 z-10 -mb-3 bg-[var(--paper)] pb-3")}>{children}</div>;
 }
 
 /**
@@ -125,7 +125,7 @@ export function FormDialog({
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
         <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
-        <ModalActions className={cx("border-t border-[var(--line)] pt-4", stickyActions && "sticky bottom-0 z-10 -mb-3 bg-[var(--paper)] pb-3")}>
+        <ModalActions className="border-t border-[var(--line)] pt-4" sticky={stickyActions}>
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
           {footerStart ? <div className="flex items-center gap-2">{footerStart}{submit}</div> : submit}
         </ModalActions>

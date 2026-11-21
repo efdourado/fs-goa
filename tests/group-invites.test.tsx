@@ -100,6 +100,31 @@ test("rapid @-invite submits send once and closing the dialog does not replay fe
   }
 });
 
+test("members and pending invitations each preview three rows and expand independently", async () => {
+  const { root, cleanup } = setup();
+  const members = Array.from({ length: 4 }, (_, index) => ({
+    ...group.members[0], id: `member-${index}`, name: `Pessoa ${index + 1}`,
+  }));
+  const pendingRequests = Array.from({ length: 5 }, (_, index) => ({
+    ...pending, id: `invite-${index}`, name: `Convidada ${index + 1}`,
+  }));
+  const showMore = (count: number) => [...document.querySelectorAll("button")].find((button) => button.textContent === `Mostrar mais (+${count})`);
+  const names = () => [...document.querySelectorAll("li strong")].map((name) => name.textContent);
+  try {
+    await act(async () => root.render(withIntl(groupScreen({ group: { ...group, members }, pendingRequests }))));
+    assert.deepEqual(names(), ["Pessoa 1", "Pessoa 2", "Pessoa 3", "Convidada 1", "Convidada 2", "Convidada 3"]);
+    await act(async () => showMore(1)!.click());
+    assert.ok(names().includes("Pessoa 4"));
+    assert.ok(!names().includes("Convidada 4"));
+    assert.equal(showMore(1), undefined);
+    await act(async () => showMore(2)!.click());
+    assert.ok(names().includes("Convidada 5"));
+    assert.equal(showMore(2), undefined);
+  } finally {
+    await cleanup();
+  }
+});
+
 test("role changes run directly while bans and cancellations confirm inside the dialog", async () => {
   const { root, cleanup } = setup();
   const calls: string[] = [];
@@ -162,19 +187,59 @@ test("role changes run directly while bans and cancellations confirm inside the 
     assert.ok(memberRow);
     assert.equal(memberRow.querySelector("button"), null);
     assert.doesNotMatch(document.body.textContent ?? "", /@outra/);
+  } finally {
+    await cleanup();
+  }
+});
 
-    await act(async () => root.render(withIntl(groupScreen({
-      group: { ...group, role: "admin" },
-      onLeaveGroup: async () => { calls.push("leave"); },
-    }))));
-    const leaveButton = findButton("Sair");
-    assert.equal(leaveButton.textContent, "Sair");
-    await act(async () => leaveButton.click());
-    const leaveDialog = document.querySelector("dialog")!;
-    assert.match(leaveDialog.textContent ?? "", /Sair do grupo\?/);
-    assert.equal(calls.includes("leave"), false);
-    await act(async () => findButton("Sair do grupo", leaveDialog).click());
-    assert.equal(calls.at(-1), "leave");
+test("the header shows an icon-only leave action for non-owners and confirms leaving", async () => {
+  const { root, cleanup } = setup();
+  let leaves = 0;
+  const onLeaveGroup = async () => { leaves += 1; };
+  const button = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  try {
+    await act(async () => root.render(withIntl(groupScreen({ onDeleteGroup: noopAsync }))));
+    assert.equal(button("Sair do grupo"), null);
+    await act(async () => button("Editar grupo")!.click());
+    const ownerDialog = document.querySelector("dialog")!;
+    assert.ok(ownerDialog.querySelector("input"));
+    assert.ok(ownerDialog.querySelector("button[type='submit']"));
+    assert.match(ownerDialog.querySelector("section")?.textContent ?? "", /Zona de perigo.*Excluir/);
+    assert.doesNotMatch(ownerDialog.textContent ?? "", /Sair/);
+    await act(async () => button("Fechar")!.click());
+
+    await act(async () => root.render(withIntl(groupScreen({ group: { ...group, role: "admin" }, onLeaveGroup }))));
+    const edit = button("Editar grupo");
+    const leave = button("Sair do grupo");
+    assert.ok(edit);
+    assert.ok(leave);
+    assert.equal(edit.nextElementSibling, leave);
+    assert.equal(leave.textContent, "");
+    assert.ok(leave.classList.contains("hover:text-[var(--danger)]"));
+    assert.equal(leave.querySelector("svg")?.getAttribute("class"), edit.querySelector("svg")?.getAttribute("class"));
+    await act(async () => edit.click());
+    const adminDialog = document.querySelector("dialog")!;
+    assert.ok(adminDialog.querySelector("input"));
+    assert.ok(adminDialog.classList.contains("overflow-y-auto"));
+    const saveBar = adminDialog.querySelector("button[type='submit']")?.parentElement;
+    assert.ok(saveBar);
+    assert.ok(saveBar.classList.contains("sticky"));
+    assert.ok(saveBar.classList.contains("bottom-0"));
+    assert.doesNotMatch(adminDialog.textContent ?? "", /Sair do grupo/);
+    await act(async () => button("Fechar")!.click());
+
+    await act(async () => root.render(withIntl(groupScreen({ group: { ...group, role: "participant" }, onLeaveGroup }))));
+    assert.equal(button("Editar grupo"), null);
+    await act(async () => button("Sair do grupo")!.click());
+    const memberDialog = document.querySelector("dialog")!;
+    assert.equal(memberDialog.querySelector("h2")?.textContent, "Sair do grupo?");
+    assert.match(memberDialog.textContent ?? "", /Tudo seu neste grupo é apagado\./);
+    assert.equal(leaves, 0);
+    const confirm = [...memberDialog.querySelectorAll("button")].find((action) => action.textContent === "Confirmar saída");
+    assert.ok(confirm);
+    await act(async () => confirm.click());
+    assert.equal(leaves, 1);
+    assert.equal(document.querySelector("dialog"), null);
   } finally {
     await cleanup();
   }
