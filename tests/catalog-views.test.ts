@@ -89,3 +89,9 @@ test("the group shelf keeps the home end card and adds a catalogue button after 
   assert.match(group, />3<\/span>.*mais em Coleção.*Ver tudo/);
   assert.match(home, /Ver tudo/);
 });
+
+test("an empty group catalogue has no shelf, even for managers", () => {
+  const props = { canManage: true, onOpenCatalog: () => undefined, data: { libraries: [], counts: {}, items: [] } };
+  assert.equal(renderWithIntl(createElement(CatalogShelfView, { ...props, scope: { groupId: "g" } })), "");
+  assert.match(renderWithIntl(createElement(CatalogShelfView, { ...props, scope: "personal" })), /Comece a coleção/);
+});

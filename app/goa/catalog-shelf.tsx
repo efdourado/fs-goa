@@ -53,7 +53,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
   const remaining = Math.max(0, Math.max(total, sorted.length) - visible.length);
 
   if (data === null) return <CatalogShelfSkeleton title={title} />;
-  if (!sorted.length && !canManage) return null;
+  if (!sorted.length && (!personal || !canManage)) return null;
 
   return (
     <section>
