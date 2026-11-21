@@ -1177,6 +1177,8 @@
     "showOptional": "Show optional fields ({count})",
     "showMore": "Show {count} more",
     "showLess": "Show less",
+    "logged": "Logged.",
+    "removeLog": "Remove",
     "saveEntry": "Save entry",
     "editAnswer": "Edit answer",
     "readOnly": "This entry is read-only.",

@@ -56,6 +56,9 @@ export function logRange(input: {
     from = earlier(from, logged[0]);
     to = later(to, logged[logged.length - 1]);
   }
+  // A dated challenge's own period is the hard edge: a stray log outside it never opens days the server refuses.
+  if (startsOn) from = later(from, startsOn);
+  if (endsOn) to = earlier(to, endsOn);
   if (to < from) to = from;
   return { from, to };
 }

@@ -51,6 +51,7 @@ import {
   ChallengeStatusBadge,
   CommentText,
   cx,
+  CircleCheckIcon,
   EmptyState,
   FaceEmptyState,
   inputClass,
@@ -269,7 +270,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const [success, setSuccess] = useState<string | null>(null);
   // An already-answered checkpoint opens as a summary; editing is opt-in.
   const hasAnswer = (answers: Record<Id, unknown>) => fields.some((field) => field.id && answers[field.id] !== undefined && answers[field.id] !== null && answers[field.id] !== "");
-  const [localEditing, setEditing] = useState(alwaysEditable || !entry || !hasAnswer(values));
+  // Every field optional (a habit's check-in, "Terminei"): the entry itself is the answer, a note is extra. It can be
+  // saved with nothing typed, a saved one reads as logged (locked) even with no note, and it can be removed.
+  const markOnly = !fields.some((field) => field.id && field.required);
+  const logged = markOnly && Boolean(entry);
+  const [localEditing, setEditing] = useState(alwaysEditable || !entry || (!hasAnswer(values) && !markOnly));
   const editing = editingOverride ?? localEditing;
   const [baseline, setBaseline] = useState(values);
   const missingRequired = findMissingRequiredField(fields, values);
@@ -349,7 +354,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // this in one go instead of each showing its own Save button.
   async function performSubmit(): Promise<boolean> {
     if (!canEdit || !editing || busy || deleting) return false;
-    if (!dirty) return true;
+    if (!dirty && !(markOnly && !entry)) return true;
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
       // No separate delete button: clearing the required answer (e.g. tapping
@@ -381,7 +386,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
       await onSave(values, entry);
       setBaseline(values);
       setSuccess(entry ? t("entryUpdated") : t("entrySaved"));
-      if (!alwaysEditable) setEditing(!hasAnswer(values));
+      if (!alwaysEditable) setEditing(!hasAnswer(values) && !markOnly);
       return true;
     } catch (cause) {
       setError(f.error(cause));
@@ -413,7 +418,19 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
 
   // Only a saved, nonempty response has a header edit button. Save appears while
   // editing and becomes available for a changed, valid response.
-  const canReopen = !hideEditButton && canEdit && hasAnswer(baseline);
+  const canReopen = !hideEditButton && canEdit && (hasAnswer(baseline) || logged);
+
+  async function removeLog() {
+    if (!onDelete || busy || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await onDelete();
+    } catch (cause) {
+      setError(f.error(cause));
+      setDeleting(false);
+    }
+  }
   const interactive = canEdit && editing;
   const showsButtons = canEdit && editing;
   // A response named after its one field ("Final score" over a "Final score" input) says it once:
@@ -516,10 +533,14 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             {showOptional ? t("showLess") : t("showMore", { count: overflowOptional.length })}
           </StateButton>
         ) : null}
+        {/* Logged with no note: say so, rather than drawing an empty form. */}
+        {logged && !interactive && !hasAnswer(values) ? <p className="flex items-center gap-2 text-sm text-[var(--muted)]"><CircleCheckIcon className="h-4 w-4 flex-none text-[var(--main)]" />{t("logged")}</p> : null}
         <StatusMessage error={error} success={success} />
         {showsButtons && !hideOwnSaveButton ? (
           <div className="flex gap-2">
-            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={!interactive || busy || deleting || !dirty || !ready}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
+            {/* A check-in has no required answer to clear, so un-logging it is its own button: left of Save, the same width. */}
+            {logged && onDelete ? <Button type="button" variant="secondary" className="flex-1" disabled={busy || deleting} onClick={() => void removeLog()}>{deleting ? tp("deletingEntry") : t("removeLog")}</Button> : null}
+            {!hideOwnSaveButton ? <Button type="submit" className="flex-1" disabled={!interactive || busy || deleting || (!dirty && !(markOnly && !entry)) || !ready}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("save") : t("saveEntry")}<ArrowRightIcon /></Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
         {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: timeZone ? f.itemDeadline(item, timeZone) ?? "" : f.dateTime(item.dueAt) })}</p> : null}

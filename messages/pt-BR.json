@@ -1177,6 +1177,8 @@
     "showOptional": "Mostrar campos opcionais ({count})",
     "showMore": "Mostrar mais {count}",
     "showLess": "Mostrar menos",
+    "logged": "Registrado.",
+    "removeLog": "Remover",
     "saveEntry": "Salvar registro",
     "editAnswer": "Editar resposta",
     "readOnly": "Este registro está disponível somente para leitura.",

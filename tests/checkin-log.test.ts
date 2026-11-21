@@ -43,6 +43,8 @@ test("sem datas, mostra as últimas cinco semanas e recua até o primeiro regist
   assert.deepEqual(logRange({ today: "2026-09-28" }), { from: "2026-08-25", to: "2026-09-28" });
   assert.equal(dayList("2026-08-25", "2026-09-28").length, 35);
   assert.deepEqual(logRange({ today: "2026-09-28", loggedDays: ["2026-09-20", "2026-07-01"] }), { from: "2026-07-01", to: "2026-09-28" });
+  // Past the end (reopened, a stray log after it): the strip still stops at the challenge's own period.
+  assert.deepEqual(logRange({ today: "2026-11-21", startsOn: "2026-07-15", endsOn: "2026-08-14", loggedDays: ["2026-08-14", "2026-11-20"] }), { from: "2026-07-15", to: "2026-08-14" });
 });
 
 test("a sequência conta os dias seguidos até hoje, ou até ontem enquanto hoje está em aberto", () => {

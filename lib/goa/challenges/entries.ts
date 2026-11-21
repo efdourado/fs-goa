@@ -125,7 +125,8 @@ async function writeEntryValues(
     if (!validation.ok) {
       throw new ApiError(400, "invalid_entry_value", `${field.label}: ${validation.message}`, { fieldId: field.id, code: validation.code });
     }
-    if (validation.value === null) continue;
+    // An empty text (a note left blank) is no answer: nothing is stored, and a note cleared on edit goes away.
+    if (validation.value === null || (field.kind === "text" && String(validation.value).trim() === "")) continue;
     presentFieldIds.push(field.id);
     const columns: [string | null, number | null, boolean | null, string | null, string | null] = [null, null, null, null, null];
     if (field.kind === "text") columns[0] = validation.value as string;
