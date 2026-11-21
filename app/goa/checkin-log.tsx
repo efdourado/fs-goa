@@ -162,11 +162,17 @@ export function CheckinLog({
   const formatDate = useGoaFormat();
   const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
 
-  const registerLabel = (day: string) => day === today ? t("registerToday") : day === addDays(today, -1) ? t("registerYesterday") : t("registerOnDate", { date: formatDate.date(day) });
+  // A day already logged is edited, not logged again: "Edit today's log" instead of "+ Log for today".
+  const registerLabel = (day: string) => records.has(day)
+    ? day === today ? t("editToday") : day === addDays(today, -1) ? t("editYesterday") : t("editOnDate", { date: formatDate.date(day) })
+    : day === today ? t("registerToday") : day === addDays(today, -1) ? t("registerYesterday") : t("registerOnDate", { date: formatDate.date(day) });
   const actionLabel = counterFinished ? t("correct") : registerLabel(selectedDay);
 
   function openCorrection() {
-    setCorrectionDay(!counterFinished || records.has(selectedDay) ? selectedDay : [...records.keys()].filter((day) => day <= today).sort().at(-1) ?? selectedDay);
+    // A finished book corrects the day picked on the strip, logged or not (a forgotten day can still be added). Only
+    // the default landing (today, nothing logged on it) falls back to the last day that has a log.
+    const lastLogged = [...records.keys()].filter((day) => day <= today).sort().at(-1);
+    setCorrectionDay(counterFinished && selectedDay === today && !records.has(today) && lastLogged ? lastLogged : selectedDay);
     setCorrecting(true);
   }
 
@@ -233,7 +239,7 @@ export function CheckinLog({
 
       {counter ? (
         canEdit ? <StateButton type="button" aria-label={actionLabel} onClick={openCorrection} className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ink)] transition hover:opacity-70">
-          {counterFinished ? <SlidersIcon className="h-4 w-4" /> : <span className="text-lg leading-none" aria-hidden="true">＋</span>}
+          {counterFinished || records.has(selectedDay) ? <SlidersIcon className="h-4 w-4" /> : <span className="text-lg leading-none" aria-hidden="true">＋</span>}
           {actionLabel}
         </StateButton> : unavailableMessage ? <p className="text-sm text-[var(--muted)]">{unavailableMessage}</p> : null
       ) : (

@@ -510,7 +510,7 @@ test('book totals block overflow without an editions warning and yesterday gets 
  try {
   await ui.render(<CheckinLog from={day} to="2026-09-28" today="2026-09-28" selectedDay={day} onSelectDay={()=>{}} canEdit records={new Map([[day,{entry:{id:'read',values:{answer:8}} as Entry,value:8}]])} counter={{field:field as ChallengeField,notes:[],total:10,book:true,entry:'position',paceFrom:day,paceTo:null,onSave:async()=>{saves++;}}} />);
   assert.equal(document.querySelector('form'),null);
-  await act(async () => ui.button('Registrar para ontem').click());
+  await act(async () => ui.button('Editar o registro de ontem').click());
   assert.match(document.body.textContent!,/Sua resposta para ontem/);
   await ui.fill(document.querySelector<HTMLInputElement>('#checkin-amount')!,'11');
   assert.equal(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled,true);

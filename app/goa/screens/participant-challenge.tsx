@@ -55,7 +55,6 @@ import {
   FaceEmptyState,
   inputClass,
   labelClass,
-  PencilIcon,
   sectionLabelClass,
   SearchField,
   Select,
@@ -80,11 +79,12 @@ import {
 // Loaded when first opened: it brings the PDF's own fonts and print sheet.
 const ExportModal = dynamic(() => import("../export/export-modal").then((module) => module.ExportModal), { ssr: false });
 
+/** A saved answer is locked (closed padlock, tap to edit); while editing the padlock stands open (tap to lock it again). */
 function ResponseEditIcon({ editing }: { editing: boolean }) {
-  if (!editing) return <PencilIcon />;
   return (
     <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m4 4 8 8m0-8-8 8" />
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+      {editing ? <path d="M5.5 7V5.2a2.5 2.5 0 0 1 4.9-.7" /> : <path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" />}
     </svg>
   );
 }
