@@ -5,7 +5,8 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
-import { defaultShowcaseBlocks, ShowcaseView } from "@/app/goa/showcase-view";
+import { defaultShowcaseBlocks } from "@/app/goa/showcase-blocks";
+import { ShowcaseView } from "@/app/goa/showcase-view";
 import { PublicStory } from "@/app/goa/story/public-view";
 import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "@/app/goa/types";
 

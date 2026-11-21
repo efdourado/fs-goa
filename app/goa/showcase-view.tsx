@@ -9,10 +9,10 @@ import { AffinityBlockView, PersonalRankingsBlock } from "./rankings-view";
 import type { AffinityBlock, ChallengeDetail, Metric, PersonalRanking, WrappedBlock } from "./types";
 import { CommentText, cx } from "./ui";
 import { metricHasData, metricTheme } from "./utils";
+import { defaultShowcaseBlocks, type ShowcaseComment } from "./showcase-blocks";
 
 type Translator = ReturnType<typeof useTranslations>;
 
-type ShowcaseComment = { id: string; text: string; itemTitle?: string | null };
 type SeriesTheme = "ranking" | "debate" | "people";
 
 const CARDS_PER_PAGE = 4;
@@ -105,30 +105,6 @@ export function hasShowcaseContent(blocks: WrappedBlock[]): boolean {
     if (block.kind === "entry_value") return Boolean(block.comment?.text);
     return false;
   });
-}
-
-/**
- * Turns a never-curated round's raw result parts into the same block list the
- * curated path produces, so both render through one component.
- */
-export function defaultShowcaseBlocks(input: {
-  metrics?: Metric[];
-  personalRankings?: PersonalRanking[];
-  affinity?: AffinityBlock | null;
-  comments?: ShowcaseComment[];
-}): WrappedBlock[] {
-  const blocks: WrappedBlock[] = [];
-  let position = 0;
-  const add = (block: Omit<WrappedBlock, "position" | "visible">) =>
-    blocks.push({ ...block, position: position++, visible: true } as WrappedBlock);
-
-  for (const metric of (input.metrics ?? []).filter(metricHasData)) add({ id: metric.id, kind: "metric", metric });
-  if ((input.personalRankings?.length ?? 0) > 1) add({ id: "rankings", kind: "ranking", ranking: input.personalRankings });
-  if (input.affinity && input.affinity.pairs.length) add({ id: "affinity", kind: "affinity", affinity: input.affinity });
-  for (const comment of input.comments ?? []) {
-    add({ id: comment.id, kind: "entry_value", comment: { id: comment.id, text: comment.text, itemTitle: comment.itemTitle ?? undefined } });
-  }
-  return blocks;
 }
 
 /**
