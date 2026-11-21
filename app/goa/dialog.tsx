@@ -9,9 +9,10 @@ import { useGoaFormat } from "./format";
 import { Button, cx, InModal, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
-export function Dialog({ title, children, onClose, busy = false, wide = false, stickyActions = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean; stickyActions?: boolean;
+export function Dialog({ title, children, onClose, busy = false, wide = false, stickyActions = false, storyWidth }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean; stickyActions?: boolean; storyWidth?: number | string;
 }) {
+  const story = storyWidth !== undefined;
   const tc = useTranslations("common");
   const ref = useRef<HTMLDialogElement>(null);
   const downOnBackdrop = useRef(false);
@@ -34,22 +35,30 @@ export function Dialog({ title, children, onClose, busy = false, wide = false, s
       onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
       onMouseDown={(event) => { downOnBackdrop.current = event.target === ref.current; }}
       onClick={(event) => { if (!busy && downOnBackdrop.current && event.target === ref.current) onClose(); }}
-      className={cx("fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-[var(--elevate-2)] [scrollbar-color:var(--control-line)_var(--paper)] [scrollbar-width:thin] backdrop:bg-[var(--scrim)]", wide ? "max-w-3xl" : "max-w-xl", stickyActions && "scroll-pb-20")}
+      className={cx(
+        "fixed inset-0 m-auto bg-[var(--paper)] p-0 text-[var(--ink)] shadow-[var(--elevate-2)] backdrop:bg-[var(--scrim)]",
+        story
+          ? "h-dvh max-h-none w-full max-w-none overflow-hidden open:flex open:flex-col sm:h-[850px] sm:max-h-[calc(100dvh-2rem)] sm:max-w-[440px] sm:rounded-3xl sm:border sm:border-[var(--line)]"
+          : cx("max-h-[90dvh] w-[calc(100%-2rem)] overflow-y-auto rounded-3xl border border-[var(--line)] [scrollbar-color:var(--control-line)_var(--paper)] [scrollbar-width:thin]", wide ? "max-w-3xl" : "max-w-xl", stickyActions && "scroll-pb-20"),
+      )}
     >
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
+      <div
+        className={cx("flex items-center justify-between gap-4 border-b border-[var(--line)]", story ? "mx-auto shrink-0 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]" : "px-6 py-4")}
+        style={{ width: storyWidth }}
+      >
         <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
         <StateButton
           type="button"
           onClick={() => { if (!busy) onClose(); }}
           disabled={busy}
           aria-label={tc("close")}
-          className={cx("-mr-1.5 grid h-8 w-8 flex-none place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40")}
+          className={cx("grid flex-none items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40", story ? "size-11 justify-items-end" : "-mr-1.5 size-8 justify-items-center")}
         >
           {/* Every modal closes with the circled minus. */}
-          <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
+          <svg viewBox="0 0 20 20" className={cx("size-5", story && "translate-x-0.5")} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
         </StateButton>
       </div>
-      <div className="p-6"><InModal.Provider value>{children}</InModal.Provider></div>
+      <div className={story ? "flex min-h-0 flex-1 flex-col" : "p-6"}><InModal.Provider value>{children}</InModal.Provider></div>
     </dialog>
   );
   /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */

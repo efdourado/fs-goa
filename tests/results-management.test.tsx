@@ -77,7 +77,7 @@ test("the first thread beads and streak outlines clear the label divider", () =>
   const story = buildStory(dated);
   assert.equal(story.kind, "dated");
   for (const fit of [false, true]) {
-    const html = renderWithIntl(createElement(DatedThread, { story, input: dated, focus: null, run: 0, fit }));
+    const html = renderWithIntl(createElement(DatedThread, { story, input: dated, focus: null, fit }));
     const divider = html.match(/<line x1="([\d.]+)" x2="\1"[^>]*stroke-opacity="0.08"/);
     const outlines = [...html.matchAll(/<rect x="([\d.]+)"[^>]*stroke-opacity="0.55"/g)];
     const beads = [...html.matchAll(/<circle cx="([\d.]+)" cy="[\d.]+" r="([\d.]+)"[^>]*stroke="var\(--spotlight\)"/g)];

@@ -1282,6 +1282,9 @@
     "emptyTitle": "No templates yet",
     "cardItems": "{count, plural, one {# item} other {# items}}",
     "cardMetrics": "{count, plural, one {# metric} other {# metrics}}",
+    "manage": "Manage",
+    "manageTitle": "Manage template",
+    "manageDescription": "Feature or unfeature to change front-page placement. Unpublish to remove the template from the public gallery.",
     "unpublish": "Unpublish",
     "detailLoading": "Loading template…",
     "duplicateCta": "Duplicate",
@@ -1309,8 +1312,8 @@
     "frontLede": "Track films, books, habits (anything) and watch it add up to a result worth sharing. These are real ones.",
     "moreTitle": "More templates",
     "seeResult": "See the whole result",
-    "feature": "Feature on the front page",
-    "unfeature": "Take off the front page",
+    "feature": "Feature",
+    "unfeature": "Unfeature",
     "storyInTune": "Most in tune",
     "storyCritic": "Toughest critic",
     "storyCriticNote": "average {average}",
@@ -1930,7 +1933,7 @@
     "you": "You"
   },
   "exportDoc": {
-    "button": "Download PDF",
+    "button": "PDF",
     "fileTitle": "{title} (log)",
     "download": "Download PDF",
     "printHint": "Choose “Save as PDF”.",
@@ -2053,8 +2056,6 @@
   "story": {
     "threadAria": "{count} people's ratings across {items} titles",
     "lanesAria": "{count} people's check-ins over {days} days",
-    "redraw": "Draw again",
-    "readRated": "Each line is one person, rising and falling with their rating. Where lines braid, you agreed; where they fan out, you split. The thick faint line is the group.",
     "readDated": "Each lane is one person: solid where they kept going, gaps where they stopped, bigger beads for bigger days. The outlined stretch is their longest run.",
     "showMore": "Show {count} more",
     "showMoreComment": "Show more",
@@ -2272,18 +2273,15 @@
       }
     },
     "download": {
-      "button": "Download highlights",
-      "title": "Highlights to share",
-      "lede": "Tap the images to pick them. Each one carries the challenge's name and numbers, shaped for stories.",
-      "one": "Download 1 image",
-      "all": "Download {count} (.zip)",
+      "button": "Results",
+      "title": "Results",
+      "steps": "Result images",
+      "goTo": "Image {index}: {title}",
+      "one": "Download image",
       "preparing": "Preparing…",
-      "format": "PNG images in 9:16 (1080 × 1920), the size of a story. All of them come in one .zip.",
-      "pickSome": "Pick the images",
-      "share": "{count, plural, one {Save 1 image} other {Save # images}}",
-      "selectAll": "Select all ({count})",
-      "clear": "Clear selection",
-      "formatShare": "9:16 images (1080 × 1920), ready for stories. They go straight to Photos or to the app you pick."
+      "retry": "Try again",
+      "saveError": "Couldn’t save the image. Try again.",
+      "shareOne": "Save image"
     },
     "duo": {
       "title": "The two of you",

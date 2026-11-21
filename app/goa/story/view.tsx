@@ -56,7 +56,6 @@ export function ThreadPanel({ input, story, fit = false, interactive = true, bar
   const t = useTranslations("story");
   const figures = useStoryFigures(story, input);
   const [focus, setFocus] = useState<Id | null>(null);
-  const [run, setRun] = useState(0);
   if (story.kind === "empty") return null;
   const ids = input.people.map((person) => person.id);
   const people = story.kind === "rated" ? story.threads.map((thread) => thread.person) : story.lanes.map((lane) => lane.person);
@@ -92,16 +91,14 @@ export function ThreadPanel({ input, story, fit = false, interactive = true, bar
             {firstName(person.name)}
           </StateButton>
         ))}
-        <span className="flex-1" />
-        {interactive ? <StateButton type="button" className="cursor-pointer text-xs text-white/60 hover:text-white" onClick={() => { setFocus(null); setRun((value) => value + 1); }}>↺ {t("redraw")}</StateButton> : null}
       </div>
 
       <div className="px-2 pb-5 sm:px-5">
         {story.kind === "rated"
-          ? <RatedThread story={story} input={input} focus={focus} run={run} fit={fit} />
-          : <DatedThread story={story} input={input} focus={focus} run={run} fit={fit} />}
+          ? <RatedThread story={story} input={input} focus={focus} fit={fit} />
+          : <DatedThread story={story} input={input} focus={focus} fit={fit} />}
       </div>
-      <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.kind === "rated" ? t("readRated") : story.lanes.length === 1 ? t("readSolo") : t(`readDated${story.rhythm === "week" ? "Week" : ""}`)}</p>
+      {story.kind === "dated" ? <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.lanes.length === 1 ? t("readSolo") : t(`readDated${story.rhythm === "week" ? "Week" : ""}`)}</p> : null}
     </div>
   );
 }

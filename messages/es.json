@@ -1286,6 +1286,9 @@
     "emptyTitle": "Ninguna plantilla todavía",
     "cardItems": "{count, plural, one {# ítem} other {# ítems}}",
     "cardMetrics": "{count, plural, one {# métrica} other {# métricas}}",
+    "manage": "Gestionar",
+    "manageTitle": "Gestionar plantilla",
+    "manageDescription": "El destacado controla si la plantilla aparece en portada. Despublicar retira la plantilla de la galería pública.",
     "unpublish": "Despublicar",
     "detailLoading": "Cargando plantilla…",
     "duplicateCta": "Duplicar",
@@ -1313,7 +1316,7 @@
     "frontLede": "Sigue películas, libros, hábitos (lo que quieras) y mira cómo todo se convierte en un resultado para compartir. Estos son reales.",
     "moreTitle": "Más plantillas",
     "seeResult": "Ver el resultado completo",
-    "feature": "Destacar en portada",
+    "feature": "Destacar",
     "unfeature": "Quitar de portada",
     "storyInTune": "Más en sintonía",
     "storyCritic": "Crítico más exigente",
@@ -1934,7 +1937,7 @@
     "you": "Tú"
   },
   "exportDoc": {
-    "button": "Descargar PDF",
+    "button": "PDF",
     "fileTitle": "{title} (registro)",
     "download": "Descargar PDF",
     "printHint": "Elige «Guardar como PDF».",
@@ -2057,8 +2060,6 @@
   "story": {
     "threadAria": "Notas de {count} personas en {items} títulos",
     "lanesAria": "Registros de {count} personas en {days} días",
-    "redraw": "Dibujar otra vez",
-    "readRated": "Cada línea es una persona, subiendo y bajando con su nota. Donde las líneas se trenzan, coincidieron; donde se abren, discreparon. La línea gruesa y tenue es el grupo.",
     "readDated": "Cada carril es una persona: continuo donde siguió, con huecos donde paró, cuentas más grandes en los días más grandes. El tramo contorneado es su racha más larga.",
     "showMore": "Ver {count} más",
     "showMoreComment": "Ver más",
@@ -2276,18 +2277,15 @@
       }
     },
     "download": {
-      "button": "Descargar destacados",
-      "title": "Destacados para compartir",
-      "lede": "Toca las imágenes para elegirlas. Cada una lleva el nombre del desafío y sus números, con forma de historia.",
-      "one": "Descargar 1 imagen",
-      "all": "Descargar {count} (.zip)",
+      "button": "Resultados",
+      "title": "Resultados",
+      "steps": "Imágenes de resultados",
+      "goTo": "Imagen {index}: {title}",
+      "one": "Descargar imagen",
       "preparing": "Preparando…",
-      "format": "Imágenes PNG en 9:16 (1080 × 1920), el tamaño de una historia. Todas vienen en un solo .zip.",
-      "pickSome": "Elige las imágenes",
-      "share": "{count, plural, one {Guardar 1 imagen} other {Guardar # imágenes}}",
-      "selectAll": "Seleccionar todas ({count})",
-      "clear": "Limpiar selección",
-      "formatShare": "Imágenes 9:16 (1080 × 1920), listas para historias. Van directo a Fotos o a la app que elijas."
+      "retry": "Intentar de nuevo",
+      "saveError": "No se pudo guardar la imagen. Inténtalo de nuevo.",
+      "shareOne": "Guardar imagen"
     },
     "duo": {
       "title": "Ustedes dos",

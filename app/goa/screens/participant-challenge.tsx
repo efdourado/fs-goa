@@ -591,8 +591,6 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
     } catch { /* leave it as it was */ }
   }
   return (
-    // On a phone the three are round icons in one row (their names stay for screen readers and on hover);
-    // from `sm:` up each carries its label.
     <div className="mt-8 flex flex-wrap gap-2">
       {/* Opens the PDF over the challenge (a modal), not a page of its own. */}
       <StateButton
@@ -600,16 +598,16 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
         onClick={onExport}
         aria-label={te("button")}
         title={te("button")}
-        className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[var(--spotlight-ink)] text-sm font-medium transition hover:opacity-90 sm:w-auto sm:px-4"
+        className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90"
       >
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
-          {/* A film strip: the challenge's whole log as one PDF (the arrow is "Download pages"). */}
+          {/* A film strip represents the challenge's whole log. */}
           <svg viewBox="0 0 20 20" className="size-[18px] flex-none sm:size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
             <rect x="3" y="2.75" width="14" height="14.5" rx="2" />
             <path d="M6.75 2.75v14.5M13.25 2.75v14.5" />
             <path d="M3 6.25h3.75M3 10h3.75M3 13.75h3.75M13.25 6.25H17M13.25 10H17M13.25 13.75H17" strokeLinecap="round" />
           </svg>
-          <span className="hidden sm:inline">{te("button")}</span>
+          <span>{te("button")}</span>
         </span>
       </StateButton>
       {extra}
@@ -1371,6 +1369,7 @@ export function ParticipantChallengeScreen({
   onCreateChallengeInvite,
   preview = false,
   previewActions,
+  previewEndActions,
   itemTools,
 }: {
   challenge: ChallengeDetail;
@@ -1398,8 +1397,10 @@ export function ParticipantChallengeScreen({
   /** Read-only public view (a published template): drops the Today tab and every
    *  entry form, keeps the header + rules + schedule + the Results showcase. */
   preview?: boolean;
-  /** A template preview's own actions (duplicate, front page, unpublish) — shown as pills in the challenge card. */
+  /** A template preview's actions before the Results button. */
   previewActions?: ReactNode;
+  /** Actions aligned to the far side of a template preview's card. */
+  previewEndActions?: ReactNode;
   /**
    * For whoever manages the challenge: add items and edit an item's details right from Today — the same
    * dialogs as Manage › Items.
@@ -1740,10 +1741,10 @@ export function ParticipantChallengeScreen({
                 />
               )
               : (
-                // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
                 <div className="mt-8 flex flex-wrap gap-2">
                   {previewActions}
-                  {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} metrics={challenge.metrics ?? []} /> : null}
+                  {previewStory ? <DownloadPagesButton compactOnMobile input={previewStory.input} story={previewStory.story} metrics={challenge.metrics ?? []} /> : null}
+                  {previewEndActions}
                 </div>
               )}
           </div>

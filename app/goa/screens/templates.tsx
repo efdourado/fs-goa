@@ -19,7 +19,7 @@ import type {
   SkippedProperty,
   User,
 } from "../types";
-import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, labelClass, PageHeading, Select, SelectableCards, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, labelClass, PageHeading, Select, SelectableCards, SlidersIcon, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -102,7 +102,7 @@ export function TemplateDetailScreen({
   backLabel?: string;
   onSignIn: () => void;
   onDuplicated: (result: { challengeId: Id }) => void;
-  onUnpublished?: () => void;
+  onUnpublished?: () => void | Promise<void>;
   csrfToken: string;
   autoCopy?: boolean;
 }) {
@@ -117,9 +117,9 @@ export function TemplateDetailScreen({
   const [copyError, setCopyError] = useState<string | null>(null);
   // Set when the copy worked but had to leave properties out — shown before opening the copy.
   const [copied, setCopied] = useState<CopyResult | null>(null);
-  const [unpublishing, setUnpublishing] = useState(false);
-  const [featuring, setFeaturing] = useState(false);
-  const [unpublishError, setUnpublishError] = useState<string | null>(null);
+  const [showManage, setShowManage] = useState(false);
+  const [managementBusy, setManagementBusy] = useState(false);
+  const [managementError, setManagementError] = useState<string | null>(null);
 
   const manageable = groups.filter((group) => group.role === "owner" || group.role === "admin");
 
@@ -163,58 +163,50 @@ export function TemplateDetailScreen({
     }
   }
 
-  async function unpublish() {
-    setUnpublishing(true);
-    setUnpublishError(null);
+  async function manage(action: "feature" | "unpublish") {
+    if (!canPublish || !detail || managementBusy) return;
+    setManagementBusy(true);
+    setManagementError(null);
     try {
-      await apiRequest(API_PATHS.challengeTemplate(challengeId), { method: "DELETE", csrfToken });
-      onUnpublished?.();
+      if (action === "unpublish") {
+        await apiRequest(API_PATHS.challengeTemplate(challengeId), { method: "DELETE", csrfToken });
+        await (onUnpublished ?? onBack)();
+        setShowManage(false);
+      } else {
+        const { featured } = await apiRequest<{ featured: boolean }>(API_PATHS.challengeTemplateFeatured(challengeId), {
+          method: "POST",
+          body: { featured: !detail.templateFeatured },
+          csrfToken,
+        });
+        setDetail((current) => current && { ...current, templateFeatured: featured });
+      }
     } catch (cause) {
-      setUnpublishError(f.error(cause));
-      setUnpublishing(false);
-    }
-  }
-
-  async function toggleFeatured() {
-    if (!detail) return;
-    const featured = !detail.templateFeatured;
-    setFeaturing(true);
-    setUnpublishError(null);
-    try {
-      await apiRequest(API_PATHS.challengeTemplateFeatured(challengeId), { method: "POST", body: { featured }, csrfToken });
-      setDetail({ ...detail, templateFeatured: featured });
-    } catch (cause) {
-      setUnpublishError(f.error(cause));
+      setManagementError(f.error(cause));
     } finally {
-      setFeaturing(false);
+      setManagementBusy(false);
     }
   }
 
-  // Pills on the dark challenge card, the same family as a challenge's "Download PDF" / "Download pages".
-  const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm transition disabled:cursor-default disabled:opacity-50";
-  const outline = "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5";
-  const headerActions = (
-    <>
-      <StateButton type="button" className={cx(pill, "bg-[var(--spotlight-ink)] font-medium hover:opacity-90")} onClick={() => (user ? setShowCopy(true) : onSignIn())}>
-        <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
-          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2" /><path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" /></svg>
-          {user ? t("duplicateCta") : t("signInToDuplicate")}
-        </span>
-      </StateButton>
-      {canPublish ? (
-        <StateButton type="button" className={cx(pill, outline)} disabled={featuring} onClick={() => void toggleFeatured()}>
-          <CirclePinIcon filled={Boolean(detail?.templateFeatured)} className="size-4 flex-none" />
-          {detail?.templateFeatured ? t("unfeature") : t("feature")}
-        </StateButton>
-      ) : null}
-      {canPublish ? (
-        <StateButton type="button" className={cx(pill, outline, "hover:border-[var(--main-2)] hover:text-[var(--main-2)]")} disabled={unpublishing} onClick={() => void unpublish()}>
-          <CircleMinusIcon className="size-4 flex-none" />
-          {t("unpublish")}
-        </StateButton>
-      ) : null}
-    </>
+  const duplicateButton = (
+    <StateButton type="button" className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90" onClick={() => (user ? setShowCopy(true) : onSignIn())}>
+      <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
+        <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2" /><path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" /></svg>
+        {user ? t("duplicateCta") : t("signInToDuplicate")}
+      </span>
+    </StateButton>
   );
+  const manageButton = canPublish ? (
+    <StateButton
+      type="button"
+      aria-label={t("manage")}
+      title={t("manage")}
+      className="ml-auto inline-flex min-h-11 w-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4"
+      onClick={() => { setManagementError(null); setShowManage(true); }}
+    >
+      <SlidersIcon className="size-4 flex-none" />
+      <span className="hidden sm:inline">{t("manage")}</span>
+    </StateButton>
+  ) : undefined;
 
   const body = error ? (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
@@ -237,10 +229,24 @@ export function TemplateDetailScreen({
         onTab={() => undefined}
         onBack={onBack}
         backLabel={backLabel}
-        previewActions={headerActions}
+        previewActions={duplicateButton}
+        previewEndActions={manageButton}
       />
-      {unpublishError ? (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6"><StatusMessage error={unpublishError} /></div>
+      {canPublish && showManage ? (
+        <Dialog title={t("manageTitle")} onClose={() => setShowManage(false)} busy={managementBusy}>
+          <p className="mb-4 text-sm leading-5 text-[var(--muted)]">{t("manageDescription")}</p>
+          <ModalActions>
+            <Button variant="secondary" disabled={managementBusy} onClick={() => void manage("feature")} className="whitespace-nowrap max-[374px]:px-2">
+              <CirclePinIcon filled={Boolean(detail.templateFeatured)} className="hidden size-4 flex-none min-[375px]:block" />
+              {detail.templateFeatured ? t("unfeature") : t("feature")}
+            </Button>
+            <Button variant="danger" disabled={managementBusy} onClick={() => void manage("unpublish")} className="whitespace-nowrap max-[374px]:px-2">
+              <CircleMinusIcon className="hidden size-4 flex-none min-[375px]:block" />
+              {t("unpublish")}
+            </Button>
+          </ModalActions>
+          <StatusMessage error={managementError} />
+        </Dialog>
       ) : null}
       {user && showCopy ? (
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>

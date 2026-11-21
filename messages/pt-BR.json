@@ -1282,6 +1282,9 @@
     "emptyTitle": "Nenhum modelo ainda",
     "cardItems": "{count, plural, one {# item} other {# itens}}",
     "cardMetrics": "{count, plural, one {# métrica} other {# métricas}}",
+    "manage": "Gerenciar",
+    "manageTitle": "Gerenciar modelo",
+    "manageDescription": "O destaque controla se o modelo aparece na capa. Despublicar retira o modelo da galeria pública.",
     "unpublish": "Despublicar",
     "detailLoading": "Carregando modelo…",
     "duplicateCta": "Duplicar",
@@ -1309,7 +1312,7 @@
     "frontLede": "Acompanhe filmes, livros, hábitos (o que quiser) e veja tudo virar um resultado que dá vontade de compartilhar. Estes são de verdade.",
     "moreTitle": "Mais modelos",
     "seeResult": "Ver o resultado completo",
-    "feature": "Destacar na capa",
+    "feature": "Destacar",
     "unfeature": "Tirar da capa",
     "storyInTune": "Mais em sintonia",
     "storyCritic": "Crítico mais exigente",
@@ -1930,7 +1933,7 @@
     "you": "Você"
   },
   "exportDoc": {
-    "button": "Baixar PDF",
+    "button": "PDF",
     "fileTitle": "{title} (registro)",
     "download": "Baixar PDF",
     "printHint": "Escolha “Salvar como PDF”.",
@@ -2053,8 +2056,6 @@
   "story": {
     "threadAria": "Notas de {count} pessoas em {items} títulos",
     "lanesAria": "Registros de {count} pessoas em {days} dias",
-    "redraw": "Desenhar de novo",
-    "readRated": "Cada linha é uma pessoa, subindo e descendo com a nota dela. Onde as linhas se trançam, vocês concordaram; onde se abrem, discordaram. A linha grossa e clara é o grupo.",
     "readDated": "Cada faixa é uma pessoa: contínua onde ela seguiu, com buracos onde parou, contas maiores nos dias maiores. O trecho contornado é a maior sequência dela.",
     "showMore": "Ver mais {count}",
     "showMoreComment": "Ver mais",
@@ -2272,18 +2273,15 @@
       }
     },
     "download": {
-      "button": "Baixar destaques",
-      "title": "Destaques para compartilhar",
-      "lede": "Toque nas imagens para escolher. Cada uma tem o nome do desafio e seus números, no formato dos stories.",
-      "one": "Baixar 1 imagem",
-      "all": "Baixar {count} (.zip)",
+      "button": "Resultados",
+      "title": "Resultados",
+      "steps": "Imagens de resultados",
+      "goTo": "Imagem {index}: {title}",
+      "one": "Baixar imagem",
       "preparing": "Preparando…",
-      "format": "Imagens PNG em 9:16 (1080 × 1920), o tamanho dos stories. Todas vêm num único .zip.",
-      "pickSome": "Escolha as imagens",
-      "share": "{count, plural, one {Salvar 1 imagem} other {Salvar # imagens}}",
-      "selectAll": "Selecionar todas ({count})",
-      "clear": "Limpar seleção",
-      "formatShare": "Imagens 9:16 (1080 × 1920), prontas para os stories. Vão direto para Fotos ou para o app que você escolher."
+      "retry": "Tentar de novo",
+      "saveError": "Não foi possível salvar. Tente de novo.",
+      "shareOne": "Salvar imagem"
     },
     "duo": {
       "title": "Vocês dois",

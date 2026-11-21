@@ -43,7 +43,7 @@ function smoothPaths(points: Array<{ x: number; y: number } | null>, low = -Infi
  * they didn't. Lines that braid are people who agree; where they fan out, the group split. Notes pinned
  * on top say what happened there. Tap a name in the legend to follow one line.
  */
-export function RatedThread({ story, input, focus, run, fit = false }: { story: RatedStory; input: StoryInput; focus: Id | null; run: number; fit?: boolean }) {
+export function RatedThread({ story, input, focus, fit = false }: { story: RatedStory; input: StoryInput; focus: Id | null; fit?: boolean }) {
   const t = useTranslations("story");
   const nf = useFormatter();
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
@@ -102,7 +102,7 @@ export function RatedThread({ story, input, focus, run, fit = false }: { story: 
 
   return (
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
-      <div key={run} className="relative" style={{ width: contentWidth || "100%", height: HEIGHT + 64 }}>
+      <div className="relative" style={{ width: contentWidth || "100%", height: HEIGHT + 64 }}>
         <svg width={contentWidth} height={HEIGHT} className="absolute left-0 top-0 block" role="img" aria-label={t("threadAria", { count: input.people.length, items: count })}>
           {ticks.map((tick) => (
             <g key={tick}>

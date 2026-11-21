@@ -19,7 +19,7 @@ const PLOT_PADDING = 12;
  * stopped. A day with a number is a bead sized by it. Each lane's longest run is outlined and named.
  * It draws itself left to right, like the days did.
  */
-export function DatedThread({ story, input, focus, run, fit = false }: { story: DatedStory; input: StoryInput; focus: Id | null; run: number; fit?: boolean }) {
+export function DatedThread({ story, input, focus, fit = false }: { story: DatedStory; input: StoryInput; focus: Id | null; fit?: boolean }) {
   const t = useTranslations("story");
   const f = useFormatter();
   const ref = useRef<HTMLDivElement>(null);
@@ -32,7 +32,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
     return () => observer.disconnect();
   }, []);
 
-  if (story.lanes.length === 1) return <SoloRhythm story={story} input={input} run={run} />;
+  if (story.lanes.length === 1) return <SoloRhythm story={story} input={input} />;
   const total = daysBetween(story.from, story.to) + 1;
   // Leave room for the first bead and streak outline past the label divider.
   const plotStart = LABEL + PLOT_PADDING;
@@ -56,7 +56,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
 
   return (
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
-      <div key={run} className="story-sweep relative" style={{ width: contentWidth || "100%", height }}>
+      <div className="story-sweep relative" style={{ width: contentWidth || "100%", height }}>
         <svg width={contentWidth} height={height} className="block" role="img" aria-label={t("lanesAria", { count: story.lanes.length, days: total })}>
           {ruler.map((day) => {
             const tick = day === story.from ? LABEL : x(day) - dayWidth / 2;
@@ -110,7 +110,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
  * one column per week, as tall as the days they showed up, the number on top, the months underneath. The
  * weeks of their longest run are brighter.
  */
-function SoloRhythm({ story, input, run }: { story: DatedStory; input: StoryInput; run: number }) {
+function SoloRhythm({ story, input }: { story: DatedStory; input: StoryInput }) {
   const t = useTranslations("story");
   const f = useFormatter();
   const ref = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ function SoloRhythm({ story, input, run }: { story: DatedStory; input: StoryInpu
 
   return (
     <div ref={ref} className="w-full">
-      <svg key={run} width={W} height={height} viewBox={`0 0 ${W} ${height}`} className="story-sweep block h-auto w-full" role="img" aria-label={t("soloAria", { days: lane.days.length, weeks })}>
+      <svg width={W} height={height} viewBox={`0 0 ${W} ${height}`} className="story-sweep block h-auto w-full" role="img" aria-label={t("soloAria", { days: lane.days.length, weeks })}>
         <line x1={pad} x2={W - pad} y1={base} y2={base} stroke="currentColor" strokeOpacity={0.18} />
         {counts.map((count, week) => {
           // A bar never gets wider than a thumb, however few the weeks: it sits centred in its week.
