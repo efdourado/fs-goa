@@ -522,7 +522,8 @@ function isWide(node: ReactNode): boolean {
  * Two columns from `@2xl`, and never an empty cell: between full-width sections, a section left alone in its row
  * (an odd one out) takes the whole row.
  */
-function Grid({ children }: { children: ReactNode }) {
+/** `stack`: on a story image these cards always go one under another (each reads at full width), never side by side. */
+function Grid({ children, stack = false }: { children: ReactNode; stack?: boolean }) {
   const nodes = Children.toArray(children);
   const lone = new Set<number>();
   let run: number[] = [];
@@ -531,7 +532,7 @@ function Grid({ children }: { children: ReactNode }) {
   close();
   return (
     // `data-story-grid`: a downloaded story lays these cards out itself (all stacked, or some side by side), see pages.tsx.
-    <div className="grid gap-4 @2xl:grid-cols-2" data-story-grid="">
+    <div className="grid gap-4 @2xl:grid-cols-2" data-story-grid="" data-story-stack={stack ? "" : undefined}>
       {nodes.map((node, index) => (lone.has(index) ? <div key={index} className="grid min-w-0 @2xl:[grid-column:1/-1]">{node}</div> : node))}
     </div>
   );
@@ -987,7 +988,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
         echoed: !s.surprises.length && !s.properties.length,
         body: (
-          <Grid>
+          // The time each and the guesses against reality read best one under the other on a story.
+          <Grid stack>
             {s.totals.minutes ? (() => {
               const minutes = s.totals.minutes;
               const days = Math.floor(minutes / 1440);

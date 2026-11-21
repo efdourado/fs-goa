@@ -79,7 +79,8 @@ function FitBox({ children }: { children: ReactNode }) {
         grid.style.gridTemplateColumns = tiling.every(Boolean) ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))";
         cards.forEach((card, index) => { card.style.gridColumn = tiling[index] ? "1 / -1" : "auto"; });
       };
-      const tilings = cards.length > 1 && cards.length <= MAX_TILED_CARDS
+      // A grid marked `data-story-stack` (see the almanac's `Grid stack`) only ever stacks its cards.
+      const tilings = cards.length > 1 && cards.length <= MAX_TILED_CARDS && !grid?.matches("[data-story-stack]")
         ? cardTilings(cards.map((card) => card.matches("[data-story-wide]") || Boolean(card.querySelector(":scope > [data-story-wide]"))))
         : [cards.map(() => true)];
       let chosen = { tiling: tilings[0], scale: 0, full: -1 };
