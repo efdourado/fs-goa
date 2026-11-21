@@ -2032,11 +2032,10 @@
   },
   "taste": {
     "title": "Who shares your taste",
-    "basis": "{count, plural, one {from the # title you've rated here} other {from the # titles you've rated here}}",
-    "replay": "Play again",
     "personAria": "{name}: {agreement}% in agreement, {count} titles in common",
     "withName": "You and {name}",
     "verdict": {
+      "same": "The same taste: you gave every title you share the same score.",
       "twins": "Practically the same taste.",
       "close": "You usually agree.",
       "mixed": "Sometimes yes, sometimes no.",
@@ -2044,6 +2043,7 @@
     },
     "inCommon": "{count, plural, one {Based on # title you both rated} other {Based on # titles you both rated}}",
     "closestOn": "Closest on",
+    "closestAmong": "Among the {count} closest",
     "furthestOn": "Furthest apart on",
     "scores": "you {you}, {name} {them}",
     "groupTwins": "{a} and {b} are the group's twins ({agreement}%).",

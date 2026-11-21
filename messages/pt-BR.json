@@ -2032,11 +2032,10 @@
   },
   "taste": {
     "title": "Quem tem o seu gosto",
-    "basis": "{count, plural, one {a partir do # título que você avaliou aqui} other {a partir dos # títulos que você avaliou aqui}}",
-    "replay": "Ver de novo",
     "personAria": "{name}: {agreement}% de concordância, {count} títulos em comum",
     "withName": "Você e {name}",
     "verdict": {
+      "same": "O mesmo gosto: vocês deram a mesma nota a todos os títulos em comum.",
       "twins": "Praticamente o mesmo gosto.",
       "close": "Vocês costumam concordar.",
       "mixed": "Às vezes sim, às vezes não.",
@@ -2044,6 +2043,7 @@
     },
     "inCommon": "{count, plural, one {Com base em # título que os dois avaliaram} other {Com base em # títulos que os dois avaliaram}}",
     "closestOn": "Mais perto em",
+    "closestAmong": "Entre os {count} mais perto",
     "furthestOn": "Mais longe em",
     "scores": "você {you}, {name} {them}",
     "groupTwins": "{a} e {b} são os gêmeos do grupo ({agreement}%).",

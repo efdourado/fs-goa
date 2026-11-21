@@ -31,6 +31,10 @@ export interface TastePerson {
   /** The title you two were closest on, and the one you were furthest apart on. */
   twin: TasteMoment | null;
   clash: TasteMoment | null;
+  /** How many shared titles tie with `twin` for the smallest gap (1 = it stands alone). */
+  twinTies: number;
+  /** Every shared title got the same score from both of you. */
+  identical: boolean;
 }
 
 export interface TastePair {
@@ -116,6 +120,7 @@ export async function groupTaste(session: SessionContext, groupId: string): Prom
       // Closest: smallest gap, the one you both liked most breaking ties. Furthest: only a real disagreement.
       const twin = [...shared].sort((x, y) => gap(x) - gap(y) || (y.mine.norm + y.theirs.norm) - (x.mine.norm + x.theirs.norm))[0];
       const clash = [...shared].sort((x, y) => gap(y) - gap(x))[0];
+      const twinTies = twin ? shared.filter((pair) => Math.abs(gap(pair) - gap(twin)) < 1e-9).length : 0;
       const moment = (pair: (typeof shared)[number] | undefined) => pair
         ? { title: pair.mine.title, you: Math.round(pair.mine.raw * 10) / 10, them: Math.round(pair.theirs.raw * 10) / 10 }
         : null;
@@ -126,6 +131,8 @@ export async function groupTaste(session: SessionContext, groupId: string): Prom
         agreement,
         twin: moment(twin),
         clash: clash && gap(clash) >= 0.3 ? moment(clash) : null,
+        twinTies,
+        identical: agreement !== null && shared.every((pair) => gap(pair) < 1e-9),
       });
     }
     people.sort((x, y) => (y.agreement ?? -1) - (x.agreement ?? -1) || y.shared - x.shared);

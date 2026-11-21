@@ -3,17 +3,16 @@
 import { StateButton } from "./state-button";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type CSSProperties, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import type { Id } from "./types";
 import { AvatarMark, cx } from "./ui";
 
 interface TasteMoment { title: string; you: number; them: number }
-interface TastePerson { userId: Id; name: string; shared: number; agreement: number | null; twin: TasteMoment | null; clash: TasteMoment | null }
+interface TastePerson { userId: Id; name: string; shared: number; agreement: number | null; twin: TasteMoment | null; clash: TasteMoment | null; twinTies: number; identical: boolean }
 interface TastePair { a: { userId: Id; name: string }; b: { userId: Id; name: string }; agreement: number; shared: number }
-interface GroupTaste { viewerId: Id; minShared: number; ratedCount: number; people: TastePerson[]; twins: TastePair | null; opposites: TastePair | null }
-
+interface GroupTaste { viewerId: Id; minShared: number; people: TastePerson[]; twins: TastePair | null; opposites: TastePair | null }
 
 /** Agreement as a colour: close in taste is green, far is coral — same language as the reveal. */
 function toneFor(agreement: number): string {
@@ -22,15 +21,19 @@ function toneFor(agreement: number): string {
   return "var(--main-2)";
 }
 
-/**
- * How far out someone sits (as % of the map's width) for an agreement score. Real scores live between
- * about 40% and 100% — mapping that band onto the whole map keeps "close" and "far" visibly different.
- */
-const radiusFor = (agreement: number) => 11 + Math.min(1, Math.max(0, (100 - agreement) / 60)) * 33;
-const RINGS = [90, 75, 60];
+const INNER_RADIUS = 13;
+const OUTER_RADIUS = 40;
+const MAX_MAP_PEOPLE = 6;
+/** Radial weight of a collapsed run of empty bands, against 1 for a band someone sits in. */
+const COLLAPSED_GAP = 0.6;
+/** Markers sit on an arc that leaves the top axis clear for the ring labels. */
+const ARC_START = -54;
+const ARC_SPAN = 288;
+/** Minimum centre-to-centre distance (viewBox units): a 10-unit marker plus its % tag. */
+const MARKER_GAP = 13;
 
 /**
- * "Who shares your taste": you in the middle, everyone else drifting in until they sit as close to you as
+ * "Who shares your taste": you in the middle, everyone else sitting as close to you as
  * your ratings of the same titles are — across every challenge the group ran. Tap someone for the title
  * you agreed on most and the one you didn't. Every distance says what it is built on ("4 in common").
  */
@@ -39,7 +42,6 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
   const nf = useFormatter();
   const [taste, setTaste] = useState<GroupTaste | null>(null);
   const [selectedId, setSelectedId] = useState<Id | null>(null);
-  const [run, setRun] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -51,79 +53,123 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
 
   if (!taste || !taste.people.length) return null;
   const scored = taste.people.filter((person): person is TastePerson & { agreement: number } => person.agreement !== null);
+  // The API lists the closest scores first. For larger groups, keep both ends of that list.
+  const matchesPerEnd = MAX_MAP_PEOPLE / 2;
+  const plotted = scored.length > MAX_MAP_PEOPLE
+    ? [...scored.slice(0, matchesPerEnd), ...scored.slice(-matchesPerEnd)]
+    : scored;
   const waiting = taste.people.filter((person) => person.agreement === null);
-  const selected = scored.find((person) => person.userId === selectedId) ?? scored[0] ?? null;
+  const selected = plotted.find((person) => person.userId === selectedId) ?? plotted[0] ?? null;
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   // A pair that includes the viewer names them "You", first.
   const pairNames = (pair: TastePair) => pair.b.userId === taste.viewerId
     ? { a: youLabel, b: pair.a.name }
     : { a: pair.a.userId === taste.viewerId ? youLabel : pair.a.name, b: pair.b.name };
 
-  // Ring labels go in the gap between the first two people, where no avatar can sit.
-  const labelAngle = (-90 + 180 / Math.max(1, scored.length) + (scored.length === 2 ? 30 : 0)) * (Math.PI / 180);
-  // Spread people round the circle, closest first from the top, so the layout is stable between visits.
-  const placed = scored.map((person, index) => {
-    const angle = (-90 + (index * 360) / scored.length + (scored.length === 2 ? 30 : 0)) * (Math.PI / 180);
-    const radius = radiusFor(person.agreement);
-    return { person, index, x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius, dx: Math.cos(angle), dy: Math.sin(angle) };
-  });
+  // Rings mark bands of `ringStep`. A band someone sits in keeps its full width; a run of two or more
+  // empty bands collapses into one thin gap, so 85–100 and 0–10 don't leave 40–60 rings standing in between.
+  // Built from the people on the map only: someone left off it must not hold a ring open.
+  const lowest = plotted.reduce((min, person) => Math.min(min, person.agreement), 100);
+  const ringStep = lowest >= 70 ? 10 : 20;
+  const floor = Math.min(70, Math.floor(lowest / ringStep) * ringStep);
+  const bandOf = (agreement: number) => Math.min(Math.floor(agreement / ringStep), 100 / ringStep - 1);
+  const occupied = new Set(plotted.map((person) => bandOf(person.agreement)));
+  const stops: Array<{ value: number; depth: number }> = [{ value: 100, depth: 0 }];
+  for (let band = 100 / ringStep - 1, depth = 0; band * ringStep >= floor;) {
+    let next = band;
+    if (occupied.has(band)) next = band - 1;
+    else while (next * ringStep >= floor && !occupied.has(next)) next -= 1;
+    const run = band - next;
+    depth += occupied.has(band) || run === 1 ? 1 : COLLAPSED_GAP;
+    stops.push({ value: (next + 1) * ringStep, depth });
+    band = next;
+  }
+  const rings = stops.map((stop) => stop.value);
+  const totalDepth = stops.at(-1)!.depth || 1;
+  const radiusFor = (agreement: number) => {
+    const index = Math.max(1, stops.findIndex((stop) => stop.value <= agreement));
+    const upper = stops[index - 1];
+    const lower = stops[index] ?? upper;
+    const share = upper.value === lower.value ? 0 : (upper.value - agreement) / (upper.value - lower.value);
+    const depth = upper.depth + share * (lower.depth - upper.depth);
+    return INNER_RADIUS + depth * (OUTER_RADIUS - INNER_RADIUS) / totalDepth;
+  };
+  // Seat people alternately from the closest and the furthest end, so near scores (100% and 98%) never sit
+  // side by side; then nudge any two markers that still touch apart along their own ring. The radius stays exact.
+  const seating = plotted.map((_, index) => (index % 2 === 0 ? index / 2 : plotted.length - 1 - (index - 1) / 2));
+  const seated = seating.map((index) => plotted[index]);
+  const radii = seated.map((person) => radiusFor(person.agreement));
+  const degrees = seated.map((_, index) => (seated.length === 1 ? 0 : ARC_START + ARC_SPAN * (index + 0.5) / seated.length));
+  const pointAt = (index: number) => {
+    const angle = degrees[index] * Math.PI / 180;
+    return { x: 50 + Math.cos(angle) * radii[index], y: 50 + Math.sin(angle) * radii[index] };
+  };
+  for (let pass = 0; pass < 120; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < seated.length; i += 1) {
+      for (let j = i + 1; j < seated.length; j += 1) {
+        const a = pointAt(i);
+        const b = pointAt(j);
+        const gap = Math.hypot(a.x - b.x, a.y - b.y);
+        if (gap >= MARKER_GAP) continue;
+        const nudge = ((MARKER_GAP - gap) / 2 / Math.min(radii[i], radii[j])) * 180 / Math.PI;
+        const direction = degrees[i] <= degrees[j] ? 1 : -1;
+        degrees[i] = Math.max(ARC_START, Math.min(ARC_START + ARC_SPAN, degrees[i] - direction * nudge));
+        degrees[j] = Math.max(ARC_START, Math.min(ARC_START + ARC_SPAN, degrees[j] + direction * nudge));
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  const placed = seated.map((person, index) => ({ person, ...pointAt(index) }));
 
   return (
     <section>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
-          <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("title")}</h2>
-          {taste.ratedCount > 0 ? <span className="text-xs text-[var(--muted)]">{t("basis", { count: taste.ratedCount })}</span> : null}
-        </div>
-        {scored.length ? (
-          <StateButton type="button" className="mt-1 flex-none cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setRun((value) => value + 1)}>↺ {t("replay")}</StateButton>
-        ) : null}
-      </div>
+      <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("title")}</h2>
 
-      <div key={run} className="overflow-hidden rounded-[24px] bg-[var(--spotlight)] text-[var(--spotlight-ink)] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="overflow-hidden rounded-[24px] bg-[var(--spotlight)] text-[var(--spotlight-ink)] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         {scored.length ? (
           <div className="relative mx-auto aspect-square w-full max-w-[34rem]">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
-              <circle cx="50" cy="50" r={radiusFor(40)} fill="none" stroke="currentColor" strokeOpacity={0.12} strokeWidth={0.25} />
-              {RINGS.map((ring) => (
-                <circle key={ring} cx="50" cy="50" r={radiusFor(ring)} fill="none" stroke="currentColor" strokeOpacity={0.12} strokeWidth={0.25} strokeDasharray="0.8 1.2" />
+              {rings.map((ring) => (
+                <circle key={ring} cx="50" cy="50" r={radiusFor(ring)} fill="none" stroke="currentColor" strokeOpacity={0.22} strokeWidth={0.25} strokeDasharray={ring === floor ? undefined : "0.8 1.2"} />
               ))}
-              {placed.map(({ person, index, x, y }) => (
+              {placed.map(({ person, x, y }) => (
                 <line
                   key={person.userId}
                   x1="50" y1="50" x2={x} y2={y}
-                  pathLength={1}
-                  className="taste-line"
                   stroke={toneFor(person.agreement)}
                   strokeOpacity={selected?.userId === person.userId ? 0.9 : 0.4}
                   strokeWidth={selected?.userId === person.userId ? 0.6 : 0.35}
-                  style={{ animationDelay: `${700 + index * 220}ms` }}
                 />
               ))}
             </svg>
-            {RINGS.map((ring) => (
-              <span key={ring} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[var(--spotlight)] px-0.5 text-[9px] tabular-nums text-white/40" style={{ left: `${50 + Math.cos(labelAngle) * radiusFor(ring)}%`, top: `${50 + Math.sin(labelAngle) * radiusFor(ring)}%` }}>{ring}%</span>
+            {rings.map((ring) => (
+              <span key={ring} className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-[var(--spotlight)] px-1 text-[10px] tabular-nums text-white/70" style={{ top: `${50 - radiusFor(ring)}%` }}>{ring}%</span>
             ))}
-            <span className="absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--spotlight-ink)] text-[11px] font-bold text-[var(--spotlight)] shadow-[var(--elevate-card)]">{youLabel}</span>
-            {placed.map(({ person, index, x, y, dx, dy }) => (
-              <StateButton
-                key={person.userId}
-                type="button"
-                onClick={() => setSelectedId(person.userId)}
-                className="taste-drift absolute flex cursor-pointer flex-col items-center gap-1 focus-visible:outline-none"
-                style={{ left: `${x}%`, top: `${y}%`, "--dx": `${dx * 160}px`, "--dy": `${dy * 160}px`, animationDelay: `${index * 220}ms` } as CSSProperties}
-                aria-label={t("personAria", { name: person.name, agreement: person.agreement, count: person.shared })}
-                aria-pressed={selected?.userId === person.userId}
-              >
-                <span
-                  className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-[var(--elevate-card)] transition", selected?.userId === person.userId && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
-                  style={{ background: toneFor(person.agreement) }}
+            <span className="absolute left-1/2 top-1/2 grid aspect-square w-[12%] max-w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--spotlight-ink)] text-[11px] font-bold text-[var(--spotlight)] shadow-[var(--elevate-card)]">{youLabel}</span>
+            {placed.map(({ person, x, y }) => {
+              const active = selected?.userId === person.userId;
+              return (
+                <div
+                  key={person.userId}
+                  className={cx("absolute aspect-square w-[10%] -translate-x-1/2 -translate-y-1/2 focus-within:z-20", active && "z-10")}
+                  style={{ left: `${x}%`, top: `${y}%` }}
                 >
-                  <AvatarMark />
-                </span>
-                <span className="whitespace-nowrap rounded-full bg-black/35 px-1.5 text-[10px] tabular-nums text-white/85">{person.agreement}%</span>
-              </StateButton>
-            ))}
+                  <StateButton
+                    type="button"
+                    onClick={() => setSelectedId(person.userId)}
+                    aria-label={t("personAria", { name: person.name, agreement: person.agreement, count: person.shared })}
+                    aria-pressed={active}
+                    className={cx("grid size-full cursor-pointer place-items-center rounded-full p-0.5 shadow-[var(--elevate-card)]", active && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
+                    style={{ background: toneFor(person.agreement) }}
+                  >
+                    <AvatarMark />
+                  </StateButton>
+                  <span className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/55 px-1.5 text-[10px] tabular-nums text-white/90" aria-hidden="true">{person.agreement}%</span>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="p-6 sm:p-8">
@@ -134,15 +180,15 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
 
         <div className={cx("space-y-5 border-white/10 p-5 sm:p-7 lg:border-l", selected && "border-t lg:border-t-0")}>
           {selected ? (
-            <div className="taste-rise" style={{ animationDelay: selectedId ? "0ms" : `${scored.length * 220 + 500}ms` }} key={selected.userId}>
+            <div>
               <p className="text-xs text-white/55">{t("withName", { name: selected.name })}</p>
-              <p className="mt-1 text-4xl font-light tracking-[-0.05em]" style={{ color: toneFor(selected.agreement!) }}>{selected.agreement}%</p>
-              <p className="mt-1 text-sm text-white/75">{t(`verdict.${selected.agreement! >= 90 ? "twins" : selected.agreement! >= 78 ? "close" : selected.agreement! >= 65 ? "mixed" : "apart"}`)}</p>
+              <p className="mt-1 text-4xl font-light tracking-[-0.05em]" style={{ color: toneFor(selected.agreement) }}>{selected.agreement}%</p>
+              <p className="mt-1 text-sm text-white/75">{t(`verdict.${selected.identical ? "same" : selected.agreement >= 90 ? "twins" : selected.agreement >= 78 ? "close" : selected.agreement >= 65 ? "mixed" : "apart"}`)}</p>
               <p className="mt-1 text-xs text-white/45">{t("inCommon", { count: selected.shared })}</p>
               <dl className="mt-4 space-y-2.5 text-sm">
-                {selected.twin ? (
+                {selected.twin && !selected.identical ? (
                   <div className="rounded-2xl bg-white/[0.05] p-3">
-                    <dt className="text-xs text-white/50">{t("closestOn")}</dt>
+                    <dt className="text-xs text-white/50">{selected.twinTies > 1 ? t("closestAmong", { count: selected.twinTies }) : t("closestOn")}</dt>
                     <dd className="mt-0.5 text-white/90">{selected.twin.title} <span className="text-white/55">· {t("scores", { you: fmt(selected.twin.you), name: selected.name.split(/\s+/)[0], them: fmt(selected.twin.them) })}</span></dd>
                   </div>
                 ) : null}
