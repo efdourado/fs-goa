@@ -152,6 +152,7 @@
     "operation": "Não foi possível concluir a operação.",
     "network": "Não foi possível falar com o servidor. Verifique sua conexão.",
     "byCode": {
+      "date_range": "Esse dia está fora do período do desafio.",
       "conflict": "Já existe um registro com esses dados.",
       "not_found": "Recurso não encontrado.",
       "invalid_origin": "Origem da requisição não autorizada.",

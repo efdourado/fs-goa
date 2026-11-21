@@ -42,6 +42,17 @@ interface EntryValueInsert {
   option_id: string | null;
 }
 
+/**
+ * A dated challenge only takes entries inside its period, whether it's still running, past its end date, or reopened
+ * without new dates: a day outside it is refused, not quietly logged. Either bound alone applies too.
+ */
+function assertInPeriod(day: string | null | undefined, startDate: string | null, endDate: string | null) {
+  if (!day) return;
+  if ((startDate && day < startDate) || (endDate && day > endDate)) {
+    throw new ApiError(400, "date_range", "A data está fora do período do desafio.");
+  }
+}
+
 async function storageFields(client: PoolClient, challengeId: string, entryTypeId: string): Promise<StorageField[]> {
   const fields = await client.query<FieldRow & { created_at: Date }>(
     `SELECT id,challenge_id,entry_type_id,semantic_key,label,help_text,kind,required,position,
@@ -488,6 +499,7 @@ export async function saveEntry(
           ? new ApiError(409, "watch_in_future", "A data assistida pode ser hoje ou uma data passada.")
           : new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
       }
+      assertInPeriod(occurredOn, access.challenge.start_date, access.challenge.end_date);
     } else {
       const requestedDay = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : null;
       // Only a type with no round item overloads `body.itemId` as the checkpoint
@@ -606,9 +618,11 @@ export async function updateEntry(
       item_id: string | null; purpose: string | null; answer_scope: "individual" | "shared"; parent_entry_id: string | null;
       shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
       updated_at: Date; created_at: Date; group_id: string; status: "draft" | "active" | "closed"; time_zone: string | null;
+      start_date: string | null; end_date: string | null;
     }>(client,
       `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,e.parent_entry_id,
-              e.answer_scope,t.shared_edit_policy,e.updated_at,e.created_at,c.group_id,c.status,c.time_zone
+              e.answer_scope,t.shared_edit_policy,e.updated_at,e.created_at,c.group_id,c.status,c.time_zone,
+              c.start_date::text AS start_date,c.end_date::text AS end_date
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
@@ -639,6 +653,7 @@ export async function updateEntry(
         if (occurredOn > dateKeyInTimeZone(new Date(), entry.time_zone ?? "UTC")) {
           throw new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
         }
+        assertInPeriod(occurredOn, entry.start_date, entry.end_date);
         await client.query("UPDATE entries SET occurred_on=$2 WHERE id=$1 OR parent_entry_id=$1", [entryId, occurredOn]);
       }
       const visitFields = await storageFields(client, entry.challenge_id, entry.entry_type_id);

@@ -7542,6 +7542,36 @@ test("copiar para um destino com a mesma propriedade de outro tipo (ou arquivada
 });
 
 
+test("um desafio com período só aceita registros dentro dele, mesmo reaberto depois do fim", async () => {
+  const owner = await register("Rita", "rita_periodo");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Leitura" } })).body as { id: string }).id;
+  const today = dateKeyInTimeZone(new Date(), "America/Sao_Paulo");
+  const shift = (days: number) => { const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
+  const startsOn = shift(-60), endsOn = shift(-30);
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "library", title: "Semanas", startsOn, endsOn, participantIds: [owner.user.id], items: [{ title: "Livro", pageCount: 300 }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    items: Array<{ id: string }>; entryTypes: Array<{ id: string; purpose: string; fields: Array<{ key: string }> }>;
+  };
+  const progress = detail.entryTypes.find((type) => type.purpose === "progress")!;
+  const log = (day: string) => call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { itemId: detail.items[0].id, entryTypeId: progress.id, occurredOn: day, values: { [progress.fields[0].key]: 10 } },
+  });
+  // Past the end: today, the day after the end and the day before the start are all refused.
+  for (const day of [today, shift(-29), shift(-61)]) {
+    const outside = await log(day);
+    assert.equal(outside.response.status, 400, `${day}: ${JSON.stringify(outside.body)}`);
+    assert.equal((outside.body as { error: string }).error, "date_range");
+  }
+  // The first and last days of the period are fine.
+  assert.equal((await log(startsOn)).response.status, 201);
+  assert.equal((await log(endsOn)).response.status, 201);
+});
+
 test("remover um tipo de resposta que já tem respostas: avisa quantas, e só com a confirmação apaga as respostas junto", async () => {
   const owner = await register("Tais", "tais_apaga");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;

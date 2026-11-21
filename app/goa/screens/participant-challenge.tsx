@@ -1459,7 +1459,10 @@ export function ParticipantChallengeScreen({
   // "" means the participant hasn't picked a date. The plain round form saves it
   // as-is (no date); the daily / per-day forms fall back to `today`.
   const [occurredOn, setOccurredOn] = useState("");
-  const effectiveOccurredOn = occurredOn || today;
+  // Past the challenge's end (or reopened without new dates) the day to log for is its last one, never a day outside
+  // the period: the server refuses those too.
+  const lastLoggableDay = challenge.endsOn && challenge.endsOn < today ? challenge.endsOn : today;
+  const effectiveOccurredOn = occurredOn || lastLoggableDay;
   const defaultItem = sortedItems.find((item) => item.status === "open" && !entriesByItem.has(item.id))
     ?? sortedItems.find((item) => !entriesByItem.has(item.id) && item.status !== "scheduled" && item.status !== "closed")
     ?? [...sortedItems].reverse().find((item) => entriesByItem.has(item.id))
@@ -1763,7 +1766,7 @@ export function ParticipantChallengeScreen({
                     today={today}
                     deadline={logDeadline}
                     records={logRecords}
-                    selectedDay={countHidesDates ? today : effectiveOccurredOn}
+                    selectedDay={countHidesDates ? lastLoggableDay : effectiveOccurredOn}
                     onSelectDay={setOccurredOn}
                     counter={logCounter}
                     compact={countHidesDates}
