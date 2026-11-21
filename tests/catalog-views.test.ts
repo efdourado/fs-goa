@@ -67,3 +67,25 @@ test("catalogue shelves show unlabeled item values and respect hidden native pro
   assert.match(html, /1961 · 204 · 0 · Não/);
   assert.doesNotMatch(html, /role="img"|>4\.2<|Hidden author|Exemplares:|Lido:|Páginas:/);
 });
+
+test("the group shelf keeps the home end card and adds a catalogue button after the arrows", () => {
+  const data = {
+    libraries: [],
+    counts: { film: 8, book: 5 },
+    items: Array.from({ length: 11 }, (_, index) => ({
+      id: String(index),
+      kind: index % 2 ? "film" : "book",
+      title: `Capa ${index}`,
+      createdAt: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+    })),
+  };
+  const props = { canManage: true, onOpenCatalog: () => undefined, data };
+  const home = renderWithIntl(createElement(CatalogShelfView, { ...props, scope: "personal" }));
+  const group = renderWithIntl(createElement(CatalogShelfView, { ...props, scope: { groupId: "g" } }));
+  const covers = (html: string) => [...html.matchAll(/title="(Capa \d+)"/g)].map((match) => match[1]);
+  assert.deepEqual(covers(group), covers(home));
+  assert.equal(covers(group).length, 10);
+  assert.match(group, /<\/button><\/div><button[^>]*>[\s\S]*?Catálogo do grupo<\/button>/);
+  assert.match(group, />3<\/span>.*mais em Coleção.*Ver tudo/);
+  assert.match(home, /Ver tudo/);
+});

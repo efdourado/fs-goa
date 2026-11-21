@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { catalogCardHeight, CatalogTile, useCatalogPropertyText } from "./catalog-views";
 import { type CatalogScope, type CatalogShelfData } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
-import { ArrowRightIcon, cx, EmptyState } from "./ui";
+import { ArrowRightIcon, CatalogIcon, cx, EmptyState } from "./ui";
 
 /** A page shows only the head of the catalogue; the rest is one tap away. */
 const PREVIEW_COUNT = 10;
@@ -39,7 +39,8 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
   const t = useTranslations("group");
   const propertyText = useCatalogPropertyText();
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
-  const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
+  const personal = scope === "personal";
+  const title = personal ? t("myCatalogTitle") : t("catalogTitle");
 
   // Every library together, newest first.
   const counts = data?.counts ?? {};
@@ -58,11 +59,20 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
-          {scope === "personal" ? null : <span aria-hidden="true" className="h-1.5 w-1.5 flex-none -translate-y-px self-center rounded-full bg-current" />}
           <h2 className="text-lg font-semibold tracking-[-0.02em]">{title}</h2>
           <span className="text-xs text-[var(--muted)]">{total}</span>
         </div>
-        {sorted.length ? <RailArrows nudge={nudge} /> : null}
+        {sorted.length ? (
+          <div className="ml-auto flex items-center gap-2">
+            <RailArrows nudge={nudge} />
+            {personal ? null : (
+              <StateButton type="button" onClick={onOpenCatalog} className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)]">
+                <CatalogIcon className="size-3.5" />
+                {t("catalogOpen")}
+              </StateButton>
+            )}
+          </div>
+        ) : null}
       </div>
       {sorted.length ? (
         <>

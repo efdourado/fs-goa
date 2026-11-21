@@ -8,14 +8,12 @@ import { type FormEvent, useRef, useState } from "react";
 import { copyText } from "../clipboard";
 import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
-import { CatalogShelfSkeleton } from "../catalog-shelf";
+import { CatalogShelfView } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
-import { catalogCardHeight, CatalogTile, useCatalogPropertyText } from "../catalog-views";
-import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
+import { useCatalogShelf } from "../libraries";
 import { NewChallengeButton } from "../welcome";
-import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
+import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -24,7 +22,6 @@ import { canManage } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
-const CATALOG_PREVIEW_COUNT = 10;
 
 export function GroupScreen({
   group,
@@ -72,7 +69,6 @@ export function GroupScreen({
 }) {
   const t = useTranslations("group");
   const canCreateChallenge = canManage(group.role) && challenges.length < challengeLimit;
-  const tl = useTranslations("libraries");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
   const f = useGoaFormat();
@@ -91,31 +87,8 @@ export function GroupScreen({
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
-  const [catalogKind, setCatalogKind] = useState<string | null>(null);
-  // One request brings the libraries, how many items each holds and the newest few of each; the last answer
-  // paints at once when the page is opened again.
-  const propertyText = useCatalogPropertyText();
-  const shelfData = useCatalogShelf({ groupId: group.id });
-  const catalog = shelfData ? shelfData.items : null;
-  const catalogCounts = shelfData?.counts ?? {};
-  const libraryName = useLibraryName();
-  const { railRef: catalogRailRef, showFade: catalogShowFade, onScroll: onCatalogScroll, nudge: nudgeCatalog } = useShelfRail();
-
-  // Each library is its own shelf — one sorted list never mixes them.
-  const catalogLibraries = (shelfData?.libraries ?? []).filter((library) => (catalogCounts[library.kind] ?? 0) > 0);
-  const totalCatalogItems = Object.values(catalogCounts).reduce((sum, count) => sum + count, 0);
-  const bothCatalogKinds = catalogLibraries.length > 1;
-  const activeCatalogKind = catalogKind && catalogLibraries.some((library) => library.kind === catalogKind)
-    ? catalogKind
-    : catalogLibraries[0]?.kind ?? null;
-  const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
-  const sortedCatalog = [...(catalog ?? [])]
-    .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
-    .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
-  const visibleCatalog = sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
-  const activeCatalogLibrary = catalogLibraries.find((library) => library.kind === activeCatalogKind) ?? null;
-  // The server sends only the newest few of each library, so how many more there are comes from the counts.
-  const remainingCatalog = Math.max(0, (activeCatalogKind ? catalogCounts[activeCatalogKind] ?? sortedCatalog.length : sortedCatalog.length) - visibleCatalog.length);
+  const catalogScope = { groupId: group.id };
+  const shelfData = useCatalogShelf(catalogScope);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -375,77 +348,7 @@ export function GroupScreen({
           ) : <FaceEmptyState title={t("noChallengesTitle")} compact />}
         </section>
 
-        {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length ? (
-          <section>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-baseline gap-2.5">
-                <StateButton
-                  type="button"
-                  onClick={onOpenCatalog}
-                  className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline"
-                >
-                  {t("catalogTitle")}
-                </StateButton>
-
-                <span className="text-xs text-[var(--muted)]">
-                  {totalCatalogItems}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {sortedCatalog.length ? <RailArrows nudge={nudgeCatalog} /> : null}
-              </div>
-            </div>
-            <>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  {bothCatalogKinds && activeCatalogKind ? (
-                    <div role="group" aria-label={tl("tabsLabel")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash-strong)]/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {catalogLibraries.map((library) => {
-                        const active = library.kind === activeCatalogKind;
-                        return (
-                          <StateButton
-                            key={library.id}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => setCatalogKind(library.kind)}
-                            className={cx(
-                              "inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] transition",
-                              active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
-                            )}
-                          >
-                            <LibraryGlyph source={library.source} className="h-4 w-4" />
-                            {libraryName(library)}
-                            <span className="text-[11px] opacity-70">{catalogCounts[library.kind] ?? 0}</span>
-                          </StateButton>
-                        );
-                      })}
-                    </div>
-                  ) : <span />}
-                </div>
-                <Rail railRef={catalogRailRef} showFade={catalogShowFade} onScroll={onCatalogScroll}>
-                  {visibleCatalog.map((item) => (
-                    <CatalogTile
-                      key={item.id}
-                      className={shelfCardWidth}
-                      title={item.title}
-                      properties={propertyText(item, shelfData?.hiddenProperties?.[item.kind])}
-                    />
-                  ))}
-                  {remainingCatalog > 0 ? (
-                    <StateButton
-                      type="button"
-                      onClick={onOpenCatalog}
-                      className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--muted)]")}
-                    >
-                      <span className="text-2xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
-                      <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
-                      <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
-                    </StateButton>
-                  ) : null}
-                </Rail>
-            </>
-          </section>
-        ) : null}
+        <CatalogShelfView scope={catalogScope} canManage={canManage(group.role)} data={shelfData} onOpenCatalog={onOpenCatalog} />
 
         {memberCount > 1 ? <TasteMap groupId={group.id} youLabel={t("tasteYou")} /> : null}
 
