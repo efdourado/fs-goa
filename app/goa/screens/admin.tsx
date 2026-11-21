@@ -16,7 +16,7 @@ import { type CatalogScope } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
 import { ItemEditorDialog as SharedItemEditorDialog } from "../item-editor-dialog";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
-import { ChallengeSettings, ChallengeStatePanel, type CopyMode } from "./challenge-actions";
+import { ChallengeSettings, ChallengeStatePanel } from "./challenge-actions";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -735,7 +735,7 @@ export function AdminScreen({
   onSaveMetric: (id: Id | null, payload: Record<string, unknown>) => Promise<void>;
   onDeleteMetric: (id: Id) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: CopyMode }) => Promise<CopyResult>;
+  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   isPlatformAdmin?: boolean;
   onPublishTemplate: () => Promise<void>;
@@ -801,7 +801,7 @@ export function AdminScreen({
                   activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]",
                 )}
               >
-                {blockers?.[id]?.length && setupOrder.includes(id) ? <SetupBlockerMarker number={setupOrder.indexOf(id) + 1} /> : null}
+                {blockers?.[id]?.length && setupOrder.includes(id) ? <SetupBlockerMarker count={blockers[id].length} /> : null}
                 {t(`tabs.${id}`)}
               </StateButton>
             ))}

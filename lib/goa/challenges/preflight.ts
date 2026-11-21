@@ -96,7 +96,8 @@ export async function computePreflight(
     if (target === "none") return true;
     return items > 0;
   });
-  if (types.length && !canRegister) {
+  // With no items at all, "no way to register" is the same problem said twice: "add an item" already fixes both.
+  if (types.length && !canRegister && !(needsItems && items === 0)) {
     err("no_way_to_register", "Não há forma válida de registrar participação (falta item ou checkpoint).");
   }
 

@@ -1734,7 +1734,7 @@ export function ParticipantChallengeScreen({
               onAddItem={challenge.status === "active" ? onAddSessionItem : undefined}
             />
           ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
-            <EmptyState title={t("noCheckpointTitle")} />
+            <FaceEmptyState title={t("noCheckpointTitle")} />
           ) : (
             <div>
               <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>

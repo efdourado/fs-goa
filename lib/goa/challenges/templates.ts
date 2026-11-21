@@ -5,7 +5,7 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { ensurePersonalWorkspace } from "../domain/challenges";
 import { parseRuleSections } from "../domain/rules";
-import { copyChallengeStructure, readCopyMode } from "./copy";
+import { copyChallengeStructure } from "./copy";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
 import { isRecipeKey, RECIPES } from "./recipes";
 import { maskShowcaseIdentities, resultForChallenge } from "./results";
@@ -259,14 +259,12 @@ export async function duplicateTemplate(
     );
 
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? template.title;
-    const { copyItems, mode } = readCopyMode(body);
     const { id: targetId, skippedProperties, status } = await copyChallengeStructure(
       client,
       template.id,
       targetGroupId,
       session.user.id,
       title,
-      { copyItems },
     );
     await client.query(
       `INSERT INTO challenge_duplications
@@ -283,7 +281,7 @@ export async function duplicateTemplate(
       "challenge",
       targetId,
       null,
-      { sourceChallengeId: template.id, fromTemplate: true, targetGroupId, mode },
+      { sourceChallengeId: template.id, fromTemplate: true, targetGroupId },
     );
     return { id: targetId, challengeId: targetId, groupId: targetGroupId, status, skippedProperties };
   });

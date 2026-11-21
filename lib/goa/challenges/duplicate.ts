@@ -4,7 +4,7 @@ import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { ensurePersonalWorkspace } from "../domain/challenges";
-import { copyChallengeStructure, readCopyMode } from "./copy";
+import { copyChallengeStructure } from "./copy";
 import { isRecipeKey } from "./recipes";
 
 export async function duplicateChallenge(
@@ -54,14 +54,12 @@ export async function duplicateChallenge(
         : `O grupo de destino atingiu o limite de ${limit} desafios.`,
     );
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? `Cópia de ${sourceAccess.challenge.title}`;
-    const { copyItems, mode } = readCopyMode(body);
     const { id: targetId, skippedProperties, status } = await copyChallengeStructure(
       client,
       sourceChallengeId,
       targetGroupId,
       session.user.id,
       title,
-      { copyItems },
     );
 
     await client.query(
@@ -72,7 +70,7 @@ export async function duplicateChallenge(
     );
     await writeAudit(client, targetGroupId, targetId, session.user.id,
       "challenge.duplicated", "challenge", targetId, null,
-      { sourceChallengeId, sourceGroupId: sourceAccess.challenge.group_id, targetGroupId, mode });
+      { sourceChallengeId, sourceGroupId: sourceAccess.challenge.group_id, targetGroupId });
     return { id: targetId, challengeId: targetId, groupId: targetGroupId, status, skippedProperties };
   });
 }

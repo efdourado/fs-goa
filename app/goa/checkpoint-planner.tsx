@@ -14,7 +14,7 @@ import { canOrganise, OrganiseDialog, organiseFromItems } from "./organize-panel
 import { useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
 import { itemIdForEntry, formatRuntime } from "./utils";
-import { AddRow, Button, ChevronIcon, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
+import { AddRow, Button, ChevronIcon, FaceEmptyState, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
 
 type Stage = ChallengeDetail["checkpoints"][number];
 const ITEM_BATCH_SIZE = 12;
@@ -139,9 +139,10 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     <StatusMessage error={error} success={success} />
     {autoDays ? <p className="mb-5 text-sm text-[var(--muted)]">{t("dailyAutoNote")}</p> : null}
     <div className="space-y-4">
-      {!stages.length || loose.length ? <section className="rounded-[20px] border border-[var(--line)] px-5 py-4 sm:px-6">
+      {/* No items at all (a fresh copy starts like this): the same quiet face as an empty updates panel. */}
+      {!items.length ? <FaceEmptyState title={t("noItems")} /> : !stages.length || loose.length ? <section className="rounded-[20px] border border-[var(--line)] px-5 py-4 sm:px-6">
         <div className="mb-2 flex items-baseline justify-between gap-3"><h2 className="text-base font-medium">{stages.length ? t("unassigned") : t("allItems")}</h2><span className="text-xs text-[var(--muted)]">{t("itemsTally", {count: loose.length})}</span></div>
-        {loose.length ? itemRows(loose) : <p className="py-3 text-sm text-[var(--muted)]">{t("noItems")}</p>}
+        {itemRows(loose)}
       </section> : null}
       {stages.map((stage, index) => {
         const list = items.filter((item) => item.checkpointId === stage.id);

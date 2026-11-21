@@ -134,8 +134,7 @@ export function TemplateDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challengeId]);
 
-  // The copy dialog: what comes along, then where it lands (a group you run, or just you).
-  const [copyMode, setCopyMode] = useState<"structure_and_items" | "structure">("structure_and_items");
+  // The copy dialog: what comes along (the structure, never the items), then where it lands (a group you run, or just you).
   const [where, setWhere] = useState<"personal" | "existing">("personal");
   const [targetId, setTargetId] = useState<Id>(manageable[0]?.id ?? "");
   const ready = where === "personal" || Boolean(targetId);
@@ -151,7 +150,7 @@ export function TemplateDetailScreen({
       const result = await apiRequest<{ challengeId: Id; skippedProperties?: SkippedProperty[] }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
         // "Just me": the server puts it in your own space (no group, no invites).
-        body: where === "personal" ? { target: "personal", mode: copyMode } : { targetGroupId, mode: copyMode },
+        body: where === "personal" ? { target: "personal" } : { targetGroupId },
         csrfToken,
       });
       if (result.skippedProperties?.length) setCopied({ challengeId: result.challengeId, skippedProperties: result.skippedProperties });
@@ -252,19 +251,7 @@ export function TemplateDetailScreen({
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
           {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
           <form className="space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
-            <div>
-              <p className={labelClass}>{t("copyModeLabel")}</p>
-              <SelectableCards
-                value={copyMode}
-                onChange={setCopyMode}
-                disabled={busy}
-                options={[
-                  { value: "structure_and_items", label: t("copyModeItems"), hint: t("copyModeItemsHint") },
-                  { value: "structure", label: t("copyModeStructure"), hint: t("copyModeStructureHint") },
-                ]}
-              />
-              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("duplicateBody")}</p>
-            </div>
+            <p className="text-sm leading-6 text-[var(--muted)]">{t("copyWhat")}</p>
             <div>
               <p className={labelClass}>{t("whereLabel")}</p>
               <SelectableCards

@@ -108,21 +108,18 @@ function TemplatePanel({ challenge, onPublish, onUnpublish }: {
   );
 }
 
-export type CopyMode = "structure" | "structure_and_items";
-
 /**
- * Copy the challenge, drawn like a template's copy dialog: what comes along, then where it lands (just you, or a
- * group you run). The copy keeps the name.
+ * Copy the challenge, drawn like a template's copy dialog: what comes along (the structure, never the items), then
+ * where it lands (just you, or a group you run). The copy keeps the name.
  */
 function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCopy }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: CopyMode }) => Promise<CopyResult>;
+  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tt = useTranslations("templates");
   const f = useGoaFormat();
-  const [mode, setMode] = useState<CopyMode>("structure_and_items");
   const [where, setWhere] = useState<"personal" | "existing">("personal");
   const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
   const [targetId, setTargetId] = useState<Id>(availableTargets[0]?.id ?? "");
@@ -137,8 +134,8 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
     setBusy(true); setError(null);
     try {
       const result = await onDuplicate(where === "personal"
-        ? { title: challenge.title, target: "personal", mode }
-        : { title: challenge.title, targetGroupId: targetId, mode });
+        ? { title: challenge.title, target: "personal" }
+        : { title: challenge.title, targetGroupId: targetId });
       if (result.skippedProperties.length) { setCopied(result); return; }
       if (result.challengeId) onOpenCopy(result.challengeId);
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
@@ -154,19 +151,7 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
   }
   return (
     <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void copy(); }}>
-      <div>
-        <p className={labelClass}>{tt("copyModeLabel")}</p>
-        <SelectableCards
-          value={mode}
-          onChange={setMode}
-          disabled={busy}
-          options={[
-            { value: "structure_and_items", label: tt("copyModeItems"), hint: tt("copyModeItemsHint") },
-            { value: "structure", label: tt("copyModeStructure"), hint: tt("copyModeStructureHint") },
-          ]}
-        />
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{tt("copyModeHint")}</p>
-      </div>
+      <p className="text-sm leading-6 text-[var(--muted)]">{tt("copyWhat")}</p>
       <div>
         <p className={labelClass}>{tt("whereLabel")}</p>
         <SelectableCards
@@ -199,7 +184,7 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
  */
 export function ChallengeSettings({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onDelete, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: CopyMode }) => Promise<CopyResult>;
+  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   onDelete?: () => Promise<void>;
   isPlatformAdmin: boolean;

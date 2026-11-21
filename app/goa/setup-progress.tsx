@@ -57,11 +57,12 @@ export function useChallengePreflight(challenge: ChallengeDetail) {
   return { report: current?.report ?? null, failed: current?.report === null, retry: () => setAttempt((value) => value + 1) };
 }
 
-export function SetupBlockerMarker({ number }: { number: number }) {
+/** On a tab: how many things are left to fix there, the same count as the list on the tab ("1 thing left…"). */
+export function SetupBlockerMarker({ count }: { count: number }) {
   const t = useTranslations("adminChallenge.setup");
   return (
     <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full border border-[var(--warn-line)] bg-[var(--warn-soft)] text-[10px] font-semibold leading-none text-[var(--warn-strong)]">
-      {number}
+      {count}
       <span className="sr-only">{t("stepTodo")}</span>
     </span>
   );
