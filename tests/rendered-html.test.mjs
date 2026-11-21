@@ -68,6 +68,14 @@ test("o servidor de produção renderiza o shell acessível com metadados sociai
     assert.match(html, new RegExp(`property="og:image" content="${BASE}/og\\.png"`, "i"));
     assert.match(html, /name="twitter:card" content="summary_large_image"/i);
 
+    for (const [locale, pickerTitle] of [["en", "People in the thread"], ["es", "Personas en el hilo"]]) {
+      const results = await fetch(`${BASE}/challenges/build-smoke?tab=results`, { headers: { "accept-language": locale } });
+      assert.equal(results.status, 200);
+      const localizedHtml = await results.text();
+      assert.ok(localizedHtml.includes(`lang="${locale}"`));
+      assert.ok(localizedHtml.includes(pickerTitle), `the Results layout supplies picker messages for ${locale}`);
+    }
+
     for (const [oldUrl, catalogue] of [["/catalog/item", "/catalog"], ["/groups/g1/catalog/item", "/groups/g1/catalog"]]) {
       const redirect = await fetch(`${BASE}${oldUrl}`, { redirect: "manual" });
       assert.equal(redirect.status, 308);

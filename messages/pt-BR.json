@@ -2056,8 +2056,12 @@
   "story": {
     "threadAria": "Notas de {count} pessoas em {items} títulos",
     "lanesAria": "Registros de {count} pessoas em {days} dias",
+    "threadPeople": {
+      "title": "Pessoas no fio",
+      "hint": "Escolha de quem mostrar os resultados.",
+      "showing": "{shown} de {total} no fio"
+    },
     "readDated": "Cada faixa é uma pessoa: contínua onde ela seguiu, com buracos onde parou, contas maiores nos dias maiores. O trecho contornado é a maior sequência dela.",
-    "showMore": "Ver mais {count}",
     "showMoreComment": "Ver mais",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Os dias de uma pessoa, desenhados.} other {Os dias de # pessoas, lado a lado.}}",
@@ -2258,6 +2262,7 @@
       "words": {
         "title": "Nas palavras deles",
         "headline": "{count, plural, one {Uma frase para guardar.} other {# frases para guardar.}}",
+        "headlinePicked": "{shown} das {count} frases para guardar.",
         "titleSolo": "Nas suas palavras"
       },
       "metrics": {
@@ -2346,7 +2351,6 @@
       "note": "Por ano de lançamento, de {first} a {last}.",
       "tooltip": "{things} de {year}, com média {average}."
     },
-    "plusMore": "+ {count} mais",
     "noVisiblePages": "Ainda não há resultados para mostrar."
   },
   "organise": {

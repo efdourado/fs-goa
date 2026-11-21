@@ -632,9 +632,9 @@ export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel
   );
 }
 
-export function ListMoreButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+export function ListMoreButton({ children, onClick, expanded }: { children: ReactNode; onClick: () => void; expanded?: boolean }) {
   return (
-    <StateButton type="button" onClick={onClick} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+    <StateButton type="button" onClick={onClick} aria-expanded={expanded} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
       {children}
     </StateButton>
   );

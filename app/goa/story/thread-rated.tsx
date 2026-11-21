@@ -1,15 +1,22 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
 
-import { firstName, personTone } from "../rating-scale";
+import { firstName } from "../rating-scale";
 import type { Id } from "../types";
 import type { RatedNote, RatedStory, StoryInput } from "./model";
+import { threadPersonStyle } from "./thread-people";
 
 const PLOT = 250;
 const BOTTOM = 34;
 const MIN_STEP = 96;
+/** A story image draws this many titles; the lines run on into a fade and a "…" for the rest. */
+const STORY_STATIONS = 6;
+/** Of those, every other title is named (three: the 2nd, 4th and 6th, which have room on both sides), one line each. */
+const STORY_LABEL_EVERY = 2;
+/** Room after the last drawn title for the lines to run on and fade (in steps). */
+const TAIL_STEPS = 0.75;
 
 /** A smooth line through points (Catmull-Rom as cubic Béziers), broken wherever someone skipped a title. */
 function smoothPaths(points: Array<{ x: number; y: number } | null>, low = -Infinity, high = Infinity): string[] {
@@ -43,8 +50,17 @@ function smoothPaths(points: Array<{ x: number; y: number } | null>, low = -Infi
  * they didn't. Lines that braid are people who agree; where they fan out, the group split. Notes pinned
  * on top say what happened there. Tap a name in the legend to follow one line.
  */
-export function RatedThread({ story, input, focus, fit = false }: { story: RatedStory; input: StoryInput; focus: Id | null; fit?: boolean }) {
+export function RatedThread({ story: whole, input, focus, visible, fit = false }: { story: RatedStory; input: StoryInput; focus: Id | null; visible?: ReadonlySet<Id>; fit?: boolean }) {
   const t = useTranslations("story");
+  const fadeId = useId();
+  // A story image is a glance: the first titles, then each line heads for the next one and fades out.
+  const tail = fit && whole.stations.length > STORY_STATIONS + 1;
+  const story: RatedStory = tail ? {
+    ...whole,
+    stations: whole.stations.slice(0, STORY_STATIONS + 1),
+    threads: whole.threads.map((thread) => ({ ...thread, values: thread.values.slice(0, STORY_STATIONS + 1) })),
+    notes: whole.notes.filter((note) => whole.stations.findIndex((station) => station.item.id === note.itemId) < STORY_STATIONS),
+  } : whole;
   const nf = useFormatter();
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   const ref = useRef<HTMLDivElement>(null);
@@ -61,13 +77,15 @@ export function RatedThread({ story, input, focus, fit = false }: { story: Rated
   const personName = (id: Id) => firstName(input.people.find((person) => person.id === id)?.name ?? "");
   const count = story.stations.length;
   const contentWidth = fit ? width : Math.max(width, count * MIN_STEP);
-  const step = contentWidth / Math.max(1, count);
+  const step = contentWidth / Math.max(1, tail ? STORY_STATIONS + TAIL_STEPS : count);
   const range = Math.max(1e-9, input.scale.max - input.scale.min);
   const x = (index: number) => step * index + step / 2;
   const ids = input.people.map((person) => person.id);
+  const threads = story.threads.filter(({ person, values }) => (!visible || visible.has(person.id)) && values.some((value) => value !== null));
   const stationIndex = new Map(story.stations.map((station, index) => [station.item.id, index]));
   const ticks = Array.from({ length: Math.floor(range) + 1 }, (_, index) => input.scale.min + index).filter((tick) => range <= 10 || tick % Math.ceil(range / 5) === 0);
   const drawMs = 1800;
+  const stagger = Math.min(140, 700 / Math.max(1, threads.length - 1));
   const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
   // Notes: each takes the first row where it doesn't run into another one (quotes stay in the almanac).
@@ -89,11 +107,19 @@ export function RatedThread({ story, input, focus, fit = false }: { story: Rated
   // every point stays on the line.
   const LABEL = 88;
   const labelled = (() => {
+    if (tail) return new Set(story.stations.slice(0, STORY_STATIONS).flatMap((_, index) => (index % STORY_LABEL_EVERY === STORY_LABEL_EVERY - 1 ? [index] : [])));
     if (step >= LABEL || count <= 2) return new Set(story.stations.map((_, index) => index));
     const slots = Math.max(2, Math.floor(contentWidth / LABEL));
     return new Set(Array.from({ length: slots }, (_, slot) => Math.round((slot * (count - 1)) / (slots - 1))));
   })();
   const labelWidth = Math.max(step, Math.min(LABEL + 24, contentWidth / Math.max(1, labelled.size)));
+  // A story's labels stay centred on their title and never reach the next one (or past the drawing's edges).
+  const labelBox = (index: number) => {
+    if (!tail) return { left: Math.max(0, Math.min(contentWidth - labelWidth, x(index) - labelWidth / 2)), width: labelWidth };
+    // The right edge is the "…" after the last title, so it always shows.
+    const half = Math.max(0, Math.min(x(index), x(STORY_STATIONS) - 14 - x(index), (step * STORY_LABEL_EVERY - 8) / 2));
+    return { left: x(index) - half, width: half * 2 };
+  };
   const top = 20 + Math.max(1, rows.length) * 30;
   const height = top + PLOT;
   const y = (value: number) => top + (1 - (value - input.scale.min) / range) * (PLOT - BOTTOM);
@@ -103,13 +129,25 @@ export function RatedThread({ story, input, focus, fit = false }: { story: Rated
   return (
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
       <div className="relative" style={{ width: contentWidth || "100%", height: HEIGHT + 64 }}>
-        <svg width={contentWidth} height={HEIGHT} className="absolute left-0 top-0 block" role="img" aria-label={t("threadAria", { count: input.people.length, items: count })}>
+        <svg width={contentWidth} height={HEIGHT} className="absolute left-0 top-0 block" role="img" aria-label={t("threadAria", { count: threads.length, items: count })}>
           {ticks.map((tick) => (
             <g key={tick}>
               <line x1={0} x2={contentWidth} y1={y(tick)} y2={y(tick)} stroke="currentColor" strokeOpacity={tick === input.scale.min || tick === input.scale.max ? 0.14 : 0.06} />
               <text x={6} y={y(tick) - 4} fontSize="10" fill="currentColor" fillOpacity={0.35}>{tick}</text>
             </g>
           ))}
+          {tail ? (
+            <defs>
+              <linearGradient id={`${fadeId}-fade`} gradientUnits="userSpaceOnUse" x1={x(STORY_STATIONS - 1) + step * 0.15} x2={x(STORY_STATIONS)} y1={0} y2={0}>
+                <stop offset="0%" stopColor="white" />
+                <stop offset="100%" stopColor="white" stopOpacity={0} />
+              </linearGradient>
+              <mask id={`${fadeId}-mask`} maskUnits="userSpaceOnUse" x={0} y={0} width={contentWidth} height={HEIGHT}>
+                <rect x={0} y={0} width={contentWidth} height={HEIGHT} fill={`url(#${fadeId}-fade)`} />
+              </mask>
+            </defs>
+          ) : null}
+          <g mask={tail ? `url(#${fadeId}-mask)` : undefined}>
           {story.stations.map((station, index) => (
             <line key={station.item.id} x1={x(index)} x2={x(index)} y1={TOP - 18} y2={HEIGHT - BOTTOM} stroke="currentColor" strokeOpacity={0.07} />
           ))}
@@ -132,7 +170,7 @@ export function RatedThread({ story, input, focus, fit = false }: { story: Rated
             if (points.length < 2) return null;
             const line = smoothPaths(points, y(input.scale.max), y(input.scale.min))[0];
             const base = y(input.scale.min);
-            const tone = personTone(ids, story.threads[0].person.id);
+            const { tone } = threadPersonStyle(ids, story.threads[0].person.id);
             return (
               <>
                 <defs>
@@ -146,34 +184,37 @@ export function RatedThread({ story, input, focus, fit = false }: { story: Rated
             );
           })() : null}
           {/* The group, as one faint line (a group only — two lines already say it, one line is it). */}
-          {story.threads.length > 2 && smoothPaths(story.stations.map((station, index) => ({ x: x(index), y: y(station.average) })), y(input.scale.max), y(input.scale.min)).map((d, index) => (
+          {!visible && story.threads.length > 2 && smoothPaths(story.stations.map((station, index) => ({ x: x(index), y: y(station.average) })), y(input.scale.max), y(input.scale.min)).map((d, index) => (
             <path key={`avg-${index}`} d={d} fill="none" stroke="currentColor" strokeOpacity={0.28} strokeWidth={7} strokeLinecap="round" pathLength={1} className="taste-line" style={{ ...delay(0), animationDuration: `${drawMs}ms` }} />
           ))}
-          {story.threads.map((thread, order) => {
-            const tone = personTone(ids, thread.person.id);
+          {threads.map((thread, order) => {
+            const { tone, dash } = threadPersonStyle(ids, thread.person.id);
             const dim = focus !== null && focus !== thread.person.id;
             return (
-              <g key={thread.person.id} style={{ opacity: dim ? 0.1 : 1, transition: "opacity 250ms" }}>
+              <g key={thread.person.id} data-thread-person={thread.person.id} style={{ opacity: dim ? 0.1 : 1, transition: "opacity 250ms" }}>
                 {smoothPaths(thread.values.map((value, index) => (value === null ? null : { x: x(index), y: y(value) })), y(input.scale.max), y(input.scale.min)).map((d, index) => (
-                  <path key={index} d={d} fill="none" stroke={tone} strokeWidth={focus === thread.person.id ? 3.5 : 2.4} strokeLinecap="round" pathLength={1} className="taste-line" style={{ ...delay(150 + order * 140), animationDuration: `${drawMs}ms` }} />
+                  <path key={index} d={d} fill="none" stroke={tone} strokeWidth={focus === thread.person.id ? 3.5 : 2.4} strokeLinecap="round" strokeDasharray={dash} pathLength={dash ? undefined : 1} className={dash ? "reveal-fade" : "taste-line"} style={{ ...delay(150 + order * stagger), animationDuration: `${drawMs}ms` }} />
                 ))}
                 {thread.values.map((value, index) => value === null ? null : (
-                  <circle key={index} cx={x(index)} cy={y(value)} r={focus === thread.person.id ? 5 : 3.6} fill={tone} stroke="var(--spotlight)" strokeWidth={1.5} className="reveal-fade" style={delay(300 + order * 140 + (index / Math.max(1, count - 1)) * drawMs)} />
+                  <circle key={index} cx={x(index)} cy={y(value)} r={focus === thread.person.id ? 5 : 3.6} fill={tone} stroke="var(--spotlight)" strokeWidth={1.5} className="reveal-fade" style={delay(300 + order * stagger + (index / Math.max(1, count - 1)) * drawMs)} />
                 ))}
               </g>
             );
           })}
+          </g>
         </svg>
 
         {bubbles.map(({ note, index, row, text, left }) => (
           <Bubble key={`${note.kind}-${index}`} note={note} text={text} left={left} top={8 + row * 30} at={drawMs * ((index + 1) / count) + 500 + row * 200} />
         ))}
 
+        {/* More titles past the edge: the lines fade out over them and a quiet "…" says so. */}
+        {tail ? <p className="absolute text-[15px] leading-none text-[var(--thread-ink)]/45" aria-hidden="true" style={{ left: x(STORY_STATIONS) - 8, top: HEIGHT - BOTTOM + 10 }}>…</p> : null}
         {/* The titles along the bottom, with the group's number. */}
         {story.stations.map((station, index) => labelled.has(index) ? (
-          <div key={station.item.id} className="absolute text-center" style={{ left: Math.max(0, Math.min(contentWidth - labelWidth, x(index) - labelWidth / 2)), width: labelWidth, top: HEIGHT - BOTTOM + 8 }}>
-            <p className="mx-auto max-w-[92%] truncate text-[11px] leading-tight text-white/80" title={station.item.title}>{station.item.title}</p>
-            <p className="mt-0.5 text-[11px] tabular-nums text-white/45">{fmt(station.average)}</p>
+          <div key={station.item.id} className="absolute text-center" style={{ ...labelBox(index), top: HEIGHT - BOTTOM + 8 }}>
+            <p className="mx-auto max-w-[92%] truncate text-[11px] leading-tight text-[var(--thread-ink)]/80" title={station.item.title}>{station.item.title}</p>
+            <p className="mt-0.5 text-[11px] tabular-nums text-[var(--thread-ink)]/45">{fmt(station.average)}</p>
           </div>
         ) : null)}
       </div>

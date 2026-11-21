@@ -3,9 +3,38 @@ import test from "node:test";
 
 import { demoFilmInput, demoReadingInput } from "../scripts/seed-showcase/data";
 import { buildStory, type DatedStory, type RatedStory, type StoryInput } from "../app/goa/story/model";
+import { initialThreadSelection, threadPersonStyle } from "../app/goa/story/thread-people";
 
 const TODAY = "2026-09-29";
 const films = demoFilmInput("Movie club", (key) => `comment ${key} — long enough to be quoted`, TODAY);
+
+test("crowded threads start with six people, including the most contrasting ratings", () => {
+  const people = Array.from({ length: 10 }, (_, index) => ({ id: `person-${index}`, name: `Person ${index}` }));
+  const story = buildStory({
+    ...films, people,
+    ratings: people.flatMap((person, index) => films.items.map((item) => ({
+      personId: person.id, itemId: item.id, value: index === 8 ? 0 : index === 9 ? 5 : 2.5,
+    }))),
+    expectations: [],
+  });
+  assert.equal(story.kind, "rated");
+  const ids = people.map((person) => person.id);
+  const selected = initialThreadSelection(story, ids);
+  assert.equal(new Set(selected).size, 6);
+  assert.deepEqual(selected.slice(0, 2), ["person-8", "person-9"]);
+  assert.deepEqual(initialThreadSelection(story, ids.slice(0, 6)), []);
+});
+
+test("each person keeps a distinct thread style in a full group", () => {
+  const ids = Array.from({ length: 62 }, (_, index) => `person-${index}`);
+  const styles = ids.map((id) => threadPersonStyle(ids, id));
+
+  assert.equal(new Set(styles.map(({ tone }) => tone)).size, ids.length);
+  assert.ok(styles.slice(0, 6).every(({ dash }) => dash === undefined));
+  assert.ok(styles.slice(6).every(({ dash }) => dash !== undefined));
+  assert.notEqual(styles[6].dash, styles[12].dash);
+  assert.deepEqual(threadPersonStyle([...ids, "new-person"], ids[7]), styles[7]);
+});
 
 test("a rated club: the drawing's pinned notes and the almanac say what the data backs", () => {
   const story = buildStory(films) as RatedStory;

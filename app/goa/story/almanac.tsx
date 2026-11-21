@@ -14,7 +14,7 @@ import { CatalogTile } from "../catalog-views";
 import { firstName, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
 import { Dialog } from "../dialog";
-import { AvatarMark, CommentText, cx, SearchField } from "../ui";
+import { AvatarMark, CommentText, cx, ListMoreButton, SearchField } from "../ui";
 import { formatRuntime } from "../utils";
 import type { DatedStory, GroupStat, ItemScore, RatedStory, Story, StoryInput } from "./model";
 
@@ -49,6 +49,8 @@ export interface AlmanacPage {
   headline: string;
   /** The body draws the headline itself (the words page puts its search beside it); the screen skips its own. */
   ownHeadline?: boolean;
+  /** The headline only repeats the page's first card (its big number), so a story image leaves it out. */
+  echoed?: boolean;
   body: ReactNode;
 }
 
@@ -67,7 +69,7 @@ const outlineClass = "rounded-[20px] border border-[var(--line)] p-5 sm:p-6";
 /** A titled, outlined section of a page — a heading, the facts, nothing else. Sections in a row share one height. */
 function Block({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <section className={cx("flex min-w-0 flex-col", outlineClass, wide && "[grid-column:1/-1]")}>
+    <section className={cx("flex min-w-0 flex-col", outlineClass, wide && "[grid-column:1/-1]")} data-story-wide={wide ? "" : undefined}>
       <h4 className={sectionTitleClass}>{title}</h4>
       <div className="mt-4 min-w-0 flex-1">{children}</div>
     </section>
@@ -216,7 +218,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
 }
 
 /** Group by participant, item and explicitly recorded set; every selected field remains visible. */
-function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
+function RecordsList({ rows, unit, showPerson, ids, limit }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string; limit?: number }) {
+  const t = useTranslations("story");
   const [open, setOpen] = useState<RecordRow | null>(null);
   const nf = useFormatter();
   const groups = new Map<string, RecordRow[]>();
@@ -225,13 +228,14 @@ function RecordsList({ rows, unit, showPerson, ids }: { rows: RecordRow[]; unit:
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   return <>
-    <div className="space-y-4">{[...groups.entries()].map(([key, group]) => {
+    <div className="space-y-4">{[...groups.entries()].slice(0, limit).map(([key, group]) => {
       const first = group[0];
       return <section key={key} className="rounded-xl bg-[var(--wash)] px-4 py-3">
         <h5 className="mb-2 text-sm font-medium">{[first.item.title, showPerson ? first.person.name : null, first.seriesLabel ? `${first.seriesLabel} ${nf.number(first.seriesValue!)}` : null].filter(Boolean).join(" · ")}</h5>
         <ul className="divide-y divide-[var(--line)]">{group.map((row) => <Progression key={`${row.metricKey ?? ""}:${row.context?.value ?? ""}`} row={row} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />)}</ul>
       </section>;
     })}</div>
+    {limit !== undefined && groups.size > limit ? <p className="mt-3 text-xs text-[var(--muted)]">{t("metricsMore", { count: groups.size - limit })}</p> : null}
     {open ? <RecordDialog row={open} unit={open.unit ?? unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
   </>;
 }
@@ -291,9 +295,8 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
  * many and ends with "…" for the rest: the page is a preview, the PDF has everything.
  */
 function ScoreShelf({ title, scores, ratingLabel, pageTiles, limit, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; pageTiles?: number; limit?: number; scrolls?: boolean }) {
-  const t = useTranslations("story");
   const [open, setOpen] = useState(false);
-  // On screen, at most `limit` until "+ N more" opens the rest; a downloaded page keeps `pageTiles` and says "…".
+  // On screen, Show more opens the rest; a downloaded page keeps `pageTiles` and says "…".
   const onScreen = pageTiles === undefined;
   const shown = !onScreen ? scores.slice(0, pageTiles) : limit !== undefined && !open ? scores.slice(0, limit) : scores;
   const cut = !onScreen && scores.length > shown.length;
@@ -320,25 +323,58 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, limit, scrolls = tr
         ))}
       </div>
       {cut ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
-      {folded ? (
-        <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={open} aria-label={open ? t("showLess") : t("showMore", { count: folded })} onClick={() => setOpen((value) => !value)}>
-          {open ? less(folded) : t("plusMore", { count: folded })}
-        </StateButton>
-      ) : null}
+      {folded ? <StoryListToggle expanded={open} count={folded} onClick={() => setOpen((value) => !value)} /> : null}
     </section>
   );
 }
 
 /** A comment card grows with its words up to this, then folds behind "Show more". */
 const COLLAPSED_COMMENT_HEIGHT = 360;
-const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
 const CHART_PREVIEW_ROWS = 5;
+/** A downloaded story is a summary, not the whole page: how much of each long list it keeps. */
+const STORY_RECORD_GROUPS = 3;
+const STORY_CRITICS_EACH_END = 2;
+const STORY_FAVOURITES = 3;
+const STORY_PAIRS = 4;
+const STORY_COMMON_GROUND = 2;
 const RANKING_PREVIEW_ROWS = 5;
 const PAGE_QUOTES = 4;
+/** A story's comment reads at a glance: about two lines of words, and a caption (who, on what) that fits one line. */
+const STORY_QUOTE_CHARS = 110;
+const STORY_CAPTION_CHARS = 40;
+
+/**
+ * The comments a story image keeps: the ones that read at a glance (short words, a one-line caption) first, the
+ * shortest breaking ties, in their own order on the image.
+ */
+function storyQuotes(quotes: WallQuote[]): WallQuote[] {
+  const glance = (quote: WallQuote) => quote.text.length <= STORY_QUOTE_CHARS && quote.caption.length <= STORY_CAPTION_CHARS;
+  const picked = new Set([...quotes]
+    .sort((a, b) => Number(glance(b)) - Number(glance(a)) || a.text.length - b.text.length)
+    .slice(0, PAGE_QUOTES)
+    .map((quote) => quote.key));
+  return quotes.filter((quote) => picked.has(quote.key));
+}
+
+/** The words page's line: on a story image that shows only some of the comments, how many of how many. */
+function wordsHeadline(t: ReturnType<typeof useTranslations>, count: number, full: boolean): string {
+  return full && count > PAGE_QUOTES
+    ? t("pages.words.headlinePicked", { shown: PAGE_QUOTES, count })
+    : t("pages.words.headline", { count });
+}
 /** How many lines the words page shows before "Show all". */
 const PREVIEW_QUOTES = 12;
-/** Folding a preview list away again: "− 4" (read out in words). Unfolding it says "+ 4 more" (`story.plusMore`). */
-const less = (count: number) => `− ${count}`;
+
+function StoryListToggle({ expanded, count, onClick }: { expanded: boolean; count: number; onClick: () => void }) {
+  const t = useTranslations("adminChallenge");
+  return (
+    <div className="mt-3 border-t border-[var(--line)]">
+      <ListMoreButton expanded={expanded} onClick={onClick}>
+        {expanded ? t("showLess") : t("showMoreItems", { count })}
+      </ListMoreButton>
+    </div>
+  );
+}
 
 type WallQuote = { key: string; person: { id: Id; name: string }; text: string; about: string; caption: string };
 
@@ -353,14 +389,13 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
   const [personId, setPersonId] = useState<Id | null>(null);
   const [showAll, setShowAll] = useState(false);
   if (full) {
-    // An image holds only what fits: the shortest lines (in their own order), never a long one cut off.
-    const picked = new Set([...quotes].sort((a, b) => a.text.length - b.text.length).slice(0, PAGE_QUOTES).map((quote) => quote.key));
+    // An image holds only what reads at a glance (see `storyQuotes`), never a long one cut off.
     return (
       <Grid>
-        {quotes.filter((quote) => picked.has(quote.key)).map((quote) => (
+        {storyQuotes(quotes).map((quote) => (
           <figure key={quote.key} className={cardClass}>
             <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
-            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><span title={quote.person.name} className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, quote.person.id) }} />{quote.caption}</figcaption>
+            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><span title={quote.person.name} className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, quote.person.id) }} /><span className="min-w-0 truncate">{quote.caption}</span></figcaption>
           </figure>
         ))}
       </Grid>
@@ -413,9 +448,7 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
         ))}
       </Grid>
       {!filtering && found.length > PREVIEW_QUOTES ? (
-        <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={showAll} aria-label={showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })} onClick={() => setShowAll((value) => !value)}>
-          {showAll ? less(found.length - PREVIEW_QUOTES) : t("plusMore", { count: found.length - PREVIEW_QUOTES })}
-        </StateButton>
+        <StoryListToggle expanded={showAll} count={found.length - PREVIEW_QUOTES} onClick={() => setShowAll((value) => !value)} />
       ) : null}
     </div>
   );
@@ -497,7 +530,8 @@ function Grid({ children }: { children: ReactNode }) {
   nodes.forEach((node, index) => { if (isWide(node)) close(); else run.push(index); });
   close();
   return (
-    <div className="grid gap-4 @2xl:grid-cols-2">
+    // `data-story-grid`: a downloaded story lays these cards out itself (all stacked, or some side by side), see pages.tsx.
+    <div className="grid gap-4 @2xl:grid-cols-2" data-story-grid="">
       {nodes.map((node, index) => (lone.has(index) ? <div key={index} className="grid min-w-0 @2xl:[grid-column:1/-1]">{node}</div> : node))}
     </div>
   );
@@ -505,8 +539,7 @@ function Grid({ children }: { children: ReactNode }) {
 
 /**
  * Every page the almanac has for this story — only the ones its data can fill. `full` is a downloaded
- * page: no buttons to press, so long lists stay at their preview and say "+ N" for the rest (a page is a
- * preview and must keep its shape; the PDF has everything).
+ * page: long lists stay at their preview length to fit on the image.
  */
 export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric[], full = false, manage = false): AlmanacPage[] {
   const t = useTranslations("story");
@@ -558,7 +591,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const displayedGenres = !full && genresExpanded ? s.genres : s.genres.slice(0, CHART_PREVIEW_ROWS);
     // The best year is the tallest column: the highest average (a tie goes to the year with more titles).
     const bestYearKey = [...yearGroups].sort((a, b) => b.average - a.average || b.count - a.count)[0]?.key;
-    const restRankLabel = (place: number) => s.ranking.length > 10 && place < 10 ? `0${place}` : String(place);
+    const rankDigits = String(s.ranking.length).length;
     const propertyLabel = (label: string) => (t.has(`property.labels.${label}`) ? t(`property.labels.${label}`) : label);
     const renderPodium = (layout: typeof fullPodiumLayout, mode: "compact" | "full", className: string) => (
       <div
@@ -595,10 +628,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       <div className={className} data-ranking-mode={mode}>
         <ol className="space-y-2.5">
           {(showAll ? rows : rows.slice(0, RANKING_PREVIEW_ROWS)).map((score, index) => {
-            const place = index + startAt;
+            const rank = String(index + startAt).padStart(rankDigits, "0");
             return (
-              <li key={score.item.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-baseline gap-2 text-xs" data-rank={restRankLabel(place)}>
-                <span className="tabular-nums text-[var(--muted)]">{restRankLabel(place)}</span>
+              <li key={score.item.id} className="grid items-baseline gap-2 text-xs" style={{ gridTemplateColumns: `max(1.5rem, ${rankDigits}ch) minmax(0, 1fr) auto` }} data-rank={rank}>
+                <span className="tabular-nums text-[var(--muted)]">{rank}</span>
                 <span className="truncate text-sm">{score.item.title}</span>
                 <span className="tabular-nums text-[var(--muted)]">{fmtScore(score.score)}</span>
               </li>
@@ -607,9 +640,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         </ol>
         {/* Only on screen: a downloaded page never lists the rest. */}
         {rows.length > RANKING_PREVIEW_ROWS ? (
-          <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={rankingExpanded ? t("showLess") : t("showMore", { count: rows.length - RANKING_PREVIEW_ROWS })} onClick={() => setRankingExpanded((value) => !value)}>
-            {rankingExpanded ? less(rows.length - RANKING_PREVIEW_ROWS) : t("plusMore", { count: rows.length - RANKING_PREVIEW_ROWS })}
-          </StateButton>
+          <StoryListToggle expanded={rankingExpanded} count={rows.length - RANKING_PREVIEW_ROWS} onClick={() => setRankingExpanded((value) => !value)} />
         ) : null}
       </div>
     );
@@ -619,9 +650,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         {/* A downloaded image says only that there's more. */}
         {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
         {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
-          <StateButton type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })} onClick={() => setGenresExpanded((value) => !value)}>
-            {genresExpanded ? less(s.genres.length - CHART_PREVIEW_ROWS) : t("plusMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
-          </StateButton>
+          <StoryListToggle expanded={genresExpanded} count={s.genres.length - CHART_PREVIEW_ROWS} onClick={() => setGenresExpanded((value) => !value)} />
         ) : null}
       </div>
     ) : null;
@@ -862,6 +891,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         ),
       });
     } else if (s.critics.length || s.pairs.length) {
+      // Generous first, toughest last. A story keeps both ends and folds the middle into "…".
+      const critics = [...s.critics].reverse();
+      const criticsCut = full && critics.length > STORY_CRITICS_EACH_END * 2 + 1;
+      const criticRows = criticsCut ? [...critics.slice(0, STORY_CRITICS_EACH_END), null, ...critics.slice(-STORY_CRITICS_EACH_END)] : critics;
+      const favourites = [...Map.groupBy(s.critics.filter((critic) => critic.favourite), (critic) => critic.favourite!.item.id).values()];
+      const shownFavourites = full ? favourites.slice(0, STORY_FAVOURITES) : favourites;
+      const shownPairs = s.pairs.slice(0, full ? STORY_PAIRS : 6);
+      const shownCommon = full ? s.commonGround.slice(0, STORY_COMMON_GROUND) : s.commonGround;
       pages.push({
         id: "people",
         title: t("pages.people.title"),
@@ -875,12 +912,15 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {s.critics.length ? (
               <Block title={t("critics.title", { name: firstName(s.critics[0].person.name), value: fmt(s.critics[0].average) })}>
                 <ul className="space-y-2.5">
-                  {[...s.critics].reverse().map((critic, index, list) => (
+                  {criticRows.map((critic) => critic === null ? (
+                    <li key="fold" className="pl-10 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</li>
+                  ) : (
                     <li key={critic.person.id} className="flex items-center gap-3 text-sm">
                       <Avatar id={critic.person.id} name={critic.person.name} ids={ids} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate">{firstName(critic.person.name)}{index === 0 ? <span className="text-[var(--muted)]"> · {t("critics.generous")}</span> : index === list.length - 1 ? <span className="text-[var(--muted)]"> · {t("critics.tough")}</span> : null}</span>
-                        <span className="block truncate text-xs text-[var(--muted)]">{t("critics.detail", { top: critic.top, favourite: critic.favourite?.item.title ?? "—" })}</span>
+                        <span className="block truncate">{firstName(critic.person.name)}{critic === critics[0] ? <span className="text-[var(--muted)]"> · {t("critics.generous")}</span> : critic === critics.at(-1) ? <span className="text-[var(--muted)]"> · {t("critics.tough")}</span> : null}</span>
+                        {/* A story is a glance: the name and the number, the details stay on the page. */}
+                        {full ? null : <span className="block truncate text-xs text-[var(--muted)]">{t("critics.detail", { top: critic.top, favourite: critic.favourite?.item.title ?? "—" })}</span>}
                       </span>
                       <strong className="font-medium tabular-nums">{fmt(critic.average)}</strong>
                     </li>
@@ -892,7 +932,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               <Block title={t("favourites.eyebrow")}>
                 <ul className="space-y-3">
                   {/* One tile per title, with everyone whose #1 it is under it. */}
-                  {[...Map.groupBy(s.critics.filter((critic) => critic.favourite), (critic) => critic.favourite!.item.id).values()].map((group) => (
+                  {shownFavourites.map((group) => (
                     <li key={group[0].favourite!.item.id}>
                       <CatalogTile title={group[0].favourite!.item.title} year={group[0].favourite!.item.year} ratingLabel="" caption="" />
                       <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs">
@@ -903,12 +943,13 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                     </li>
                   ))}
                 </ul>
+                {favourites.length > shownFavourites.length ? <p className="mt-2 text-xs text-[var(--muted)]">{t("metricsMore", { count: favourites.length - shownFavourites.length })}</p> : null}
               </Block>
             ) : null}
             {s.pairs.length ? (
               <Block title={t("pairs.eyebrow")}>
                 <ul className="space-y-2">
-                  {s.pairs.slice(0, 6).map((pair, index) => (
+                  {shownPairs.map((pair, index) => (
                     <li key={`${pair.a.id}-${pair.b.id}`}>
                       <Bar label={<span className="flex items-center gap-1.5"><span className="flex -space-x-1.5"><Avatar id={pair.a.id} name={pair.a.name} ids={ids} size={6} /><Avatar id={pair.b.id} name={pair.b.name} ids={ids} size={6} /></span><span className="truncate">{firstName(pair.a.name)} & {firstName(pair.b.name)}</span></span>} value={pair.agreement} max={100} figure={`${pair.agreement}%`} strong={index === 0} tone={index === 0 ? "var(--tag-blue)" : "var(--main-line)"} />
                     </li>
@@ -920,7 +961,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {s.commonGround.length ? (
               <Block title={t("common.eyebrow")}>
                 <ul className="space-y-3 text-sm">
-                  {s.commonGround.map((row) => (
+                  {shownCommon.map((row) => (
                     <li key={`${row.a.id}-${row.b.id}`} className="flex items-start gap-3">
                       <span className="flex -space-x-2"><Avatar id={row.a.id} name={row.a.name} ids={ids} /><Avatar id={row.b.id} name={row.b.name} ids={ids} /></span>
                       <span className="leading-snug">{t("common.line", { a: firstName(row.a.name), b: firstName(row.b.name), agreement: row.agreement, genre: row.genre, aValue: fmt(row.aAverage), bValue: fmt(row.bAverage) })}</span>
@@ -944,6 +985,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           : s.properties[0]
             ? t("pages.details.headlineProperty", { label: propertyLabel(s.properties[0].label), name: s.properties[0].best.key })
             : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
+        echoed: !s.surprises.length && !s.properties.length,
         body: (
           <Grid>
             {s.totals.minutes ? (() => {
@@ -1006,11 +1048,11 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
-        headline: t("pages.words.headline", { count: s.quotes.length }),
+        headline: wordsHeadline(t, s.quotes.length, full),
         ownHeadline: true,
         body: (
           <QuoteWall
-            headline={t("pages.words.headline", { count: s.quotes.length })}
+            headline={wordsHeadline(t, s.quotes.length, full)}
             full={full}
             ids={ids}
             quotes={s.quotes.map((quote) => ({
@@ -1095,9 +1137,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               {byStreak.map((lane) => (
                 <li key={lane.person.id} className="flex items-center gap-3 text-sm">
                   <Avatar id={lane.person.id} name={lane.person.name} ids={ids} />
-                  <span className="w-16 truncate">{firstName(lane.person.name)}</span>
+                  <span className="w-24 flex-none truncate">{firstName(lane.person.name)}</span>
                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full" style={{ width: `${Math.max(4, ((lane.longest?.length ?? (lane.days.length ? 1 : 0)) / Math.max(1, byStreak[0].longest?.length ?? 1)) * 100)}%`, background: personTone(ids, lane.person.id) }} /></span>
-                  <span className="w-32 flex-none whitespace-nowrap text-right text-xs text-[var(--muted)]">{t("streaks.best", { count: lane.longest?.length ?? (lane.days.length ? 1 : 0) })}{lane.current > 1 ? ` · ${t("streaks.now", { count: lane.current })}` : ""}</span>
+                  <span className="w-28 flex-none whitespace-nowrap text-right text-xs text-[var(--muted)]">{t("streaks.best", { count: lane.longest?.length ?? (lane.days.length ? 1 : 0) })}{lane.current > 1 ? ` · ${t("streaks.now", { count: lane.current })}` : ""}</span>
                 </li>
               ))}
             </ul>
@@ -1212,7 +1254,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <Grid>
             <Block title={t("records.list")} wide>
-              <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} />
+              <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} limit={full ? STORY_RECORD_GROUPS : undefined} />
             </Block>
           </Grid>
         ),
@@ -1223,11 +1265,11 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
-        headline: t("pages.words.headline", { count: s.notes.length }),
+        headline: wordsHeadline(t, s.notes.length, full),
         ownHeadline: true,
         body: (
           <QuoteWall
-            headline={t("pages.words.headline", { count: s.notes.length })}
+            headline={wordsHeadline(t, s.notes.length, full)}
             full={full}
             ids={ids}
             quotes={s.notes.map((note) => ({

@@ -17,9 +17,37 @@ import { storyHeadline, ThreadPanel, useStoryFigures } from "./view";
 const PAGE_WIDTH = 540;
 const PAGE_HEIGHT = 960;
 
+/** How far a page may shrink to fit, and how far a short one may grow to fill the story instead of leaving it empty. */
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 1.3;
+/** Two layouts this close in scale read the same; the one with more full-width cards wins. */
+const SCALE_TIE = 0.04;
+/** Side by side, each card keeps at least this much room (layout px): a narrower one reads as a sliver. */
+const MIN_PAIRED_COLUMN = 240;
+const GRID_GAP = 16;
+/** Past this many cards the layouts multiply (a Fibonacci count); the page is simply stacked. */
+const MAX_TILED_CARDS = 8;
+
 /**
- * A story is one screen: when a page holds more than fits, the whole of it shrinks until it does (a story can't
- * scroll, and cutting it off would hide the end). It's laid out wider by the same factor, so it keeps its shape.
+ * Every way to lay a page's cards out in a two-column grid with no lone half: each card either spans the row or
+ * pairs with its neighbour. `true` marks a full-width card. A `wide` card always spans.
+ */
+function cardTilings(wide: boolean[]): boolean[][] {
+  const out: boolean[][] = [];
+  const walk = (index: number, row: boolean[]) => {
+    if (index >= wide.length) { out.push(row); return; }
+    walk(index + 1, [...row, true]);
+    if (index + 1 < wide.length && !wide[index] && !wide[index + 1]) walk(index + 2, [...row, false, false]);
+  };
+  walk(0, []);
+  return out;
+}
+
+/**
+ * A story is one screen that can't scroll. The page is tried in every card layout (all stacked, or some cards side by
+ * side), each at the largest scale that fits; the biggest wins, more full-width cards breaking a near tie. A page with
+ * little on it grows (up to `MAX_SCALE`) rather than leaving the story half empty. It's laid out narrower or wider by
+ * the same factor, so it keeps its shape.
  */
 function FitBox({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
@@ -28,22 +56,49 @@ function FitBox({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const outer = box.current, content = inner.current;
     if (!outer || !content) return;
-    // Laid out wider, a page also gets shorter (cards go side by side, lines hold more words), so the scale is
-    // found by trying: the largest one, down to half, at which the page laid out at that width fits.
+    // The search resizes the content itself, which wakes the observer; only a real change (fonts, data) refits.
+    let settled = { room: -1, height: -1 };
     const fit = () => {
       const room = outer.clientHeight;
+      if (room === settled.room && content.scrollHeight === settled.height) return;
       const heightAt = (value: number) => { content.style.width = `${100 / value}%`; return content.scrollHeight * value; };
-      let found = 1;
-      if (heightAt(1) > room) {
-        let low = 0.5, high = 1;
-        for (let step = 0; step < 9; step += 1) {
+      const bestScale = (ceiling: number) => {
+        if (heightAt(ceiling) <= room) return ceiling;
+        let low = MIN_SCALE, high = ceiling;
+        for (let step = 0; step < 8; step += 1) {
           const mid = (low + high) / 2;
           if (heightAt(mid) <= room) low = mid; else high = mid;
         }
-        found = low;
+        return low;
+      };
+      // The page's card grid (`Grid` in the almanac), laid out here instead of by its width.
+      const grid = content.querySelector<HTMLElement>("[data-story-grid]");
+      const cards = grid ? [...grid.children].filter((node): node is HTMLElement => node instanceof HTMLElement) : [];
+      const apply = (tiling: boolean[]) => {
+        if (!grid) return;
+        grid.style.gridTemplateColumns = tiling.every(Boolean) ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))";
+        cards.forEach((card, index) => { card.style.gridColumn = tiling[index] ? "1 / -1" : "auto"; });
+      };
+      const tilings = cards.length > 1 && cards.length <= MAX_TILED_CARDS
+        ? cardTilings(cards.map((card) => card.matches("[data-story-wide]") || Boolean(card.querySelector(":scope > [data-story-wide]"))))
+        : [cards.map(() => true)];
+      let chosen = { tiling: tilings[0], scale: 0, full: -1 };
+      for (const tiling of tilings) {
+        // Paired cards cap the scale: past it, laid out narrower, each column would drop under its minimum.
+        const ceiling = tiling.every(Boolean) ? MAX_SCALE : Math.max(MIN_SCALE, Math.min(MAX_SCALE, outer.clientWidth / (MIN_PAIRED_COLUMN * 2 + GRID_GAP)));
+        const full = tiling.filter(Boolean).length;
+        // A layout that can't beat the one in hand, even at its ceiling, isn't worth measuring.
+        if (ceiling <= chosen.scale + SCALE_TIE && full <= chosen.full) continue;
+        apply(tiling);
+        const value = bestScale(ceiling);
+        const better = value > chosen.scale + SCALE_TIE || (value >= chosen.scale - SCALE_TIE && full > chosen.full);
+        if (better) chosen = { tiling, scale: value, full };
       }
-      content.style.width = `${100 / found}%`;
-      setScale(found);
+      apply(chosen.tiling);
+      // Every page starts right under its name; a short one grows (up to MAX_SCALE) rather than floating.
+      heightAt(chosen.scale);
+      settled = { room, height: content.scrollHeight };
+      setScale(chosen.scale);
     };
     fit();
     const observer = new ResizeObserver(fit);
@@ -69,7 +124,7 @@ function StoryFrame({ input, figures, index, eyebrow, headline, children }: {
   eyebrow?: string; headline?: string; children: ReactNode;
 }) {
   return (
-    <article className="story-still story-page flex flex-col overflow-hidden bg-[var(--canvas)] px-9 pb-7 pt-9 text-[var(--ink)]" style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT }}>
+    <article className="story-still story-page flex flex-col overflow-hidden bg-[var(--canvas)] px-9 pb-7 pt-9 text-left text-[var(--ink)]" style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT }}>
       <header className="border-b border-[var(--line)] pb-5">
         <h1 className="line-clamp-2 text-[38px] font-light leading-[1.02] tracking-[-0.05em]">{input.title}</h1>
         <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
@@ -82,7 +137,8 @@ function StoryFrame({ input, figures, index, eyebrow, headline, children }: {
         </dl>
       </header>
       <section className="mt-6 flex min-h-0 flex-1 flex-col">
-        {eyebrow ? <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">{eyebrow}</p> : null}
+        {/* The page's name as its tab says it on screen: sentence case, not a shouted label. */}
+        {eyebrow ? <p className="text-[15px] font-medium text-[var(--muted)]">{eyebrow}</p> : null}
         {headline ? <p className="mt-1.5 text-[21px] font-light leading-snug tracking-[-0.02em]">{headline}</p> : null}
         <FitBox>{children}</FitBox>
       </section>
@@ -114,7 +170,8 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
   };
   return [
     ...(story.kind !== "empty" && !input.resultPresentation?.hiddenPages.includes("thread") ? [{ id: "thread", title: t("title"), node: frame(t("title"), storyHeadline(story, input, t), <ThreadPanel input={input} story={story} fit interactive={false} bare />) }] : []),
-    ...almanac.map((page) => ({ id: page.id, title: page.title, node: frame(page.title, page.headline, page.body) })),
+    // No line that says again what's right under it: the first card's big number, or the page's own name.
+    ...almanac.map((page) => ({ id: page.id, title: page.title, node: frame(page.title, page.echoed || page.headline === page.title ? undefined : page.headline, page.body) })),
   ];
 }
 

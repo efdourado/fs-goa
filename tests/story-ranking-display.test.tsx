@@ -91,6 +91,27 @@ test("interactive words pages fit each comment up to a cap while downloadable pa
   assert.ok(downloadable.includes("A complete opinion 1"));
 });
 
+test("ranks below the podium use the digit count of the full ranking", () => {
+  function Ranking({ count }: { count: number }) {
+    const items = Array.from({ length: count }, (_, index) => ({ id: `film-${index}`, title: `Film ${index + 1}` }));
+    const fixture: StoryInput = {
+      ...input,
+      items,
+      ratings: items.map((item, index) => ({ personId: "me", itemId: item.id, value: 5 - index / count })),
+      scores: undefined,
+    };
+    return useAlmanacPages(buildStory(fixture), fixture, []).find((page) => page.id === "rankings")?.body;
+  }
+
+  for (const [count, compactRank, fullRank] of [[9, "4", "6"], [10, "04", "06"], [99, "04", "06"], [100, "004", "006"]] as const) {
+    const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Ranking count={count} /></NextIntlClientProvider>);
+    const ranks = [...html.matchAll(/data-rank="(\d+)"/g)].map((match) => match[1]);
+    assert.equal(ranks[0], compactRank);
+    assert.equal(ranks[5], fullRank);
+    assert.deepEqual([...html.matchAll(/data-podium-place="(\d+)"/g)].map((match) => match[1]), ["2", "1", "3", "4", "2", "1", "3", "5"]);
+  }
+});
+
 test("long genre and year charts stay paired, horizontal and independently expandable", () => {
   const genres = ["Suspense", "Drama", "Comedy", "Sci-Fi", "Action", "Romance", "Horror"];
   const items = Array.from({ length: 19 }, (_, index) => ({
@@ -126,9 +147,9 @@ test("long genre and year charts stay paired, horizontal and independently expan
   assert.ok(html.includes('data-horizontal-chart="genres" data-chart-rows="5"'));
   assert.ok(html.includes('data-vertical-chart="years" data-chart-columns="19"'), "every year is a column, no folding");
   assert.ok(!html.includes("2001–03") && html.includes("’01"), "one column per year, never merged into ranges, short labels when crowded");
-  assert.ok(html.includes('aria-label="Show 2 more"') && html.includes(">+ 2 more<"), "the genres chart has its own + N more action");
+  assert.match(html, /aria-expanded="false"[^>]*>Show more \(\+2\)<\/button>/, "the genres chart has its own Show more button");
   assert.ok(!html.includes("See every year") && !html.includes("data-scrollable-year-chart"));
-  assert.ok(html.includes(">+ 11 more<") && html.includes(">+ 9 more<"), "the rest of the ranking says + N more");
+  assert.ok(html.includes(">Show more (+11)<") && html.includes(">Show more (+9)<"), "both ranking lists show the remaining count in the shared button");
   assert.ok(html.includes('title="1 film from 2001, averaging'), "a year's column explains itself on hover");
   assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
 

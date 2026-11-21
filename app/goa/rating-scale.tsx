@@ -10,7 +10,7 @@ import { AvatarMark, cx } from "./ui";
  * Each person keeps one colour wherever they appear (reveal, recap, taste map) — an identity, not a
  * verdict: nobody's rating is painted "wrong" for being far from the group.
  */
-const PERSON_TONES = ["var(--tag-blue)", "var(--tag-violet)", "var(--tag-amber)", "var(--tag-green)", "var(--tag-rose)", "var(--tag-coral)"];
+export const PERSON_TONES = ["var(--tag-blue)", "var(--tag-violet)", "var(--tag-amber)", "var(--tag-green)", "var(--tag-rose)", "var(--tag-coral)"] as const;
 
 export function personTone(ids: readonly Id[], id: Id): string {
   const index = ids.indexOf(id);

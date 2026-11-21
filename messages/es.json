@@ -2060,8 +2060,12 @@
   "story": {
     "threadAria": "Notas de {count} personas en {items} títulos",
     "lanesAria": "Registros de {count} personas en {days} días",
+    "threadPeople": {
+      "title": "Personas en el hilo",
+      "hint": "Elige de quién mostrar los resultados.",
+      "showing": "{shown} de {total} en el hilo"
+    },
     "readDated": "Cada carril es una persona: continuo donde siguió, con huecos donde paró, cuentas más grandes en los días más grandes. El tramo contorneado es su racha más larga.",
-    "showMore": "Ver {count} más",
     "showMoreComment": "Ver más",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Los días de una persona, dibujados.} other {Los días de # personas, lado a lado.}}",
@@ -2262,6 +2266,7 @@
       "words": {
         "title": "En sus palabras",
         "headline": "{count, plural, one {Una frase para guardar.} other {# frases para guardar.}}",
+        "headlinePicked": "{shown} de las {count} frases para guardar.",
         "titleSolo": "En tus palabras"
       },
       "metrics": {
@@ -2350,7 +2355,6 @@
       "note": "Por año de estreno, de {first} a {last}.",
       "tooltip": "{things} de {year}, con media {average}."
     },
-    "plusMore": "+ {count} más",
     "noVisiblePages": "Todavía no hay resultados que mostrar."
   },
   "organise": {

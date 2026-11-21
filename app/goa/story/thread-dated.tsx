@@ -3,10 +3,11 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-import { firstName, personTone } from "../rating-scale";
+import { firstName } from "../rating-scale";
 import type { Id } from "../types";
 import { addDaysKey, type DatedStory, daysBetween, type StoryInput, weekIndex } from "./model";
 import { AvatarMark } from "../ui";
+import { threadPersonStyle } from "./thread-people";
 
 const LANE = 46;
 const TOP = 30;
@@ -19,7 +20,7 @@ const PLOT_PADDING = 12;
  * stopped. A day with a number is a bead sized by it. Each lane's longest run is outlined and named.
  * It draws itself left to right, like the days did.
  */
-export function DatedThread({ story, input, focus, fit = false }: { story: DatedStory; input: StoryInput; focus: Id | null; fit?: boolean }) {
+export function DatedThread({ story, input, focus, visible, fit = false }: { story: DatedStory; input: StoryInput; focus: Id | null; visible?: ReadonlySet<Id>; fit?: boolean }) {
   const t = useTranslations("story");
   const f = useFormatter();
   const ref = useRef<HTMLDivElement>(null);
@@ -33,6 +34,7 @@ export function DatedThread({ story, input, focus, fit = false }: { story: Dated
   }, []);
 
   if (story.lanes.length === 1) return <SoloRhythm story={story} input={input} />;
+  const lanes = visible ? story.lanes.filter(({ person }) => visible.has(person.id)) : story.lanes;
   const total = daysBetween(story.from, story.to) + 1;
   // Leave room for the first bead and streak outline past the label divider.
   const plotStart = LABEL + PLOT_PADDING;
@@ -42,9 +44,9 @@ export function DatedThread({ story, input, focus, fit = false }: { story: Dated
   const plotEnd = plotStart + plotWidth;
   const contentWidth = plotEnd + PLOT_PADDING;
   const x = (day: string) => plotStart + daysBetween(story.from, day) * dayWidth + dayWidth / 2;
-  const height = TOP + story.lanes.length * LANE + 8;
+  const height = TOP + lanes.length * LANE + 8;
   const ids = input.people.map((person) => person.id);
-  const maxValue = Math.max(1, ...story.lanes.flatMap((lane) => lane.days.map((row) => row.value ?? 0)));
+  const maxValue = story.lanes.reduce((max, lane) => lane.days.reduce((peak, day) => Math.max(peak, day.value ?? 0), max), 1);
   // Month starts (or every ~2 weeks on short spans) as the time ruler.
   const ruler: string[] = [];
   for (let offset = 0; offset < total; offset += 1) {
@@ -57,7 +59,7 @@ export function DatedThread({ story, input, focus, fit = false }: { story: Dated
   return (
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
       <div className="story-sweep relative" style={{ width: contentWidth || "100%", height }}>
-        <svg width={contentWidth} height={height} className="block" role="img" aria-label={t("lanesAria", { count: story.lanes.length, days: total })}>
+        <svg width={contentWidth} height={height} className="block" role="img" aria-label={t("lanesAria", { count: lanes.length, days: total })}>
           {ruler.map((day) => {
             const tick = day === story.from ? LABEL : x(day) - dayWidth / 2;
             return (
@@ -67,8 +69,8 @@ export function DatedThread({ story, input, focus, fit = false }: { story: Dated
               </g>
             );
           })}
-          {story.lanes.map((lane, laneIndex) => {
-            const tone = personTone(ids, lane.person.id);
+          {lanes.map((lane, laneIndex) => {
+            const { tone } = threadPersonStyle(ids, lane.person.id);
             const mid = TOP + laneIndex * LANE + LANE / 2;
             const dim = focus !== null && focus !== lane.person.id;
             // Each run (days in a row, or for a workout weeks in a row) is one solid stroke.
@@ -94,10 +96,10 @@ export function DatedThread({ story, input, focus, fit = false }: { story: Dated
           })}
         </svg>
         {/* Names stay pinned on the left while the calendar scrolls. */}
-        {story.lanes.map((lane, laneIndex) => (
+        {lanes.map((lane, laneIndex) => (
           <div key={lane.person.id} className="absolute left-0 flex items-center gap-1.5 pl-1" style={{ top: TOP + laneIndex * LANE + LANE / 2 - 12, opacity: focus !== null && focus !== lane.person.id ? 0.3 : 1 }}>
-            <span className="grid h-6 w-6 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, lane.person.id) }}><AvatarMark /></span>
-            <span className="max-w-[3.6rem] truncate text-[11px] text-white/75">{firstName(lane.person.name)}</span>
+            <span className="grid h-6 w-6 place-items-center rounded-full p-[2px]" style={{ background: threadPersonStyle(ids, lane.person.id).tone }}><AvatarMark /></span>
+            <span className="max-w-[3.6rem] truncate text-[11px] text-[var(--thread-ink)]/75">{firstName(lane.person.name)}</span>
           </div>
         ))}
       </div>
@@ -123,7 +125,7 @@ function SoloRhythm({ story, input }: { story: DatedStory; input: StoryInput }) 
     return () => observer.disconnect();
   }, []);
   const lane = story.lanes[0];
-  const tone = personTone(input.people.map((person) => person.id), lane.person.id);
+  const { tone } = threadPersonStyle(input.people.map((person) => person.id), lane.person.id);
   // Whole weeks, Monday to Sunday, from the first week to the last.
   const firstWeek = weekIndex(story.from);
   const weeks = weekIndex(story.to) - firstWeek + 1;
@@ -174,7 +176,7 @@ function SoloRhythm({ story, input }: { story: DatedStory; input: StoryInput }) 
           );
         })}
       </svg>
-      {lane.longest ? <p className="mt-3 px-3 text-xs text-white/60">{t(story.rhythm === "week" ? "calendarRunWeek" : "calendarRun", { count: lane.longest.length })}</p> : null}
+      {lane.longest ? <p className="mt-3 px-3 text-xs text-[var(--thread-ink)]/60">{t(story.rhythm === "week" ? "calendarRunWeek" : "calendarRun", { count: lane.longest.length })}</p> : null}
     </div>
   );
 }

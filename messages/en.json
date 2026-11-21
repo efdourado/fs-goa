@@ -2056,8 +2056,12 @@
   "story": {
     "threadAria": "{count} people's ratings across {items} titles",
     "lanesAria": "{count} people's check-ins over {days} days",
+    "threadPeople": {
+      "title": "People in the thread",
+      "hint": "Choose whose results to show.",
+      "showing": "{shown} of {total} shown"
+    },
     "readDated": "Each lane is one person: solid where they kept going, gaps where they stopped, bigger beads for bigger days. The outlined stretch is their longest run.",
-    "showMore": "Show {count} more",
     "showMoreComment": "Show more",
     "showLess": "Show less",
     "datedHeadline": "{count, plural, one {One person's days, drawn.} other {# people's days, drawn side by side.}}",
@@ -2258,6 +2262,7 @@
       "words": {
         "title": "In their words",
         "headline": "{count, plural, one {One line worth keeping.} other {# lines worth keeping.}}",
+        "headlinePicked": "{shown} of the {count} lines worth keeping.",
         "titleSolo": "In your words"
       },
       "metrics": {
@@ -2346,7 +2351,6 @@
       "note": "By release year, {first} to {last}.",
       "tooltip": "{things} from {year}, averaging {average}."
     },
-    "plusMore": "+ {count} more",
     "noVisiblePages": "No results to show yet."
   },
   "organise": {
