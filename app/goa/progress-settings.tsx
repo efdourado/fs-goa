@@ -6,8 +6,10 @@ import type { ChallengeDetail, Entry } from "./types";
 import { storyFromChallenge, buildStory } from "./story/model";
 import { BoxSection, Disclosure, Field, inputClass, Select, Toggle } from "./ui";
 
-export function ProgressSettings({ challenge, entries, value, onChange, showPerformance = true, showCheckins = true, performanceBare = false }: {
+export function ProgressSettings({ challenge, entries, value, onChange, showPerformance = true, showCheckins = true, performanceBare = false, inBox = false }: {
   showPerformance?: boolean; showCheckins?: boolean; performanceBare?: boolean;
+  /** Drawn inside a box that already has its outline (the Results tab's form): its sections lose their own frame. */
+  inBox?: boolean;
   challenge: ChallengeDetail; entries: Entry[]; value: ProgressTracking; onChange: (value: ProgressTracking) => void;
 }) {
   const t = useTranslations("progressTracking");
@@ -57,8 +59,8 @@ export function ProgressSettings({ challenge, entries, value, onChange, showPerf
         <ul className="space-y-1 text-xs text-[var(--muted)]">{samples.map((sample, index) => <li key={index}>{t("preview", { title: sample.item.title, first: sample.first, latest: sample.series.at(-1)! })} · {sample.label}{sample.seriesLabel ? ` · ${sample.seriesLabel} ${sample.seriesValue}` : ""}{sample.context ? ` · ${sample.context.label} ${sample.context.value} ${sample.context.unit}` : ""}</li>)}</ul>
       </div>;
   return <>
-      {showPerformance && fields.length ? performanceBare ? performanceControls : <BoxSection title={t("performanceTitle")}>{performanceControls}</BoxSection> : null}
-      {showCheckins && dated ? <BoxSection title={t("checkinsTitle")}><div className="space-y-3">
+      {showPerformance && fields.length ? performanceBare ? performanceControls : <BoxSection flat={inBox} title={t("performanceTitle")}>{performanceControls}</BoxSection> : null}
+      {showCheckins && dated ? <BoxSection flat={inBox} title={t("checkinsTitle")}><div className="space-y-3">
         <Toggle bare checked={Boolean(goal)} onChange={(enabled) => onChange({ ...value, consistency: enabled ? { target: 4, periodDays: 7, count: "sessions" } : null })} label={t("consistency")} />
         {goal ? <>
           <div className="grid grid-cols-2 gap-3">

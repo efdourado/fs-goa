@@ -519,14 +519,16 @@ export function LinkPill({ url, placeholder, copied, busy = false, onCopy, onRen
 }
 
 /** A box of content, as Manage's tabs lay out their parts: a thin border, its name, an optional line, then its controls. */
-export function BoxSection({ title, hint, danger = false, mark, children }: {
+export function BoxSection({ title, hint, danger = false, mark, flat = false, children }: {
   title: string; hint?: string; danger?: boolean;
   /** A small mark before the name (a status dot, say). */
   mark?: ReactNode;
+  /** A part of a box that already has its outline (a tab's one form): no frame of its own. */
+  flat?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
+    <section className={cx("p-5 sm:p-6", !flat && "rounded-[20px] border border-[var(--line)]")}>
       <h2 className={cx("flex items-center gap-2.5 text-lg font-medium tracking-tight", danger && "text-[var(--danger)]")}>{mark}{title}</h2>
       {hint ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</p> : null}
       <div className="mt-4">{children}</div>

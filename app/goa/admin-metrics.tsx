@@ -92,9 +92,11 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
     <PageHeading title={ta("tabs.results")} />
     <StatusMessage error={error} success={success} />
     {closed ? <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{ta("metricsClosedNote")}</p> : null}
-    <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <fieldset disabled={busy} className="min-w-0 space-y-4">
-        <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
+    {/* One box like the General tab: the pages, the check-in settings under a hairline, and the save button pinned to
+        the box's foot while it scrolls. */}
+    <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="rounded-[20px] border border-[var(--line)]">
+      <fieldset disabled={busy} className="min-w-0">
+        <section className="p-5 sm:p-6">
           <div className="mb-3 flex items-center gap-3 border-b border-[var(--line)] pb-4">
             <Toggle bare disabled={closed} checked={!hidden.includes("thread")} onChange={(value) => show("thread", value)} ariaLabel={t("showPage", { title: t("thread") })} />
             <StateButton type="button" onClick={() => setPreview("thread")} className="min-w-0 flex-1 cursor-pointer text-left"><strong className="block text-sm font-medium">{t("thread")}</strong><span className="text-xs text-[var(--muted)]">{t("threadHint")}</span></StateButton>
@@ -125,9 +127,13 @@ export function AdminMetrics({ challenge, entries, onSaveSettings, onSaveMetric,
           </ol>
           {!closed ? <AddRow label={ta("addMetric")} ariaLabel={ta("addMetric")} onClick={() => setEditing("new")} /> : null}
         </section>
-        <fieldset disabled={closed} className="min-w-0 space-y-4"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} /></fieldset>
-        <Button type="submit" className="w-full" disabled={closed || !dirty || busy}>{busy ? tc("saving") : tc("save")}</Button>
+        <fieldset disabled={closed} className="min-w-0 divide-y divide-[var(--line)] border-[var(--line)] empty:hidden [&:not(:empty)]:border-t"><ProgressSettings challenge={challenge} entries={entries} value={settings} onChange={setSettings} showPerformance={false} inBox /></fieldset>
       </fieldset>
+      {closed ? null : (
+        <div className="sticky bottom-0 z-10 rounded-b-[19px] border-t border-[var(--line)] bg-[var(--canvas)] px-5 py-3 sm:px-6">
+          <Button type="submit" className="w-full px-6" disabled={!dirty || busy}>{busy ? tc("saving") : tc("save")}</Button>
+        </div>
+      )}
     </form>
     {preview ? <Dialog title={preview === "thread" ? t("thread") : rows.find((row) => row.id === preview)?.title ?? t("preview")} wide onClose={() => setPreview(null)}>
       <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{previewMetric ? t("metricExplanation", { operation: tm(`operationName.${previewMetric.operation}`), group: tm(`groupBy.${previewMetric.groupBy ?? "none"}`) }) : t(`pages.${preview === "thread" ? "thread" : preview}.description`)}</p>
