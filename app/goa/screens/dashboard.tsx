@@ -454,7 +454,7 @@ export function DashboardScreen({
     );
   }
 
-  const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
+  const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={title} /></div>;
 
   // Starting a challenge of your own: one small button beside the shelf's title, like "new group", that asks chat or by
   // hand (hidden while a colour filters it).
@@ -501,7 +501,11 @@ export function DashboardScreen({
   const hasPersonalChallenge = challenges.some((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
   const personalItems = personalShelf ? personalShelf.items.length + Object.values(personalShelf.counts).reduce((sum, count) => sum + count, 0) : 0;
   const personalBlank = !hasPersonalChallenge && personalItems === 0;
-  const showPersonalSide = !personalBlank || Boolean(colorFilter);
+  // A colour filter shows only the sections holding a challenge of that colour, and just the empty state when
+  // none has it.
+  const showPersonalSide = colorFilter ? filtered.personal.length > 0 : !personalBlank;
+  const showGroupSide = colorFilter ? filtered.group.length > 0 : hasGroups;
+  const filterEmpty = Boolean(colorFilter) && filteredCount === 0;
 
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
@@ -531,7 +535,9 @@ export function DashboardScreen({
 
       <StatusMessage error={error} />
 
-      {brandNew ? (
+      {filterEmpty ? (
+        <FaceEmptyState title={t("filter.empty")} />
+      ) : brandNew ? (
         <>
           <FaceEmptyState title={tWelcome("starts.quick.title")} />
           <ReadyMadeTemplatesSection onOpen={onOpenTemplate} />
@@ -551,9 +557,9 @@ export function DashboardScreen({
             </HomeSectionBlock>
           ) : null}
 
-          {hasGroups ? (
+          {showGroupSide ? (
             <HomeSectionBlock first={!showPersonalSide && !filtered.pinned.length} title={th("sectionGroups")}>
-              {shelves.group.length ? (
+              {(colorFilter ? filtered.group.length : shelves.group.length) ? (
                 <ChallengeShelf title={t("shelf.running")} challenges={filtered.group} renderCard={(challenge) => renderCard(challenge)} />
               ) : null}
               {groupsShelf}
