@@ -143,10 +143,24 @@ export function DeleteButton({ open, disabled, onClick }: { open: boolean; disab
   );
 }
 
-/**
- * Deleting, confirmed inside the same modal: the footer's Delete opens this panel under it (what goes, then one
- * "Confirm deletion" in the same red) instead of stacking a second modal on top. Owns its busy + error.
- */
+export function InlineConfirmation({ body, label, busy, danger, onConfirm }: {
+  body: ReactNode;
+  label: string;
+  busy: boolean;
+  danger?: boolean;
+  onConfirm: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { panelRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, []);
+  return (
+    <div ref={panelRef} className={cx("space-y-3 rounded-2xl border p-4", danger ? "border-[var(--danger-line)]" : "border-[var(--line)]")}>
+      <div className="text-sm leading-6">{body}</div>
+      <Button variant={danger ? "danger" : "primary"} className="w-full" disabled={busy} onClick={onConfirm}>{label}</Button>
+    </div>
+  );
+}
+
+/** The Delete action's inline panel owns its request and feedback. */
 export function DeleteConfirm({ body, onConfirm, busyLabel }: {
   body: ReactNode;
   onConfirm: () => Promise<void> | void;
@@ -156,31 +170,20 @@ export function DeleteConfirm({ body, onConfirm, busyLabel }: {
   const f = useGoaFormat();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  // It opens at the bottom of the modal, maybe below the fold on a phone.
-  useEffect(() => { panelRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, []);
   return (
-    <div ref={panelRef} className="space-y-3 rounded-2xl border border-[var(--danger-line)] p-4">
-      <div className="text-sm leading-6">{body}</div>
+    <>
       <StatusMessage error={error} />
-      <Button
-        variant="danger"
-        className="w-full"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError(null);
-          try {
-            await onConfirm();
-          } catch (cause) {
-            setError(f.error(cause));
-            setBusy(false);
-          }
-        }}
-      >
-        {busy ? busyLabel ?? tc("deleting") : tc("confirmDelete")}
-      </Button>
-    </div>
+      <InlineConfirmation body={body} danger busy={busy} label={busy ? busyLabel ?? tc("deleting") : tc("confirmDelete")} onConfirm={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await onConfirm();
+        } catch (cause) {
+          setError(f.error(cause));
+          setBusy(false);
+        }
+      }} />
+    </>
   );
 }
 

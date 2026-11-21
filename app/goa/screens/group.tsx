@@ -6,20 +6,46 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
-import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, ModalActions } from "../dialog";
+import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, InlineConfirmation, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfView } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
 import { useCatalogShelf } from "../libraries";
 import { NewChallengeButton } from "../welcome";
-import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
+import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
+import { AvatarMark, BackButton, Button, cx, ExitIcon, FaceEmptyState, Field, InlineSubmit, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
 const summaryPart = "max-w-[60vw] rounded-md text-[13px] text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline focus-visible:text-[var(--ink)] focus-visible:underline aria-expanded:text-[var(--ink)]";
 import { canManage } from "../utils";
 import { ActiveChallengeCard, ChallengeShelf } from "./dashboard";
+
+const groupActionClass = "grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25";
+const groupActionIconClass = "h-[18px] w-[18px]";
+const groupAvatarClass = "size-7 place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)]";
+const groupAvatarOverlap = "-ml-3 sm:-ml-2";
+const groupAvatarCountClass = cx(groupAvatarClass, "grid bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]");
+const personRowClass = "flex w-full items-center justify-between gap-3 rounded-xl px-2 py-3 text-left";
+const personRowButtonClass = cx(personRowClass, "cursor-pointer transition hover:bg-[var(--hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]");
+const memberRoleClass = "flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]";
+
+type SelectedPerson = { kind: "member"; id: Id } | { kind: "invite"; request: PendingGroupRequest };
+type PersonAction = { label: string; confirmation?: { label: string; body: string }; danger?: boolean; run: () => Promise<void> };
+
+function PersonRowIdentity({ name, detail }: { name: string; detail: string }) {
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-[var(--wash-strong)]">
+        <AvatarMark />
+      </span>
+      <span className="min-w-0">
+        <strong className="block truncate text-[13.5px] font-medium">{name}</strong>
+        <small className="text-[var(--muted)]">{detail}</small>
+      </span>
+    </span>
+  );
+}
 
 export function GroupScreen({
   group,
@@ -66,7 +92,8 @@ export function GroupScreen({
   onSetMemberBan?: (userId: Id, banned: boolean) => Promise<void>;
 }) {
   const t = useTranslations("group");
-  const canCreateChallenge = canManage(group.role) && challenges.length < challengeLimit;
+  const canManageGroup = canManage(group.role);
+  const canCreateChallenge = canManageGroup && challenges.length < challengeLimit;
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
   const f = useGoaFormat();
@@ -82,6 +109,7 @@ export function GroupScreen({
   const [copyBusy, setCopyBusy] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const memberActionRef = useRef(false);
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
@@ -90,29 +118,47 @@ export function GroupScreen({
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
-  const [roleBusyId, setRoleBusyId] = useState<Id | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<SelectedPerson | null>(null);
+  const [confirmation, setConfirmation] = useState<PersonAction | null>(null);
   const memberCount = group.memberCount ?? group.members?.length ?? 0;
-
-  async function toggleRole(member: Member) {
-    if (!onSetMemberRole) return;
-    const nextRole = member.role === "admin" ? "participant" : "admin";
-    setRoleBusyId(member.id);
-    setRoleError(null);
-    try {
-      await onSetMemberRole(member.id, nextRole);
-    } catch (cause) {
-      setRoleError(f.error(cause));
-    } finally {
-      setRoleBusyId(null);
-    }
-  }
-
-  // The owner bans anyone but themselves; an admin bans participants only (the server holds the same line).
-  const canBan = (member: Member) => Boolean(onSetMemberBan) && member.role !== "owner" && (group.role === "owner" || member.role === "participant");
-  const [banning, setBanning] = useState<Member | null>(null);
+  const headerMembers = (group.members ?? []).slice(0, memberCount > 3 ? 2 : 3);
+  const remainingMemberCount = memberCount - headerMembers.length;
   const [leaving, setLeaving] = useState(false);
   const [unbanBusyId, setUnbanBusyId] = useState<Id | null>(null);
+
+  const selectedMember = selectedPerson?.kind === "member" ? group.members?.find((member) => member.id === selectedPerson.id) : undefined;
+  const selectedInvite = selectedPerson?.kind === "invite" ? selectedPerson.request : undefined;
+  const person = selectedMember ?? selectedInvite;
+  const personActions: PersonAction[] = [];
+  if (selectedMember && selectedMember.role !== "owner") {
+    if (onSetMemberBan && (group.role === "owner" || selectedMember.role === "participant")) {
+      personActions.push({
+        label: t("ban"),
+        confirmation: { label: t("confirmBan"), body: t("banBody", { name: selectedMember.name }) },
+        danger: true,
+        run: () => onSetMemberBan(selectedMember.id, true),
+      });
+    }
+    if (onSetMemberRole && group.role === "owner") {
+      const promote = selectedMember.role !== "admin";
+      personActions.push({
+        label: t(promote ? "makeAdmin" : "makeParticipant"),
+        run: () => onSetMemberRole(selectedMember.id, promote ? "admin" : "participant"),
+      });
+    }
+  }
+  if (selectedInvite && canManageGroup) {
+    personActions.push({
+      label: t("cancelInvite"),
+      confirmation: { label: t("confirmCancelInvite"), body: t("cancelInviteConfirm", { name: selectedInvite.name }) },
+      danger: true,
+      run: async () => {
+        await onCancelRequest(selectedInvite.id);
+        setMemberSuccess(t("inviteCancelled"));
+      },
+    });
+  }
 
   async function unban(userId: Id) {
     if (!onSetMemberBan) return;
@@ -213,9 +259,11 @@ export function GroupScreen({
 
   async function inviteMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (memberActionRef.current) return;
     const form = event.currentTarget;
     const username = String(new FormData(form).get("username") ?? "").trim();
     if (!username) return;
+    memberActionRef.current = true;
     setMemberBusy(true);
     setMemberError(null);
     setMemberSuccess(null);
@@ -227,22 +275,35 @@ export function GroupScreen({
           : result.status === "already_pending" ? t("invitePending", { handle })
           : t("alreadyMember", { handle }),
       );
-      if (result.status === "requested") form.reset();
+      form.reset();
     } catch (cause) {
       setMemberError(f.error(cause));
     } finally {
+      memberActionRef.current = false;
       setMemberBusy(false);
     }
   }
 
-  async function cancelRequest(id: Id, name: string) {
+  function selectPerson(person: SelectedPerson | null) {
+    setSelectedPerson(person);
+    setConfirmation(null);
+    setMemberError(null);
+  }
+
+  async function runPersonAction(action: PersonAction) {
+    if (memberActionRef.current) return;
+    memberActionRef.current = true;
+    setMemberBusy(true);
     setMemberError(null);
     setMemberSuccess(null);
     try {
-      await onCancelRequest(id);
-      setMemberSuccess(t("inviteCancelled", { name }));
+      await action.run();
+      selectPerson(null);
     } catch (cause) {
       setMemberError(f.error(cause));
+    } finally {
+      memberActionRef.current = false;
+      setMemberBusy(false);
     }
   }
 
@@ -251,6 +312,7 @@ export function GroupScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
       <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
+      <StatusMessage error={memberError} success={memberSuccess} />
 
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -259,31 +321,83 @@ export function GroupScreen({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-b border-[var(--line)] pb-5">
-        <div className="flex">
-          {(group.members ?? []).slice(0, 5).map((member, index) => (
-            <span key={member.id} title={member.name} className={cx("grid h-7 w-7 place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]", index > 0 && "-ml-2")}>
+      <div className="mt-4 flex items-center gap-2 border-b border-[var(--line)] pb-5 sm:gap-3">
+        <div className="flex shrink-0">
+          {headerMembers.map((member, index) => (
+            <span key={member.id} title={member.name} className={cx(groupAvatarClass, "grid bg-[var(--main-line)]", index > 0 && groupAvatarOverlap)}>
               <AvatarMark />
             </span>
           ))}
-          {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
+          {remainingMemberCount > 0 ? <span className={cx(groupAvatarCountClass, headerMembers.length > 0 && groupAvatarOverlap)}>+{remainingMemberCount}</span> : null}
           {/* An empty seat at the end of the faces: the quiet way in to inviting someone. */}
-          {canManage(group.role) ? (
-            <StateButton type="button" onClick={openInvite} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--ink-strong)] hover:outline-[var(--main-line)]">
+          {canManageGroup ? (
+            <StateButton type="button" onClick={openInvite} aria-label={t("inviteTitle")} title={t("inviteTitle")} className={cx(groupAvatarClass, "grid cursor-pointer bg-[var(--canvas)] text-[var(--muted)] opacity-75 outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition-opacity hover:opacity-100", memberCount > 0 && groupAvatarOverlap)}>
               <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
             </StateButton>
           ) : null}
         </div>
-        <span className="text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })} · {tr(group.role)}</span>
-        <span className="flex-1" />
-        {canManage(group.role) ? (
-          <div className="flex items-center gap-2">
-            <StateButton type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
-              <SlidersIcon className="h-[18px] w-[18px]" />
-            </StateButton>
+        <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })} · {tr(group.role)}</span>
+        {canManageGroup || onLeaveGroup ? (
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {canManageGroup ? (
+              <StateButton type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className={groupActionClass}>
+                <SlidersIcon className={groupActionIconClass} />
+              </StateButton>
+            ) : null}
+            {onLeaveGroup ? (
+              <StateButton type="button" onClick={() => setLeaving(true)} aria-label={t("leaveToggle")} aria-haspopup="dialog" className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-1.5 text-xs text-[var(--danger)] opacity-85 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger-line)]">
+                <ExitIcon className={cx(groupActionIconClass, "shrink-0")} />
+                {t("leaveShort")}
+              </StateButton>
+            ) : null}
           </div>
         ) : null}
       </div>
+
+      {leaving && onLeaveGroup ? (
+        <ConfirmDialog title={t("leaveTitle")} body={t("leaveConfirm")} confirmLabel={t("leaveToggle")} danger onClose={() => setLeaving(false)} onConfirm={onLeaveGroup} />
+      ) : null}
+
+      {canManageGroup && person ? (
+        <Dialog title={t(selectedInvite ? "inviteDetailsTitle" : "memberDetailsTitle", { name: person.name })} busy={memberBusy} onClose={() => selectPerson(null)}>
+          <div className="flex items-center gap-3 rounded-2xl bg-[var(--wash)] p-3">
+            <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--wash-strong)]"><AvatarMark /></span>
+            <p className="min-w-0 flex-1 break-words text-sm text-[var(--muted)]">
+              {selectedInvite ? t("pendingInviteMeta", { username: person.username, date: f.date(selectedInvite.createdAt) }) : `@${person.username}`}
+            </p>
+            {selectedMember ? <span className={memberRoleClass}>{tr(selectedMember.role)}</span> : null}
+          </div>
+          {personActions.length ? (
+            <ModalActions className="mt-6 border-t border-[var(--line)] pt-4">
+              {personActions.map((action) => (
+                <Button key={action.label} variant={action.danger ? "danger" : "secondary"} disabled={memberBusy} aria-expanded={action.confirmation ? confirmation?.label === action.label : undefined} onClick={() => {
+                  if (!action.confirmation) {
+                    setConfirmation(null);
+                    void runPersonAction(action);
+                    return;
+                  }
+                  setMemberError(null);
+                  setConfirmation(confirmation?.label === action.label ? null : action);
+                }}>
+                  {action.label}
+                </Button>
+              ))}
+            </ModalActions>
+          ) : null}
+          {confirmation?.confirmation ? (
+            <div className="mt-4">
+              <InlineConfirmation
+                key={confirmation.label}
+                body={confirmation.confirmation.body}
+                danger={confirmation.danger}
+                busy={memberBusy}
+                label={memberBusy ? tc("saving") : confirmation.confirmation.label}
+                onConfirm={() => void runPersonAction(confirmation)}
+              />
+            </div>
+          ) : null}
+        </Dialog>
+      ) : null}
 
       {showGroupEdit ? (
         <Dialog title={t("editTitle")} onClose={() => setShowGroupEdit(false)} busy={groupBusy}>
@@ -323,7 +437,6 @@ export function GroupScreen({
               <input className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
               <InlineSubmit label={t("sendInvite")} disabled={memberBusy} />
             </div>
-            <StatusMessage error={memberError} success={memberSuccess} />
           </form>
         </Dialog>
       ) : null}
@@ -348,43 +461,21 @@ export function GroupScreen({
           </div>
           {group.members?.length ? (
             <ul className="divide-y divide-[var(--line)]">
-              {group.members.map((member) => (
-                <li className="flex items-center justify-between gap-3 py-3" key={member.id}>
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-[var(--wash-strong)]">
-                      <AvatarMark />
-                    </span>
-                    <span className="min-w-0">
-                      <strong className="block truncate text-[13.5px] font-medium">{member.name}</strong>
-                      <small className="text-[var(--muted)]">@{member.username}</small>
-                    </span>
-                  </div>
-                  {/* What can be done with this person sits together at the row's right: their role, then banning. */}
-                  <div className="flex flex-none items-center justify-end gap-2">
-                    {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
-                      <StateButton
-                        type="button"
-                        className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--line)] px-3 text-[11px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:opacity-50"
-                        disabled={roleBusyId === member.id}
-                        onClick={() => void toggleRole(member)}
-                      >
-                        {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
-                      </StateButton>
-                    ) : (
-                      <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
-                    )}
-                    {canBan(member) ? (
-                      <StateButton
-                        type="button"
-                        className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--danger-line)] px-3 text-[11px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
-                        onClick={() => setBanning(member)}
-                      >
-                        {t("ban")}
-                      </StateButton>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+              {group.members.map((member) => {
+                const content = (
+                  <>
+                    <PersonRowIdentity name={member.name} detail={`@${member.username}`} />
+                    <span className={memberRoleClass}>{tr(member.role)}</span>
+                  </>
+                );
+                return (
+                  <li key={member.id}>
+                    {canManageGroup ? (
+                      <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "member", id: member.id })}>{content}</StateButton>
+                    ) : <div className={personRowClass}>{content}</div>}
+                  </li>
+                );
+              })}
             </ul>
           ) : <p className="text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
           {onSetMemberRole || onSetMemberBan ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
@@ -406,43 +497,21 @@ export function GroupScreen({
             </div>
           ) : null}
 
-          {canManage(group.role) && pendingRequests.length ? (
+          {canManageGroup && pendingRequests.length ? (
             <div className="mt-6 border-t border-[var(--line)] pt-5">
               <h3 className="text-sm font-semibold">{t("pendingInvitesTitle")}</h3>
               <ul className="mt-2 divide-y divide-[var(--line)]">
                 {pendingRequests.map((request) => (
-                  <li className="flex items-center justify-between gap-3 py-3" key={request.id}>
-                    <span className="min-w-0">
-                      <strong className="block truncate text-sm">{request.name}</strong>
-                      <small className="text-[var(--muted)]">{t("pendingInviteMeta", { username: request.username, date: f.date(request.createdAt) })}</small>
-                    </span>
-                    <Button className="min-h-9 flex-none px-3 py-1 text-xs" variant="ghost" onClick={() => void cancelRequest(request.id, request.name)}>{tc("cancel")}</Button>
+                  <li key={request.id}>
+                    <StateButton type="button" aria-haspopup="dialog" className={personRowButtonClass} onClick={() => selectPerson({ kind: "invite", request })}>
+                      <PersonRowIdentity name={request.name} detail={t("pendingInviteMeta", { username: request.username, date: f.date(request.createdAt) })} />
+                    </StateButton>
                   </li>
                 ))}
               </ul>
-              {!showInvite ? <div className="mt-3"><StatusMessage error={memberError} success={memberSuccess} /></div> : null}
             </div>
           ) : null}
 
-          {onLeaveGroup ? (
-            <div className="mt-6 border-t border-[var(--line)] pt-5">
-              <StateButton type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setLeaving(true)}>{t("leaveToggle")}</StateButton>
-            </div>
-          ) : null}
-
-          {banning && onSetMemberBan ? (
-            <ConfirmDialog
-              title={t("banTitle", { name: banning.name })}
-              body={t("banBody")}
-              confirmLabel={t("ban")}
-              danger
-              onClose={() => setBanning(null)}
-              onConfirm={async () => { await onSetMemberBan(banning.id, true); setBanning(null); }}
-            />
-          ) : null}
-          {leaving && onLeaveGroup ? (
-            <ConfirmDialog title={t("leaveTitle")} body={t("leaveConfirm")} confirmLabel={t("leaveToggle")} danger onClose={() => setLeaving(false)} onConfirm={onLeaveGroup} />
-          ) : null}
         </section>
       </div>
     </main>

@@ -533,6 +533,13 @@
       "when": 1793733000000,
       "tag": "0075_library_item_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1795190400000,
+      "tag": "0076_settle_member_invites",
+      "breakpoints": true
     }
   ]
 }

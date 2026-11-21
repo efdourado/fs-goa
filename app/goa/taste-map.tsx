@@ -73,7 +73,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
           <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("title")}</h2>
-          <span className="text-xs text-[var(--muted)]">{t("basis", { count: taste.ratedCount })}</span>
+          {taste.ratedCount > 0 ? <span className="text-xs text-[var(--muted)]">{t("basis", { count: taste.ratedCount })}</span> : null}
         </div>
         {scored.length ? (
           <StateButton type="button" className="mt-1 flex-none cursor-pointer text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setRun((value) => value + 1)}>↺ {t("replay")}</StateButton>
@@ -132,7 +132,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
           </div>
         )}
 
-        <div className="space-y-5 border-t border-white/10 p-5 sm:p-7 lg:border-l lg:border-t-0">
+        <div className={cx("space-y-5 border-white/10 p-5 sm:p-7 lg:border-l", selected && "border-t lg:border-t-0")}>
           {selected ? (
             <div className="taste-rise" style={{ animationDelay: selectedId ? "0ms" : `${scored.length * 220 + 500}ms` }} key={selected.userId}>
               <p className="text-xs text-white/55">{t("withName", { name: selected.name })}</p>
@@ -164,7 +164,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
           ) : null}
 
           {waiting.length ? (
-            <div className="border-t border-white/10 pt-4">
+            <div>
               <p className="text-xs text-white/50">{t("notYet", { count: taste.minShared })}</p>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {waiting.map((person) => (

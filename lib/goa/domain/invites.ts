@@ -5,7 +5,7 @@ import { ApiError, stringValue } from "../../http";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { writeAudit } from "./audit";
 import { assertUnderMembershipCap, lockGroupMemberships } from "./group-membership-cap";
-import { assertGroupHasCapacity, assertNotBanned } from "./groups";
+import { assertGroupHasCapacity, assertNotBanned, settlePendingGroupInvite } from "./groups";
 import { integerValue, publicId } from "./shared";
 
 type InviteKind = "group" | "challenge";
@@ -218,6 +218,7 @@ export async function acceptInvite(session: SessionContext, token: string) {
          role = CASE WHEN group_members.role IN ('owner', 'admin') THEN group_members.role ELSE 'participant' END`,
       [invite.group_id, session.user.id, invite.role, invite.created_by_user_id],
     );
+    await settlePendingGroupInvite(client, invite.group_id, session.user.id);
     if (invite.challenge_id) {
       await client.query(
         `INSERT INTO challenge_participants

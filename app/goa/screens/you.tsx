@@ -9,7 +9,7 @@ import { type ReactNode, useState } from "react";
 import { LanguageSegmented } from "../SettingsMenu";
 import { ThemeToggle } from "../ThemeToggle";
 import type { User } from "../types";
-import { cx, UserAvatar } from "../ui";
+import { cx, ExitIcon, UserAvatar } from "../ui";
 import { CONTACT_EMAIL } from "./about";
 
 const rowClass = "flex min-h-14 w-full cursor-pointer items-center gap-3.5 text-left text-[15px] transition hover:text-[var(--ink-strong)]";
@@ -24,7 +24,6 @@ const ICONS = {
   about: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg>,
   contact: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><path d="M12 4c4.4 0 8 2.9 8 6.6s-3.6 6.6-8 6.6c-.9 0-1.8-.1-2.6-.4L5 19l1.1-3.4C4.8 14.4 4 12.6 4 10.6 4 6.9 7.6 4 12 4Z" /></svg>,
   admin: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><path d="M12 3.5 19 6v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z" /></svg>,
-  signOut: <svg viewBox="0 0 24 24" className="h-5 w-5 flex-none" {...stroke}><path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16l-4-4 4-4M6 12h9" /></svg>,
 };
 
 function Chevron() {
@@ -113,7 +112,7 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onTempl
         onClick={async () => { setSigningOut(true); try { await onLogout(); } finally { setSigningOut(false); } }}
         className={cx("mt-9 flex min-h-12 cursor-pointer items-center gap-3.5 text-[15px] text-[var(--danger)] transition hover:opacity-80 disabled:opacity-50")}
       >
-        {ICONS.signOut}
+        <ExitIcon className="h-5 w-5 flex-none" />
         {signingOut ? tNav("signingOut") : tNav("signOut")}
       </StateButton>
     </main>

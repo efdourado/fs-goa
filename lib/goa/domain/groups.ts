@@ -27,11 +27,7 @@ export async function assertGroupHasCapacity(
   joiningUserId: string,
   options: { reservePending?: boolean } = {},
 ): Promise<void> {
-  const group = await client.query(
-    "SELECT id FROM groups WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL FOR UPDATE",
-    [groupId],
-  );
-  if (!group.rowCount) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+  await lockActiveGroup(client, groupId);
   const active = await oneOrNull<{ is_member: boolean }>(
     client,
     `SELECT EXISTS (
@@ -56,6 +52,23 @@ export async function assertGroupHasCapacity(
     LIMITS.membersPerGroup,
     "group_full",
     `Este grupo atingiu o limite de ${LIMITS.membersPerGroup} pessoas.`,
+  );
+}
+
+async function lockActiveGroup(client: PoolClient, groupId: string) {
+  const group = await client.query(
+    "SELECT id FROM groups WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL FOR UPDATE",
+    [groupId],
+  );
+  if (!group.rowCount) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+}
+
+/** Call while holding the group lock so joining and inviting cannot cross. */
+export async function settlePendingGroupInvite(client: PoolClient, groupId: string, userId: string) {
+  await client.query(
+    `UPDATE group_member_requests SET status = 'accepted', responded_at = now()
+      WHERE group_id = $1 AND user_id = $2 AND status = 'pending'`,
+    [groupId, userId],
   );
 }
 
@@ -136,14 +149,7 @@ export async function requestGroupMember(
 
   return inTransaction(async (client) => {
     await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
-    const group = await oneOrNull<{ id: string }>(
-      client,
-      `SELECT id FROM groups
-        WHERE id = $1 AND kind = 'standard'
-          AND archived_at IS NULL AND deleted_at IS NULL`,
-      [groupId],
-    );
-    if (!group) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+    await lockActiveGroup(client, groupId);
 
     const target = await oneOrNull<{
       id: string;
@@ -153,7 +159,7 @@ export async function requestGroupMember(
       client,
       `SELECT id, display_name, username FROM users
         WHERE username_normalized = $1 AND disabled_at IS NULL
-        FOR UPDATE`,
+        FOR NO KEY UPDATE`,
       [usernameNormalized],
     );
     if (!target) throw new ApiError(404, "not_found", "Conta não encontrada.");
@@ -165,6 +171,7 @@ export async function requestGroupMember(
       [groupId, target.id],
     );
     if (activeMember) {
+      await settlePendingGroupInvite(client, groupId, target.id);
       return {
         groupId,
         member: { id: target.id, name: target.display_name, username: target.username, role: activeMember.role },
@@ -237,21 +244,26 @@ export async function respondToMemberRequest(
   action: "accept" | "decline",
 ) {
   return inTransaction(async (client) => {
-    const request = await oneOrNull<MemberRequestRow>(
+    // Match the link-join lock order before locking the directed request.
+    const request = await oneOrNull<Pick<MemberRequestRow, "group_id" | "group_name">>(
       client,
-      `SELECT r.id, r.group_id, g.name AS group_name, r.user_id, r.status
+      `SELECT r.group_id, g.name AS group_name
          FROM group_member_requests r
          JOIN groups g ON g.id = r.group_id AND g.kind = 'standard'
           AND g.archived_at IS NULL AND g.deleted_at IS NULL
-        WHERE r.id = $1
-        FOR UPDATE OF r`,
-      [requestId],
+        WHERE r.id = $1 AND r.user_id = $2
+        FOR UPDATE OF g`,
+      [requestId, session.user.id],
     );
-    if (!request || request.user_id !== session.user.id) {
+    if (!request) {
       throw new ApiError(404, "not_found", "Solicitação não encontrada.");
     }
-    if (request.status !== "pending") {
-      if (request.status === "accepted") {
+    const current = await oneOrNull<Pick<MemberRequestRow, "status">>(
+      client, "SELECT status FROM group_member_requests WHERE id = $1 FOR UPDATE", [requestId],
+    );
+    if (!current) throw new ApiError(404, "not_found", "Solicitação não encontrada.");
+    if (current.status !== "pending") {
+      if (current.status === "accepted") {
         return { status: "accepted" as const, groupId: request.group_id, groupName: request.group_name, idempotent: true };
       }
       throw new ApiError(409, "request_settled", "Esta solicitação já foi respondida.");

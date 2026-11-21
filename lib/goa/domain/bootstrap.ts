@@ -69,6 +69,10 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
           AND g.deleted_at IS NULL AND g.archived_at IS NULL
          LEFT JOIN users inviter ON inviter.id = r.invited_by_user_id
         WHERE r.user_id = $1 AND r.status = 'pending'
+          AND NOT EXISTS (
+            SELECT 1 FROM group_members gm
+             WHERE gm.group_id = r.group_id AND gm.user_id = r.user_id AND gm.removed_at IS NULL
+          )
         ORDER BY r.created_at DESC`,
       [session.user.id],
     );
@@ -195,11 +199,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       ? pool.query<{
           group_id: string;
           id: string;
+          user_id: string;
           display_name: string;
           username: string;
           created_at: Date;
         }>(
-          `SELECT r.group_id, r.id, u.display_name, u.username, r.created_at
+          `SELECT r.group_id, r.id, r.user_id, u.display_name, u.username, r.created_at
              FROM group_member_requests r JOIN users u ON u.id = r.user_id
             WHERE r.group_id = ANY($1::text[]) AND r.status = 'pending'
             ORDER BY r.created_at`,
@@ -223,7 +228,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       list.push({ id: row.id, name: row.display_name, username: row.username });
       bannedByGroup.set(row.group_id, list);
     }
-    const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
+    const membersByGroup = new Map<string, Array<{ id: string; name: string; username: string; role: GroupRole }>>();
     for (const member of members?.rows ?? []) {
       const list = membersByGroup.get(member.group_id) ?? [];
       list.push({ id: member.id, name: member.display_name, username: member.username, role: member.role });
@@ -231,6 +236,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
     }
     const pendingByGroup = new Map<string, Array<Record<string, unknown>>>();
     for (const row of pending?.rows ?? []) {
+      if (membersByGroup.get(row.group_id)?.some((member) => member.id === row.user_id)) continue;
       const list = pendingByGroup.get(row.group_id) ?? [];
       list.push({ id: row.id, name: row.display_name, username: row.username, createdAt: row.created_at.toISOString() });
       pendingByGroup.set(row.group_id, list);

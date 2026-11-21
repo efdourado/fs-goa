@@ -92,6 +92,7 @@ export function Button({
   disabled,
   onClick,
   className,
+  "aria-expanded": expanded,
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -99,6 +100,7 @@ export function Button({
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
+  "aria-expanded"?: boolean;
 }) {
   const inModal = useContext(InModal);
   const tones = {
@@ -117,6 +119,7 @@ export function Button({
       )}
       type={type}
       disabled={disabled}
+      aria-expanded={expanded}
       readiness={variant === "primary"}
       onClick={onClick}
     >
@@ -679,6 +682,14 @@ export function SlidersIcon({ className }: { className?: string }) {
       <path d="M2 4.5h12M2 11.5h12" />
       <circle cx="11" cy="4.5" r="2" fill="currentColor" stroke="none" />
       <circle cx="5" cy="11.5" r="2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function ExitIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16l-4-4 4-4M6 12h9" />
     </svg>
   );
 }

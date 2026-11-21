@@ -499,6 +499,16 @@ function GoaAppContent() {
     await refreshBootstrap();
   }
 
+  async function inviteGroupMember(groupId: Id, username: string, csrfToken: string) {
+    const result = await apiRequest<GroupInviteResult>(API_PATHS.groupMembers(groupId), {
+      method: "POST",
+      body: { username },
+      csrfToken,
+    });
+    await refreshBootstrap().catch(() => undefined);
+    return result;
+  }
+
   async function cancelMemberRequest(requestId: Id) {
     if (!bootstrap) return;
     await apiRequest(API_PATHS.memberRequestCancel(requestId), { method: "POST", body: {}, csrfToken: bootstrap.csrfToken });
@@ -703,7 +713,7 @@ function GoaAppContent() {
   } else if (screen.kind === "quick-create") {
     content = <QuickCreateScreen currentUserId={user.id} groups={bootstrap.groups} into={screen.into} onBack={goUp} backLabel={backLabel} onCreateGroup={createGroupAndGetId} onSubmit={(target, input) => createChallenge(target, input, { launch: true })} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onQuickCreate={() => setScreen({ kind: "quick-create", into: { groupId: selectedGroup.id } })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} onSetMemberBan={canManage(selectedGroup.role) ? (userId, banned) => setMemberBan(selectedGroup.id, userId, banned) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onQuickCreate={() => setScreen({ kind: "quick-create", into: { groupId: selectedGroup.id } })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => inviteGroupMember(selectedGroup.id, username, bootstrap.csrfToken)} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} onSetMemberBan={canManage(selectedGroup.role) ? (userId, banned) => setMemberBan(selectedGroup.id, userId, banned) : undefined} />;
   } else if (screen.kind === "group-catalog" && selectedGroup) {
     content = <CatalogWorkspaceScreen key={selectedGroup.id} scope={{ groupId: selectedGroup.id }} title={t("groupCatalogTitle", { name: selectedGroup.name })} canManage={canManage(selectedGroup.role)} members={selectedGroup.members ?? []} onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "personal-catalog") {

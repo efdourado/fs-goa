@@ -760,10 +760,39 @@ test("convites distinguem grupo e desafio, e convite por username exige aceite",
   assert.equal((anonymousGroupPreview.body as { accepted: boolean }).accepted, false);
   assert.equal((anonymousGroupPreview.body as { status: string }).status, "valid");
 
-  const acceptedGroup = await call("POST", `/api/invites/${groupToken}`, {
+  const directedGroupInvite = await call("POST", `/api/groups/${groupId}/members`, {
+    session: owner, body: { username: groupGuest.user.username },
+  });
+  assert.equal((directedGroupInvite.body as { status: string }).status, "requested");
+  const directedGroupRequestId = await pendingRequestId(groupGuest.user.id);
+  const [acceptedGroup, concurrentInvite] = await Promise.all([
+    call("POST", `/api/invites/${groupToken}`, {
+      session: groupGuest,
+      body: {},
+    }),
+    call("POST", `/api/groups/${groupId}/members`, {
+      session: owner, body: { username: groupGuest.user.username },
+    }),
+  ]);
+  assert.equal(concurrentInvite.response.status, 200, JSON.stringify(concurrentInvite.body));
+  assert.ok(["already_member", "already_pending"].includes((concurrentInvite.body as { status: string }).status));
+  const linkSettledRequest = await adminPool.query<{ status: string }>(
+    "SELECT status FROM group_member_requests WHERE id = $1",
+    [directedGroupRequestId],
+  );
+  assert.equal(linkSettledRequest.rows[0]?.status, "accepted");
+  const ownerAfterLink = await call("GET", "/api/bootstrap", { session: owner });
+  const groupAfterLink = (ownerAfterLink.body as { groups: import("../../app/goa/types").GroupSummary[] }).groups.find((group) => group.id === groupId);
+  assert.ok(groupAfterLink);
+  assert.ok(groupAfterLink.members?.some((member) => member.id === groupGuest.user.id));
+  assert.ok(!groupAfterLink.pendingRequests?.some((request) => request.id === directedGroupRequestId));
+  const guestAfterLink = await call("GET", "/api/bootstrap", { session: groupGuest });
+  assert.ok(!(guestAfterLink.body as { memberRequests: Array<{ id: string }> }).memberRequests.some((request) => request.id === directedGroupRequestId));
+  const acceptDirectedAfterLink = await call("POST", `/api/member-requests/${directedGroupRequestId}/accept`, {
     session: groupGuest,
     body: {},
   });
+  assert.equal((acceptDirectedAfterLink.body as { idempotent: boolean }).idempotent, true);
   assert.equal(acceptedGroup.response.status, 200, JSON.stringify(acceptedGroup.body));
   assert.equal((acceptedGroup.body as { kind: string }).kind, "group");
   const groupOnlyMembership = await adminPool.query<{ group_member: boolean; challenge_participant: boolean }>(
