@@ -276,11 +276,11 @@ function HowItWorks({ challenge, doc }: { challenge: ChallengeDetail; doc: Doc }
       <ol className="xd-rules">
         {rules.map((rule, index) => (
           <li key={index}>
-            <b>{rule.title}</b>{rule.description ? <> {rule.description}</> : null}
+            <b>{rule.title}</b>{rule.description ? <span className="xd-rule-text">{rule.description}</span> : null}
             {rule.topics?.length ? (
               <ol>
                 {rule.topics.map((topic, topicIndex) => (
-                  <li key={topicIndex}><span>{index + 1}.{topicIndex + 1}</span><b>{topic.title}</b>{topic.description ? <> {topic.description}</> : null}</li>
+                  <li key={topicIndex}><span>{index + 1}.{topicIndex + 1}</span><b>{topic.title}</b>{topic.description ? <span className="xd-rule-text">{topic.description}</span> : null}</li>
                 ))}
               </ol>
             ) : null}
@@ -537,19 +537,19 @@ function DownloadIcon() {
 }
 
 /**
+ * The printed page: A4 with no page margin at all. The sheet carries its own spacing (export.css), and with no
+ * margin there is nowhere for the browser to print its header and footer (URL, date, page number) or a white band.
+ */
+const PAGE_CSS = "@page { size: A4; margin: 0; }";
+
+/**
  * The export dashboard: pick what goes in, see the document as it will print, and save it as a PDF.
  * Everything shown is what the viewer can already see in the challenge — `listEntries` applied the rules.
  */
-/** A CSS string literal that can't close the string, the rule or the <style> tag it's written into. */
-function cssString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\3c ").replace(/[\r\n]+/g, " ")}"`;
-}
-
-export function ExportDocument({ challenge, entries, userId, fontClassName = "", displayFont = "inherit", onClose }: {
+export function ExportDocument({ challenge, entries, userId, fontClassName = "", onClose }: {
   challenge: ChallengeDetail; entries: Entry[]; userId: Id;
-  /** The two faces (`fonts.ts`), passed in by the page and the modal: next/font only exists where Next compiles. */
+  /** The fonts class (`fonts.ts`), passed in by the page and the modal. */
   fontClassName?: string;
-  displayFont?: string;
   /** In the app's modal: a × beside the download button. */
   onClose?: () => void;
 }) {
@@ -559,15 +559,6 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
     document.documentElement.classList.add("xd-doc");
     return () => document.documentElement.classList.remove("xd-doc");
   }, []);
-  // The printed page: A4, the page number in the bottom margin (where a browser still keeps @page margins).
-  const pageCss = `
-@page { size: A4; margin: 24mm 0 22mm; background: #faf8f3;
-  @bottom-center { content: ${cssString(doc.t("footer", { title: challenge.title }))} counter(page); font-family: ${displayFont}; font-size: 7.5pt; letter-spacing: 0.04em; color: #a8a498; }
-}
-@page :first { @bottom-center { content: none; } }
-/* Where the sheet can carry its own top and bottom margins onto every page (export.css), the page's are
-   dropped: then the print dialog's "Margins" setting (often left on "None") can't take them away. */
-@supports (box-decoration-break: clone) { @page { margin: 0; } }`;
   const tc = useTranslations("common");
   const [showWhen, setShowWhen] = useState(false);
   const words = { yes: tc("yes"), no: tc("no"), group: doc.t("group") };
@@ -592,7 +583,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
   const onlyCover = shown("cover") && !SECTIONS.some((section) => section !== "cover" && shown(section));
   return (
     <div className={`xd-screen ${fontClassName}`}>
-      <style dangerouslySetInnerHTML={{ __html: pageCss }} />
+      <style dangerouslySetInnerHTML={{ __html: PAGE_CSS }} />
       <div className="xd-toolbar">
         <div className="xd-toolbar-inner">
           {/* One row: whether entries show their dates, then how to save it. No title or Back link: the browser's Back

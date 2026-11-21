@@ -9,7 +9,7 @@ import { getChallengeDetail } from "@/lib/goa/challenges/detail";
 import { listEntries } from "@/lib/goa/challenges/entries";
 import { SESSION_COOKIE_NAME } from "@/lib/security";
 import { ExportDocument } from "@/app/goa/export/export-document";
-import { exportDisplayFontFamily, exportFontClass } from "@/app/goa/export/fonts";
+import { exportFontClass } from "@/app/goa/export/fonts";
 import "@/app/goa/export/export.css";
 import type { ChallengeDetail, Entry } from "@/app/goa/types";
 
@@ -52,7 +52,6 @@ export default async function ChallengeExportPage({ params }: { params: Promise<
       entries={entries}
       userId={userId}
       fontClassName={exportFontClass}
-      displayFont={exportDisplayFontFamily}
     />
   );
 }

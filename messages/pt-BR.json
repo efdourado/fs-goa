@@ -1982,7 +1982,6 @@
     "recordsTitle": "Recordes",
     "recordsLede": "O melhor de cada item, somando todos os registros.",
     "colophon": "Gerado pelo Goa em {date}. Os dados são seus, este PDF é só uma forma bonita de guardá-los.",
-    "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# dia} other {# dias}}",
     "showWhen": "Datas",
     "progressDays": "{count, plural, one {em # dia} other {em # dias}}",

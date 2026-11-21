@@ -141,7 +141,7 @@
 /* ── Cover ─────────────────────────────────────────────────────── */
 .xd-cover {
   display: flex;
-  min-height: 251mm; /* the A4 page less its @page margins (24mm + 22mm) */
+  min-height: 251mm; /* the A4 page less the sheet's printed top and bottom (24mm + 22mm) */
   flex-direction: column;
   break-after: page;
 }
@@ -216,6 +216,8 @@
 .xd-rules ol { margin: 1.5mm 0 0; padding-left: 5mm; list-style: none; color: var(--xd-soft); }
 .xd-rules ol li + li { margin-top: 1mm; }
 .xd-rules ol span { margin-right: 2mm; font-variant-numeric: tabular-nums; color: var(--xd-muted); }
+/* As on screen (rules.tsx): a rule's text sits under its title and keeps the line breaks it was written with. */
+.xd-rule-text { display: block; margin-top: 0.8mm; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* ── Items ─────────────────────────────────────────────────────── */
 .xd-chapter {
   margin: 10mm 0 5mm;
@@ -464,8 +466,8 @@
 @media print {
   /* Scoped to `html.xd-doc` (set while the document is on screen): this sheet stays loaded in the app. */
   html.xd-doc, html.xd-doc body, .xd-screen { background: #faf8f3 !important; }
-  /* The paper colour runs into the top and bottom margins (@page) too. Without this, Chrome's
-     "Background graphics" (off by default) prints them white: a beige page between two white bands. */
+  /* The paper colour fills the whole sheet (@page has no margin, see export-document.tsx). Without this, a
+     browser's "Background graphics" (off by default) would print it white. */
   html.xd-doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html.xd-doc body { min-height: 0 !important; overflow: visible !important; }
   /* In the app's modal, only the document prints, and as plain flow: a fixed, scrolling box would print
@@ -482,13 +484,12 @@
   }
   .xd-toolbar { display: none !important; }
   .xd-stage { padding: 0; }
-  /* The side margins are the sheet's own padding, not @page's: a print dialog set to "Margins: None"
-     (or a browser that ignores @page) would otherwise print edge to edge. */
-  .xd { width: auto; padding: 0 16mm; border-radius: 0; box-shadow: none; }
-  /* Every printed page gets the same 24mm top and 22mm bottom from the sheet itself, repeated on each page
-     it spans, whatever the print dialog's margins are. (Without clone support, @page keeps them.) */
-  @supports (box-decoration-break: clone) {
-    .xd { padding: 24mm 16mm 22mm; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  /* All the page's margins are the sheet's own padding (@page has none, so the browser has nowhere to print its
+     header and footer). Where the browser can repeat it, every printed page gets the same 24mm top and 22mm bottom;
+     elsewhere only the first page's top and the last page's bottom do. */
+  .xd {
+    width: auto; padding: 24mm 16mm 22mm; border-radius: 0; box-shadow: none;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone;
   }
   .xd-page + .xd-page, .xd-cover + .xd-page { margin-top: 0; }
 }
