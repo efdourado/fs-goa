@@ -1192,9 +1192,7 @@
   },
   "resultView": {
     "emptyTitle": "Vitrine em preparo",
-    "liveEmptyTitle": "Sem números ainda",
-    "shareCopy": "Copiar link público",
-    "shareCopied": "Copiado"
+    "liveEmptyTitle": "Sem números ainda"
   },
   "rules": {
     "coverLabel": "Regras · {count}",

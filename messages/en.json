@@ -1192,9 +1192,7 @@
   },
   "resultView": {
     "emptyTitle": "Showcase in the works",
-    "liveEmptyTitle": "No numbers yet",
-    "shareCopy": "Copy public link",
-    "shareCopied": "Copied"
+    "liveEmptyTitle": "No numbers yet"
   },
   "rules": {
     "coverLabel": "Rules · {count}",

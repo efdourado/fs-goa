@@ -8,7 +8,6 @@ import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, use
 import { ApiError } from "../api";
 import { counterField, logRange } from "../checkin-days";
 import { CheckinLog, type LogCounter, type LogRecord } from "../checkin-log";
-import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { useLibraryProperties } from "../property-inputs";
 import { useDoneItems } from "../use-done-items";
@@ -569,27 +568,11 @@ export function ResultView({
 }
 
 /**
- * Copies the public `/results/<token>` link — a header button beside "Manage",
- * for every member (not just admins). On click the copy glyph fades out and a
- * circled checkmark draws itself in, then reverts after a couple of seconds.
+ * The challenge's outward actions, at the foot of its dark card: download the PDF log and the result images.
+ * The public link is copied from the challenge's manage page (Publication), not from here.
  */
-/**
- * The challenge's outward actions, at the foot of its dark card: download the PDF log and, once the round
- * has a public page, copy its link. Copying answers on the button itself — the squares give way to a
- * check drawn inside a ring, the label slides to "Copied", and the pill fills with the brand green.
- */
-function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: () => void; shareToken?: string | null; extra?: ReactNode; end?: ReactNode }) {
-  const tr = useTranslations("resultView");
+function ChallengeCardActions({ onExport, extra, end }: { onExport: () => void; extra?: ReactNode; end?: ReactNode }) {
   const te = useTranslations("exportDoc");
-  const [copied, setCopied] = useState(false);
-  async function copyPublicLink() {
-    if (!shareToken) return;
-    try {
-      await copyText(`${window.location.origin}/results/${encodeURIComponent(shareToken)}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
-    } catch { /* leave it as it was */ }
-  }
   return (
     <div className="mt-8 flex flex-wrap gap-2">
       {/* Opens the PDF over the challenge (a modal), not a page of its own. */}
@@ -611,43 +594,6 @@ function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: 
         </span>
       </StateButton>
       {extra}
-      {shareToken ? (
-        <StateButton
-          type="button"
-          onClick={() => void copyPublicLink()}
-          aria-label={copied ? tr("shareCopied") : tr("shareCopy")}
-          title={tr("shareCopy")}
-          className={cx(
-            "inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border text-sm transition-[background-color,border-color,color,transform] duration-300 sm:w-auto sm:px-4",
-            copied
-              ? "scale-[1.03] border-transparent bg-[var(--main)] text-white"
-              : "border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5",
-          )}
-        >
-          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-            <g className={cx("transition-opacity duration-150", copied ? "opacity-0" : "opacity-100")}>
-              <rect x="7" y="7" width="9" height="9" rx="2" />
-              <path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" />
-            </g>
-            <circle
-              cx="10" cy="10" r="8" pathLength={1}
-              className="transition-[stroke-dashoffset] duration-500 ease-out"
-              style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
-            />
-            <path
-              d="M6 10.3 9 13l5-5.5" strokeLinecap="round" strokeLinejoin="round" pathLength={1}
-              className="transition-[stroke-dashoffset] duration-300 ease-out [transition-delay:180ms]"
-              style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
-            />
-          </svg>
-          {/* Both labels share one cell, so the pill keeps its width while one slides out and the other in. */}
-          <span className="hidden overflow-hidden sm:grid">
-            <span className={cx("col-start-1 row-start-1 transition duration-300", copied ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100")}>{tr("shareCopy")}</span>
-            <span aria-hidden={!copied} className={cx("col-start-1 row-start-1 font-medium transition duration-300", copied ? "translate-y-0 opacity-100" : "translate-y-full opacity-0")}>{tr("shareCopied")}</span>
-          </span>
-          <span role="status" aria-live="polite" className="sr-only">{copied ? tr("shareCopied") : ""}</span>
-        </StateButton>
-      ) : null}
       {end}
     </div>
   );
@@ -1729,7 +1675,6 @@ export function ParticipantChallengeScreen({
               ? (
                 <ChallengeCardActions
                   onExport={() => setExporting(true)}
-                  shareToken={challenge.result?.shareToken}
                   extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
                   // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
                   end={onAdmin ? (

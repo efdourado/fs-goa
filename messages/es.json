@@ -1196,9 +1196,7 @@
   },
   "resultView": {
     "emptyTitle": "Vitrina en preparación",
-    "liveEmptyTitle": "Sin números todavía",
-    "shareCopy": "Copiar enlace público",
-    "shareCopied": "Copiado"
+    "liveEmptyTitle": "Sin números todavía"
   },
   "rules": {
     "coverLabel": "Reglas · {count}",
