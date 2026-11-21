@@ -6,17 +6,17 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
-import { SkippedPropertiesNotice } from "../copy-notice";
 import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
+import { type CatalogScope, useCatalogLibraries } from "../libraries";
+import { LibraryChoiceField } from "../library-choice";
 import { SettingsMenu } from "../SettingsMenu";
 import { PublishedTemplates } from "../template-gallery";
 import type {
   ChallengeDetail,
-  CopyResult,
   GroupSummary,
   Id,
-  SkippedProperty,
+  LibraryPick,
   User,
 } from "../types";
 import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, labelClass, PageHeading, Select, SelectableCards, SlidersIcon, StatusMessage } from "../ui";
@@ -115,8 +115,6 @@ export function TemplateDetailScreen({
   const [showCopy, setShowCopy] = useState(Boolean(autoCopy && user));
   const [busy, setBusy] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
-  // Set when the copy worked but had to leave properties out — shown before opening the copy.
-  const [copied, setCopied] = useState<CopyResult | null>(null);
   const [showManage, setShowManage] = useState(false);
   const [managementBusy, setManagementBusy] = useState(false);
   const [managementError, setManagementError] = useState<string | null>(null);
@@ -137,7 +135,14 @@ export function TemplateDetailScreen({
   // The copy dialog: what comes along (the structure, never the items), then where it lands (a group you run, or just you).
   const [where, setWhere] = useState<"personal" | "existing">("personal");
   const [targetId, setTargetId] = useState<Id>(manageable[0]?.id ?? "");
-  const ready = where === "personal" || Boolean(targetId);
+  // Where the copy's items go: always asked, among the destination's libraries (read only while the dialog is open).
+  const source = detail?.templateLibrary ?? null;
+  const scope: CatalogScope | null = !source || !user || !showCopy ? null : where === "personal" ? "personal" : targetId ? { groupId: targetId } : null;
+  const libraries = useCatalogLibraries(scope);
+  const scopeKey = JSON.stringify(scope);
+  const [picked, setPicked] = useState<{ scope: string; pick: LibraryPick } | null>(null);
+  const library = picked?.scope === scopeKey ? picked.pick : null;
+  const ready = (where === "personal" || Boolean(targetId)) && (!source || Boolean(library));
 
   async function duplicate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,14 +152,13 @@ export function TemplateDetailScreen({
     try {
       const targetGroupId = where === "existing" ? targetId : null;
       if (where === "existing" && !targetGroupId) throw new Error(t("errPickGroup"));
-      const result = await apiRequest<{ challengeId: Id; skippedProperties?: SkippedProperty[] }>(API_PATHS.templateDuplicate(challengeId), {
+      const result = await apiRequest<{ challengeId: Id }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
         // "Just me": the server puts it in your own space (no group, no invites).
-        body: where === "personal" ? { target: "personal" } : { targetGroupId },
+        body: { ...(where === "personal" ? { target: "personal" } : { targetGroupId }), ...(library ? { library } : {}) },
         csrfToken,
       });
-      if (result.skippedProperties?.length) setCopied({ challengeId: result.challengeId, skippedProperties: result.skippedProperties });
-      else onDuplicated(result);
+      onDuplicated(result);
     } catch (cause) {
       setCopyError(f.error(cause));
     } finally {
@@ -249,8 +253,7 @@ export function TemplateDetailScreen({
       ) : null}
       {user && showCopy ? (
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
-          {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
-          <form className="space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
+          <form className="space-y-6" onSubmit={duplicate}>
             <p className="text-sm leading-6 text-[var(--muted)]">{t("copyWhat")}</p>
             <div>
               <p className={labelClass}>{t("whereLabel")}</p>
@@ -269,7 +272,10 @@ export function TemplateDetailScreen({
                   options={manageable.map((group) => ({ value: group.id, label: group.kind === "personal" ? tm("personal") : group.name }))} />
               ) : null}
             </div>
-            <StatusMessage error={copyError} />
+            {source && scope ? (
+              <LibraryChoiceField origin={source} libraries={libraries.data} value={library} onChange={(pick) => setPicked({ scope: scopeKey, pick })} />
+            ) : null}
+            <StatusMessage error={copyError ?? libraries.error} />
             <ModalActions className="border-t border-[var(--line)] pt-4">
               <Button type="submit" disabled={busy || !ready}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button>
             </ModalActions>

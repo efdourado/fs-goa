@@ -717,11 +717,13 @@ async function listLibrariesWithClient(client: Pick<PoolClient, "query">, groupI
 // never from this endpoint.
 const CREATABLE_LIBRARY_SOURCES = new Set(["tables", "custom"]);
 
-async function insertLibrary(
+/** Makes a library in a workspace. `kind` is only passed by a challenge's first library, rebuilt from the one it was copied from. */
+export async function insertLibrary(
   client: PoolClient,
   groupId: string,
   userId: string,
   body: Record<string, unknown>,
+  presetKind?: string,
 ): Promise<CatalogLibrary> {
   const source = typeof body.source === "string" && CREATABLE_LIBRARY_SOURCES.has(body.source) ? body.source : "custom";
   // A Tables library can go without a stored name — it then shows the locale-aware
@@ -732,7 +734,7 @@ async function insertLibrary(
   // Opaque and stable: never derived from `label`, so a rename never touches
   // it, and it never collides with another workspace's library of the same
   // starting kind (each gets its own generated key, not a shared literal).
-  const kind = `lib_${crypto.randomUUID().replace(/-/g, "")}`;
+  const kind = presetKind ?? `lib_${crypto.randomUUID().replace(/-/g, "")}`;
   const positionRow = await oneOrNull<{ position: number }>(
     client,
     "SELECT coalesce(max(position), -1)::int + 1 AS position FROM catalog_libraries WHERE group_id = $1",

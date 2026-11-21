@@ -1,120 +1,24 @@
 import type { PoolClient } from "pg";
 
 import { publicId } from "../../goa-domain";
-import { linkChallengeLibrary, readChallengeLibraries } from "./libraries";
 import type { FieldRow, MetricRow } from "./types";
 
 /**
- * A property that could not come across because the destination library already
- * has one under the same internal key that means something else. The copy keeps
- * the destination's definition untouched and leaves this property — and its
- * values — out, rather than push a value into a property of another type.
- */
-export interface SkippedProperty {
-  library: { kind: string; label: string | null; source: string };
-  key: string;
-  label: string;
-  type: string;
-  reason: "type_mismatch" | "archived";
-  /** `type_mismatch` only: what the destination's property of that key holds. */
-  existingType: string | null;
-}
-
-/**
- * Recreates one library in the target group with the same starting config, name
- * and properties. A library the target already has is left as its owners set it
- * up — the copy only adds custom properties it is missing (so copied values have
- * somewhere to live) and never overwrites their names, order or visibility. The
- * copy is a separate row: renaming either side never touches the other.
- *
- * A property the target already defines under the same key is a conflict when its
- * type differs (or it was archived there): it is skipped and reported back.
- */
-async function copyLibrary(
-  client: PoolClient,
-  sourceGroupId: string,
-  targetGroupId: string,
-  kind: string,
-  actorUserId: string,
-): Promise<SkippedProperty[]> {
-  const conflicts = await client.query<{
-    key: string; label: string; type: string; target_type: string; archived: boolean;
-    library_label: string | null; library_source: string;
-  }>(
-    `SELECT d.semantic_key AS key, d.label, d.type, t.type AS target_type, (t.archived_at IS NOT NULL) AS archived,
-            cl.label AS library_label, cl.source AS library_source
-       FROM catalog_attribute_defs d
-       JOIN catalog_attribute_defs t
-         ON t.group_id = $2 AND t.kind = d.kind AND t.semantic_key = d.semantic_key
-       JOIN catalog_libraries cl ON cl.group_id = d.group_id AND cl.kind = d.kind
-      WHERE d.group_id = $1 AND d.kind = $3 AND d.archived_at IS NULL
-        AND (t.archived_at IS NOT NULL OR t.type <> d.type)
-      ORDER BY d.position`,
-    [sourceGroupId, targetGroupId, kind],
-  );
-  const skipped: SkippedProperty[] = conflicts.rows.map((row) => ({
-    library: { kind, label: row.library_label, source: row.library_source },
-    key: row.key, label: row.label, type: row.type,
-    reason: row.archived ? "archived" : "type_mismatch",
-    existingType: row.archived ? null : row.target_type,
-  }));
-  const created = await client.query<{ id: string }>(
-    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
-     SELECT gen_random_uuid()::text, $2, cl.kind, cl.source, cl.label, cl.position, $3, now(), now()
-       FROM catalog_libraries cl WHERE cl.group_id = $1 AND cl.kind = $4
-     ON CONFLICT (group_id, kind) DO NOTHING
-     RETURNING id`,
-    [sourceGroupId, targetGroupId, actorUserId, kind],
-  );
-  if (created.rows[0]) {
-    // Renamed or hidden built-in columns (year, pages…) come along with a brand-new library only.
-    await client.query(
-      `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
-       SELECT gen_random_uuid()::text, $2, n.property_key, n.label, n.hidden, n.position, now(), now()
-         FROM catalog_native_property_configs n
-         JOIN catalog_libraries cl ON cl.id = n.library_id AND cl.group_id = $1 AND cl.kind = $3`,
-      [sourceGroupId, created.rows[0].id, kind],
-    );
-  } else {
-    // A library the target already had keeps its own configuration — except the event date
-    // switch: copied items carry their dates, and they'd be stored but invisible without it.
-    await client.query(
-      `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
-       SELECT gen_random_uuid()::text, tl.id, n.property_key, n.label, n.hidden, n.position, now(), now()
-         FROM catalog_native_property_configs n
-         JOIN catalog_libraries sl ON sl.id = n.library_id AND sl.group_id = $1 AND sl.kind = $3
-         JOIN catalog_libraries tl ON tl.group_id = $2 AND tl.kind = $3
-        WHERE n.property_key = 'scheduled_at' AND n.hidden = false
-       ON CONFLICT (library_id, property_key) DO NOTHING`,
-      [sourceGroupId, targetGroupId, kind],
-    );
-  }
-  await client.query(
-    `INSERT INTO catalog_attribute_defs
-       (id, group_id, kind, semantic_key, label, type, position, hidden, created_by_user_id, created_at, updated_at)
-     SELECT gen_random_uuid()::text, $2, d.kind, d.semantic_key, d.label, d.type, d.position, d.hidden, $3, now(), now()
-       FROM catalog_attribute_defs d
-      WHERE d.group_id = $1 AND d.kind = $4 AND d.archived_at IS NULL
-     ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,
-    [sourceGroupId, targetGroupId, actorUserId, kind],
-  );
-  return skipped;
-}
-
-/**
  * Copies a challenge's structure — rules, entry types (with who may see and who
- * may fill each answer), fields and their options, the libraries it draws from
- * (their properties, not their items), the manual checkpoint layout, and metric
- * definitions — into `targetGroupId` as a fresh `draft`. The recipe carries over;
+ * may fill each answer), fields and their options, the manual checkpoint layout,
+ * and metric definitions — into `targetGroupId` as a fresh `draft`. The recipe carries over;
  * the challenge's participation **period** does not (the copy starts undated, so
  * the admin picks new ones). The item list never comes across: the new owners add
  * their own from their library. Day-by-day checkpoints are left out — those
  * regenerate from the period. No items, entries, participants, results, or share tokens come across.
  *
+ * No library comes across either, nor is one made in the target: the copy's owner
+ * picks it (the duplicate dialog, or the first time they add items), offered the
+ * source's library by name (see `librarySuggestion`).
+ *
  * Shared by "duplicate this challenge" and "duplicate this template". Callers own
  * every access check and their own audit/bookkeeping rows; this function only
- * writes the structural copy and returns the new challenge id, plus any library
- * properties it had to leave out because the destination defines them differently.
+ * writes the structural copy and returns the new challenge id.
  */
 export async function copyChallengeStructure(
   client: PoolClient,
@@ -122,12 +26,8 @@ export async function copyChallengeStructure(
   targetGroupId: string,
   createdByUserId: string,
   title: string,
-): Promise<{ id: string; skippedProperties: SkippedProperty[]; status: "draft" }> {
+): Promise<{ id: string; status: "draft" }> {
   const targetId = publicId();
-  const skippedProperties: SkippedProperty[] = [];
-  const copyLibraryAndRemember = async (sourceGroupId: string, kind: string, createdBy: string) => {
-    skippedProperties.push(...await copyLibrary(client, sourceGroupId, targetGroupId, kind, createdBy));
-  };
   await client.query(
     `INSERT INTO challenges
       (id,group_id,created_by_user_id,title,description,rules,rule_sections,recipe_key,recipe_version,
@@ -233,18 +133,6 @@ export async function copyChallengeStructure(
     );
   }
 
-  // The libraries this challenge draws from come along with their properties (not their items), so a
-  // restaurant or match template keeps the fields that made it useful, empty for the new owners to fill.
-  const origin = (await client.query<{ group_id: string; recipe_key: string | null }>(
-    "SELECT group_id, recipe_key FROM challenges WHERE id=$1", [sourceChallengeId])).rows[0];
-  const sourceGroupId = origin.group_id;
-  const linkedKinds = new Set<string>();
-  for (const library of await readChallengeLibraries(client, sourceChallengeId, sourceGroupId, origin.recipe_key)) {
-    await copyLibraryAndRemember(sourceGroupId, library.kind, createdByUserId);
-    await linkChallengeLibrary(client, targetId, targetGroupId, library.kind, createdByUserId);
-    linkedKinds.add(library.kind);
-  }
-
   // The item list never comes across: items belong to the source group's library, and copying them would add
   // titles to the target's library behind its owners' backs. The new owners add their own.
 
@@ -292,5 +180,5 @@ export async function copyChallengeStructure(
      ON CONFLICT DO NOTHING`,
     [targetId, targetGroupId, createdByUserId],
   );
-  return { id: targetId, skippedProperties, status: "draft" as const };
+  return { id: targetId, status: "draft" as const };
 }

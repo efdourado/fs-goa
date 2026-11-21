@@ -495,18 +495,18 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.notEqual((republished.body as { shareToken: string }).shareToken, anonToken, "e não é o link revogado");
 
   const crossGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
-    session: owner, body: { title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },
+    session: owner, body: { library: { suggested: true }, title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },
   });
   assert.equal(crossGroupDuplicate.response.status, 404, "grupo alheio não pode ser descoberto como destino");
 
   const sameGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
-    session: owner, body: { title: "Cópia no mesmo grupo", targetGroupId: groupId },
+    session: owner, body: { library: { suggested: true }, title: "Cópia no mesmo grupo", targetGroupId: groupId },
   });
   assert.equal(sameGroupDuplicate.response.status, 400, "a cópia precisa reutilizar o modelo em outro grupo");
 
   // "Só eu": a cópia vai para o espaço pessoal de quem copia, como rascunho e já com a pessoa dentro.
   const mineDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
-    session: owner, body: { title: "Cine só meu", target: "personal" },
+    session: owner, body: { library: { suggested: true }, title: "Cine só meu", target: "personal" },
   });
   assert.equal(mineDuplicate.response.status, 201, JSON.stringify(mineDuplicate.body));
   const mine = await adminPool.query<{ kind: string; owner_user_id: string; status: string; participants: number }>(
@@ -518,7 +518,7 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.deepEqual(mine.rows[0], { kind: "personal", owner_user_id: owner.user.id, status: "draft", participants: 1 });
 
   const duplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
-    session: owner, body: { title: "Cine — edição 2", targetGroupId },
+    session: owner, body: { library: { suggested: true }, title: "Cine — edição 2", targetGroupId },
   });
   assert.equal(duplicate.response.status, 201, JSON.stringify(duplicate.body));
   const duplicateId = (duplicate.body as { id: string }).id;
@@ -1086,7 +1086,7 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   const strangerGroupId = (strangerGroup.body as { id: string }).id;
   const copied = await call("POST", `/api/templates/${challengeId}/duplicate`, {
     session: stranger,
-    body: { targetGroupId: strangerGroupId },
+    body: { library: { suggested: true }, targetGroupId: strangerGroupId },
   });
   assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
   const copyId = (copied.body as { challengeId: string }).challengeId;
@@ -1107,12 +1107,12 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
 
   const notMyGroup = await call("POST", `/api/templates/${challengeId}/duplicate`, {
     session: stranger,
-    body: { targetGroupId: groupId },
+    body: { library: { suggested: true }, targetGroupId: groupId },
   });
   assert.equal(notMyGroup.response.status, 404, "não dá para duplicar num grupo que você não administra");
 
   // "Só eu": a cópia vai para o espaço pessoal de quem duplica, criado na hora se ainda não existe.
-  const toMySpace = await call("POST", `/api/templates/${challengeId}/duplicate`, { session: stranger, body: { target: "personal" } });
+  const toMySpace = await call("POST", `/api/templates/${challengeId}/duplicate`, { session: stranger, body: { library: { suggested: true }, target: "personal" } });
   assert.equal(toMySpace.response.status, 201, JSON.stringify(toMySpace.body));
   const mySpaceRow = await adminPool.query<{ kind: string; owner_user_id: string }>(
     "SELECT g.kind, g.owner_user_id FROM challenges c JOIN groups g ON g.id = c.group_id WHERE c.id = $1",
@@ -1317,7 +1317,7 @@ test("copiar um desafio carrega as semanas, mas nunca os itens", async () => {
   });
 
   const copied = await call("POST", `/api/challenges/${sourceId}/duplicate`, {
-    session: owner, body: { targetGroupId: targetGroup, title: "Ciclo copiado" },
+    session: owner, body: { library: { suggested: true }, targetGroupId: targetGroup, title: "Ciclo copiado" },
   });
   assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
   const copyId = (copied.body as { challengeId: string }).challengeId;
@@ -1422,7 +1422,7 @@ test("aplica limites de criação por dono e por grupo", async () => {
   assert.equal(copySource.response.status, 201, JSON.stringify(copySource.body));
   const overflowCopy = await call("POST", `/api/challenges/${(copySource.body as { id: string }).id}/duplicate`, {
     session: owner,
-    body: { title: "Não cabe no destino", targetGroupId: groupId },
+    body: { library: { suggested: true }, title: "Não cabe no destino", targetGroupId: groupId },
   });
   assert.equal(overflowCopy.response.status, 403, "a cópia também respeita o limite do grupo de destino");
   assert.equal((overflowCopy.body as { error: string }).error, "challenge_limit");
@@ -2242,14 +2242,17 @@ test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma c�
   // Uma cópia do desafio (mesmo sem entradas ainda) precisa remapear os três campos da métrica combinada
   // para os campos NOVOS — não os do desafio de origem — ou a nota geral fica muda no destino.
   const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês 2 (cópia)" } })).body as { id: string }).id;
-  const duplicated = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  // A copy always says where its items go: without a pick it's refused; here the destination has no library, so the suggestion.
+  const unpicked = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  assert.equal(unpicked.response.status, 400, JSON.stringify(unpicked.body));
+  assert.equal((unpicked.body as { error: string }).error, "copy_library_required");
+  const duplicated = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, library: { suggested: true } } });
   assert.equal(duplicated.response.status, 201, JSON.stringify(duplicated.body));
   const dcid = (duplicated.body as { id: string }).id;
   const dupDetail = (await call("GET", `/api/challenges/${dcid}`, { session: owner })).body as {
     items: Array<{ id: string; title: string }>;
   };
   assert.deepEqual(dupDetail.items, [], "a cópia nasce sem itens");
-  // The copy's owners add their own places from their library.
   const dupItem = await call("POST", `/api/challenges/${dcid}/items`, { session: owner, body: { items: [{ title: "Cantina do Zé" }] } });
   assert.equal(dupItem.response.status, 201, JSON.stringify(dupItem.body));
   const dupItemId = (dupItem.body as { itemIds: string[] }).itemIds[0];
@@ -2356,12 +2359,12 @@ test("cópia de modelo (fase 7): só a estrutura, nunca os itens, o escopo compa
   const gallery = (await call("GET", "/api/templates")).body as { templates: Array<{ id: string }> };
   assert.ok(gallery.templates.some((template) => template.id === cid), "o modelo personalizado aparece na galeria");
 
-  const structureOnly = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  const structureOnly = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, targetGroupId: dstGid } });
   assert.equal(structureOnly.response.status, 201, JSON.stringify(structureOnly.body));
   const soId = (structureOnly.body as { id: string }).id;
 
   // An older client still asking for the items gets the structure only: the item list never crosses groups.
-  const withItems = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure_and_items" } });
+  const withItems = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, targetGroupId: dstGid, mode: "structure_and_items" } });
   assert.equal(withItems.response.status, 201, JSON.stringify(withItems.body));
   const wiId = (withItems.body as { id: string }).id;
 
@@ -2380,17 +2383,20 @@ test("cópia de modelo (fase 7): só a estrutura, nunca os itens, o escopo compa
   // o nome externo e as recomendações não vazam para o espaço de destino
   assert.equal(await count("SELECT count(*) AS n FROM catalog_recommenders WHERE group_id = $1", dstGid), 0);
   assert.equal(await count("SELECT count(*) AS n FROM catalog_items WHERE group_id = $1 AND (recommended_by_user_id IS NOT NULL OR recommended_by_external_id IS NOT NULL OR origin_note IS NOT NULL)", dstGid), 0);
-  // a biblioteca própria vai junto, com o mesmo nome — separada da original
+  // o destino não tinha biblioteca: a sugestão faz a original lá, com o mesmo nome — separada da original, e as duas cópias usam a mesma
   const dstLibs = (await call("GET", `/api/groups/${dstGid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ label: string | null; kind: string }> };
-  const copied = dstLibs.libraries.find((lib) => lib.kind === library.kind);
-  assert.equal(copied?.label, "Futebol");
+  assert.deepEqual(dstLibs.libraries.map((lib) => [lib.kind, lib.label]), [[library.kind, "Futebol"]]);
+  for (const id of [soId, wiId]) {
+    const linked = ((await call("GET", `/api/challenges/${id}`, { session: owner })).body as { libraries: Array<{ label: string | null }> }).libraries;
+    assert.deepEqual(linked.map((lib) => lib.label), ["Futebol"]);
+  }
   const renamedCopy = await call("PATCH", `/api/catalog/libraries/${(await adminPool.query<{ id: string }>("SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dstGid, library.kind])).rows[0].id}`, { session: owner, body: { label: "Só no destino" } });
   assert.equal(renamedCopy.response.status, 200);
   const srcLibs = (await call("GET", `/api/groups/${srcGid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ label: string | null; kind: string }> };
   assert.equal(srcLibs.libraries.find((lib) => lib.kind === library.kind)?.label, "Futebol", "renomear a cópia não mexe na original");
 
   // duplicar um desafio comum também nunca leva os itens
-  const plain = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  const plain = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, targetGroupId: dstGid } });
   assert.equal(plain.response.status, 201, JSON.stringify(plain.body));
   assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1", (plain.body as { id: string }).id), 0);
 });
@@ -2429,7 +2435,7 @@ test("insights da administração (fase 8): só contagens confirmadas, sem a equ
   await call("POST", `/api/challenges/${cid}/transition`, { session: person, body: { status: "active" } });
   const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: person })).body as { items: Array<{ id: string }> }).items[0].id;
   await call("POST", `/api/challenges/${cid}/entries`, { session: person, body: { itemId, values: { nota: 5, comentario: "Comentário Secreto" } } });
-  await call("POST", `/api/challenges/${cid}/duplicate`, { session: person, body: { targetGroupId: otherGid } });
+  await call("POST", `/api/challenges/${cid}/duplicate`, { session: person, body: { library: { suggested: true }, targetGroupId: otherGid } });
 
   // atividade da própria equipe não entra por padrão
   const staffGid = ((await call("POST", "/api/groups", { session: staff, body: { name: "Teste da equipe" } })).body as { id: string }).id;
@@ -3049,7 +3055,7 @@ test("cópia: carrega a receita, zera a agenda e não leva itens ao acervo do de
   await addExpectationType(sourceId);
 
   const copy = await call("POST", `/api/challenges/${sourceId}/duplicate`, {
-    session: owner, body: { title: "Sessão — bis", targetGroupId: target },
+    session: owner, body: { library: { suggested: true }, title: "Sessão — bis", targetGroupId: target },
   });
   assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
   const copyId = (copy.body as { id: string }).id;
@@ -7091,7 +7097,7 @@ test("duplicar preserva a privacidade de cada resposta: quem vê e quem preenche
   assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${individual.id}`, { session: owner, body: { visibilityPolicy: "author_only" } })).response.status, 200);
   assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${shared.id}`, { session: owner, body: { visibilityPolicy: "after_close" } })).response.status, 200);
 
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, targetGroupId: dstGid } });
   assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
   const copied = (await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as {
     entryTypes: Array<{ semanticKey: string; answerScope: string; visibilityPolicy: string; sharedEditPolicy: string | null }>;
@@ -7105,7 +7111,7 @@ test("duplicar preserva a privacidade de cada resposta: quem vê e quem preenche
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [owner.user.id]);
   const platform = await login("gabi_privada");
   assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: platform, body: {} })).response.status, 200);
-  const fromTemplate = await call("POST", `/api/templates/${cid}/duplicate`, { session: platform, body: { targetGroupId: dstGid } });
+  const fromTemplate = await call("POST", `/api/templates/${cid}/duplicate`, { session: platform, body: { library: { suggested: true }, targetGroupId: dstGid } });
   assert.equal(fromTemplate.response.status, 201, JSON.stringify(fromTemplate.body));
   const tpl = await adminPool.query<{ visibility_policy: string }>(
     "SELECT visibility_policy FROM entry_types WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY visibility_policy", [(fromTemplate.body as { id: string }).id],
@@ -7113,7 +7119,7 @@ test("duplicar preserva a privacidade de cada resposta: quem vê e quem preenche
   assert.deepEqual(tpl.rows.map((row) => row.visibility_policy), ["after_close", "author_only"]);
 });
 
-test("duplicar leva a biblioteca com propriedades (nunca os itens, os valores ou a agenda deles) — e nunca sobrescreve o que o destino já tinha", async () => {
+test("duplicar sempre pergunta a biblioteca: a sugerida leva as propriedades da original (nunca os itens, os valores ou a agenda deles), uma do destino entra como está", async () => {
   const owner = await register("Hugo", "hugo_copa");
   const srcGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa 2026" } })).body as { id: string }).id;
   const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro bolão" } })).body as { id: string }).id;
@@ -7144,11 +7150,13 @@ test("duplicar leva a biblioteca com propriedades (nunca os itens, os valores ou
   assert.equal(day.response.status, 200, JSON.stringify(day.body));
   assert.equal((await call("PATCH", `/api/challenges/${cid}/items/${items[0].id}`, { session: owner, body: { opensAt: kickoff, dueAt: "2026-06-15T21:00:00.000Z" } })).response.status, 200);
 
-  const copied = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  const copied = await call("POST", `/api/challenges/${cid}/duplicate`, {
+    session: owner, body: { targetGroupId: dstGid, library: { suggested: true } },
+  });
   assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
   const copyId = (copied.body as { id: string }).id;
 
-  // a biblioteca, com o nome e as duas propriedades (inclusive a oculta), já existe no destino
+  // a biblioteca sugerida, com o nome e as duas propriedades (inclusive a oculta), existe no destino
   const dstLib = (await adminPool.query<{ id: string; label: string }>("SELECT id, label FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dstGid, matches.kind])).rows[0];
   assert.equal(dstLib.label, "Jogos");
   const dstProps = (await call("GET", `/api/catalog/libraries/${dstLib.id}/properties`, { session: owner })).body as {
@@ -7171,36 +7179,24 @@ test("duplicar leva a biblioteca com propriedades (nunca os itens, os valores ou
   assert.deepEqual(copyDetail.items, [], "a cópia nasce sem itens");
   assert.equal(copyDetail.startsOn, null, "o período de participação continua zerado");
   assert.deepEqual(copyDetail.libraries.map((library) => [library.kind, library.label]), [[matches.kind, "Jogos"]]);
+  const added = await call("POST", `/api/challenges/${copyId}/items`, { session: owner, body: { title: "Espanha x Itália" } });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
 
-  // a cópia continua ligada à biblioteca, com as suas propriedades, e aceita os itens dos novos donos
+  // sem escolher: recusada, e nada é criado
   const dst2 = ((await call("POST", "/api/groups", { session: owner, body: { name: "Só a estrutura" } })).body as { id: string }).id;
-  const structure = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst2 } });
-  assert.equal(structure.response.status, 201, JSON.stringify(structure.body));
-  const structureId = (structure.body as { id: string }).id;
-  const structureDetail = (await call("GET", `/api/challenges/${structureId}`, { session: owner })).body as { items: unknown[]; libraries: Array<{ kind: string; id: string }> };
-  assert.equal(structureDetail.items.length, 0);
-  assert.deepEqual(structureDetail.libraries.map((library) => library.kind), [matches.kind], "a cópia só da estrutura continua ligada à biblioteca");
-  const structureProps = (await call("GET", `/api/catalog/libraries/${structureDetail.libraries[0].id}/properties`, { session: owner })).body as { properties: Array<{ storage: string }> };
-  assert.equal(structureProps.properties.filter((property) => property.storage === "attribute").length, 2);
-  const added = await call("POST", `/api/challenges/${structureId}/items`, { session: owner, body: { title: "Espanha x Itália" } });
-  assert.equal(added.response.status, 201, `dá para adicionar itens à cópia sem escolher biblioteca: ${JSON.stringify(added.body)}`);
+  const unpicked = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst2 } });
+  assert.equal(unpicked.response.status, 400, JSON.stringify(unpicked.body));
+  assert.equal((await adminPool.query<{ n: number }>("SELECT count(*)::int AS n FROM challenges WHERE group_id = $1", [dst2])).rows[0].n, 0);
+  assert.equal((await adminPool.query<{ n: number }>("SELECT count(*)::int AS n FROM catalog_libraries WHERE group_id = $1", [dst2])).rows[0].n, 0);
 
-  // um destino que já customizou a biblioteca e já tinha um item: o que é dele fica
+  // uma biblioteca que o destino já tem entra como está: nome e propriedades dele, nada mesclado
   const dst3 = ((await call("POST", "/api/groups", { session: owner, body: { name: "Já tinha" } })).body as { id: string }).id;
-  await adminPool.query(
-    "INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id) VALUES ('lib-ja-tinha', $1, $2, 'custom', 'Partidas', 0, $3)",
-    [dst3, matches.kind, owner.user.id],
-  );
-  await adminPool.query(
-    `INSERT INTO catalog_attribute_defs (id, group_id, kind, semantic_key, label, type, position, created_by_user_id)
-     VALUES ('def-ja-tinha', $1, $2, $3, 'Etapa', 'text', 0, $4)`, [dst3, matches.kind, stage.key, owner.user.id],
-  );
-  const merged = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst3 } });
+  const theirs = (await call("POST", `/api/groups/${dst3}/catalog/libraries`, { session: owner, body: { label: "Partidas" } })).body as { id: string; kind: string };
+  const merged = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst3, library: { libraryId: theirs.id } } });
   assert.equal(merged.response.status, 201, JSON.stringify(merged.body));
-  const mergedLib = (await adminPool.query<{ label: string }>("SELECT label FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dst3, matches.kind])).rows[0];
-  assert.equal(mergedLib.label, "Partidas", "o nome que o destino deu à biblioteca não é sobrescrito");
-  const mergedDefs = await adminPool.query<{ label: string }>("SELECT label FROM catalog_attribute_defs WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL ORDER BY label", [dst3, matches.kind]);
-  assert.deepEqual(mergedDefs.rows.map((row) => row.label), ["Estádio", "Etapa"], "a propriedade que o destino tinha fica como está; só falta a que ele não tinha");
+  const mergedDetail = (await call("GET", `/api/challenges/${(merged.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ kind: string; label: string | null }> };
+  assert.deepEqual(mergedDetail.libraries.map((library) => [library.kind, library.label]), [[theirs.kind, "Partidas"]]);
+  assert.equal((await adminPool.query<{ n: number }>("SELECT count(*)::int AS n FROM catalog_attribute_defs WHERE group_id = $1", [dst3])).rows[0].n, 0, "nenhuma propriedade é empurrada para a biblioteca do destino");
 });
 
 test("um desafio usa uma biblioteca só: duas são recusadas, a escolhida fica guardada e só troca enquanto vazia", async () => {
@@ -7245,7 +7241,7 @@ test("um desafio usa uma biblioteca só: duas são recusadas, a escolhida fica g
 
   // the copy keeps its one library
   const dst = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cópia" } })).body as { id: string }).id;
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst } });
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst, library: { suggested: true } } });
   assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
   const copyDetail = (await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ label: string | null }> };
   assert.deepEqual(copyDetail.libraries.map((library) => library.label), ["Séries"]);
@@ -7481,27 +7477,21 @@ test("\"as respostas abrem em\" bloqueia de verdade no servidor; \"responder at�
   assert.equal(late.response.status, 201, "o prazo passado nunca bloqueia");
 });
 
-test("copiar para um destino com a mesma propriedade de outro tipo (ou arquivada): pula, avisa e preserva", async () => {
+test("a sugestão num destino que já tem a biblioteca da origem: usa a dele como está, sem empurrar colunas", async () => {
   const owner = await register("Sonia", "sonia_conflito");
   const srcGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Origem" } })).body as { id: string }).id;
   const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
   const matches = (await call("POST", `/api/groups/${srcGid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string; kind: string };
-  const attr = async (label: string, type: string) =>
-    (await call("POST", `/api/groups/${srcGid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label, type } })).body as { id: string; key: string };
-  const stage = await attr("Fase", "text");
-  const venue = await attr("Estádio", "text");
-  const round = await attr("Rodada", "number");
+  const stage = (await call("POST", `/api/groups/${srcGid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label: "Fase", type: "text" } })).body as { key: string };
+  await call("POST", `/api/groups/${srcGid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label: "Estádio", type: "text" } });
   const created = await call("POST", `/api/groups/${srcGid}/challenges`, {
     session: owner,
-    body: {
-      recipe: "custom", title: "Copa", libraryId: matches.id, participantIds: [owner.user.id],
-      items: [{ title: "Brasil x Argentina", attributes: { [stage.key]: "Grupos", [venue.key]: "Maracanã", [round.key]: 3 } }],
-    },
+    body: { recipe: "custom", title: "Copa", libraryId: matches.id, participantIds: [owner.user.id], items: [{ title: "Brasil x Argentina", attributes: { [stage.key]: "Grupos" } }] },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
 
-  // o destino já tem a mesma chave: "Fase" como número, e "Estádio" arquivada
+  // o destino já tem a biblioteca da origem (de uma cópia antiga), com "Fase" como número
   await adminPool.query(
     "INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id) VALUES ('lib-conflito', $1, $2, 'custom', 'Partidas', 0, $3)",
     [dstGid, matches.kind, owner.user.id],
@@ -7510,35 +7500,14 @@ test("copiar para um destino com a mesma propriedade de outro tipo (ou arquivada
     `INSERT INTO catalog_attribute_defs (id, group_id, kind, semantic_key, label, type, position, created_by_user_id)
      VALUES ('def-fase-numero', $1, $2, $3, 'Fase', 'number', 0, $4)`, [dstGid, matches.kind, stage.key, owner.user.id],
   );
-  await adminPool.query(
-    `INSERT INTO catalog_attribute_defs (id, group_id, kind, semantic_key, label, type, position, archived_at, created_by_user_id)
-     VALUES ('def-estadio-arquivado', $1, $2, $3, 'Estádio', 'text', 1, now(), $4)`, [dstGid, matches.kind, venue.key, owner.user.id],
-  );
 
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
-  assert.equal(copy.response.status, 201, `a cópia não é rejeitada por causa do conflito: ${JSON.stringify(copy.body)}`);
-  const skipped = (copy.body as { skippedProperties: Array<{ key: string; label: string; type: string; reason: string; existingType: string | null; library: { label: string | null } }> }).skippedProperties;
-  assert.deepEqual(
-    skipped.map((property) => [property.key, property.reason, property.type, property.existingType]).sort(),
-    [[stage.key, "type_mismatch", "text", "number"], [venue.key, "archived", "text", null]].sort(),
-  );
-  assert.equal(skipped[0].library.label, "Jogos");
-
-  // a definição do destino continua intacta, e nenhum valor atravessa (a cópia nunca leva itens)
-  const stageDef = (await adminPool.query<{ type: string; label: string }>("SELECT type, label FROM catalog_attribute_defs WHERE id = 'def-fase-numero'")).rows[0];
-  assert.deepEqual(stageDef, { type: "number", label: "Fase" });
-  const values = await adminPool.query<{ key: string; number_value: number | null; text_value: string | null }>(
-    `SELECT d.semantic_key AS key, v.number_value, v.text_value
-       FROM catalog_attribute_values v
-       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id
-       JOIN catalog_items ci ON ci.id = v.catalog_item_id
-      WHERE ci.group_id = $1`, [dstGid]);
-  assert.deepEqual(values.rows, [], "nenhum valor de item atravessa");
-
-  // duplicar dentro da mesma origem, sem conflito, não avisa de nada
-  const dst2 = ((await call("POST", "/api/groups", { session: owner, body: { name: "Limpo" } })).body as { id: string }).id;
-  const clean = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst2 } });
-  assert.deepEqual((clean.body as { skippedProperties: unknown[] }).skippedProperties, []);
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, library: { suggested: true } } });
+  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
+  const linked = ((await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ id: string; label: string | null }> }).libraries;
+  assert.deepEqual(linked.map((library) => [library.id, library.label]), [["lib-conflito", "Partidas"]]);
+  const defs = (await adminPool.query<{ label: string; type: string }>("SELECT label, type FROM catalog_attribute_defs WHERE group_id = $1 ORDER BY label", [dstGid])).rows;
+  assert.deepEqual(defs, [{ label: "Fase", type: "number" }], "a biblioteca do destino continua como estava");
+  assert.equal((await adminPool.query<{ n: number }>("SELECT count(*)::int AS n FROM catalog_items WHERE group_id = $1", [dstGid])).rows[0].n, 0, "nenhum item atravessa");
 });
 
 
@@ -8211,7 +8180,7 @@ test("check-in com vários itens: um treino guarda um registro por exercício, e
 
   // copiar o desafio leva a estrutura: o tipo de registro continua dentro do tipo de check-in
   const otherGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outra academia" } })).body as { id: string }).id;
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { title: "Cópia do treino", targetGroupId: otherGroup } });
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, title: "Cópia do treino", targetGroupId: otherGroup } });
   assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
   const copied = (await call("GET", `/api/challenges/${(copy.body as { challengeId: string }).challengeId}`, { session: owner })).body as Detail;
   const copiedVisit = copied.entryTypes.find((type) => type.semanticKey === "sessao")!;
@@ -9246,7 +9215,7 @@ test("progress tracking persists explicit workload factors, validates goals, and
   await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { title: "Renamed workload" } });
   assert.deepEqual((await get()).trackingSettings, trackingSettings, "unrelated updates preserve calculation rules");
   const targetGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copied progress rules" } })).body as { id: string }).id;
-  const copied = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { title: "Copied rules", targetGroupId: targetGroup } });
+  const copied = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { library: { suggested: true }, title: "Copied rules", targetGroupId: targetGroup } });
   assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
   const copy = await get((copied.body as { id: string }).id);
   assert.deepEqual(copy.trackingSettings?.consistency, trackingSettings.consistency);
@@ -9465,7 +9434,7 @@ test("performance comparisons validate sources, copy field references, and prese
   assert.deepEqual((await call("GET", `/api/challenges/${cid}/entries`, {session: owner})).body, entriesBefore, "all record IDs, dates and values survive result settings changes");
   assert.deepEqual(after.items, before.items);
   const copyGroup = ((await call("POST", "/api/groups", {session: owner, body: {name: "Copied comparison group"}})).body as {id: string}).id;
-  const clone = await call("POST", `/api/challenges/${cid}/duplicate`, {session: owner, body: {title: "Copied comparisons", targetGroupId: copyGroup}});
+  const clone = await call("POST", `/api/challenges/${cid}/duplicate`, {session: owner, body: { library: { suggested: true }, title: "Copied comparisons", targetGroupId: copyGroup}});
   assert.equal(clone.response.status, 201, JSON.stringify(clone.body));
   const copied = await get((clone.body as {id: string}).id);
   const [copiedWeight, copiedReps, copiedSet] = copied.entryTypes.find((type) => type.parentTypeId)!.fields.map((field) => field.id!);

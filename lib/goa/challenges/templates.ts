@@ -6,6 +6,7 @@ import { assertUnder, LIMITS } from "../../limits";
 import { ensurePersonalWorkspace } from "../domain/challenges";
 import { parseRuleSections } from "../domain/rules";
 import { copyChallengeStructure } from "./copy";
+import { describeChallengeLibrary, linkCopyLibrary } from "./libraries";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
 import { isRecipeKey, RECIPES } from "./recipes";
 import { maskShowcaseIdentities, resultForChallenge } from "./results";
@@ -134,7 +135,12 @@ export async function getTemplatePreview(challengeId: string) {
     );
     // A finished (or living-list) template also carries its thread — the same public-safe story as a results link.
     const publicStory = row.status === "closed" || row.kind === "list" ? await publicStoryInput(client, row).catch(() => null) : null;
-    return { ...detail, templateFeatured: row.template_featured_at !== null, publicStory };
+    // What a copy of it draws from (named, never its items), so the copy dialog can ask where its items go.
+    const library = await describeChallengeLibrary(client, row);
+    return {
+      ...detail, templateFeatured: row.template_featured_at !== null, publicStory,
+      templateLibrary: library ? { kind: library.kind, source: library.source, label: library.label } : null,
+    };
   });
 }
 
@@ -259,13 +265,14 @@ export async function duplicateTemplate(
     );
 
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? template.title;
-    const { id: targetId, skippedProperties, status } = await copyChallengeStructure(
+    const { id: targetId, status } = await copyChallengeStructure(
       client,
       template.id,
       targetGroupId,
       session.user.id,
       title,
     );
+    await linkCopyLibrary(client, { id: targetId, group_id: targetGroupId }, body, await describeChallengeLibrary(client, template), session.user.id);
     await client.query(
       `INSERT INTO challenge_duplications
         (source_group_id,target_group_id,source_challenge_id,target_challenge_id,copied_by_user_id,created_at)
@@ -283,7 +290,7 @@ export async function duplicateTemplate(
       null,
       { sourceChallengeId: template.id, fromTemplate: true, targetGroupId },
     );
-    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status, skippedProperties };
+    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status };
   });
 }
 

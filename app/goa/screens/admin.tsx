@@ -26,6 +26,7 @@ import type {
   ChallengeSummary,
   CheckpointInput,
   CopyResult,
+  DuplicatePayload,
   Entry,
   GroupSummary,
   Id,
@@ -735,7 +736,7 @@ export function AdminScreen({
   onSaveMetric: (id: Id | null, payload: Record<string, unknown>) => Promise<void>;
   onDeleteMetric: (id: Id) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
+  onDuplicate: (payload: DuplicatePayload) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   isPlatformAdmin?: boolean;
   onPublishTemplate: () => Promise<void>;

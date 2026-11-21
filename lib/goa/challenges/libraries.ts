@@ -5,7 +5,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import { ApiError } from "../../http";
 import { challengeAccess } from "../domain/access";
 import { writeAudit } from "../domain/audit";
-import { ensureCatalogLibrary, resolveItemKind } from "../catalog";
+import { ensureCatalogLibrary, insertLibrary, resolveItemKind } from "../catalog";
 import { entryTypesForChallenge, recipeCatalogKind, usesRoundItems } from "./entry-types";
 
 interface ChallengeLibraryRow {
@@ -163,11 +163,8 @@ export async function addChallengeLibrary(session: SessionContext, challengeId: 
     }
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
-    const kind = await resolveItemKind(client, access.challenge.group_id, { libraryId: body.libraryId, kind: body.libraryKind });
     await ensureChallengeLibraries(client, access.challenge, session.user.id);
-    await linkChallengeLibrary(client, challengeId, access.challenge.group_id, kind, session.user.id);
-    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "challenge.library_linked", "challenge", challengeId, null, { kind });
+    await chooseChallengeLibrary(client, { id: challengeId, group_id: access.challenge.group_id }, body, null, session.user.id);
     return { libraries: await linkedRows(client, challengeId) };
   });
 }
@@ -203,4 +200,101 @@ export async function removeChallengeLibrary(session: SessionContext, challengeI
       "challenge.library_unlinked", "challenge", challengeId, null, { kind: library.kind });
     return { libraries: await linkedRows(client, challengeId) };
   });
+}
+
+/** The library a challenge draws from, as a copy of it sees it: what its suggestion rebuilds, columns included. */
+export interface LibraryOrigin {
+  groupId: string;
+  kind: string;
+  source: string;
+  label: string | null;
+}
+
+/** A challenge's (first, only) library, or null when it uses none. */
+export async function describeChallengeLibrary(
+  client: PoolClient,
+  challenge: { id: string; group_id: string; recipe_key: string | null },
+): Promise<LibraryOrigin | null> {
+  const [library] = await readChallengeLibraries(client, challenge.id, challenge.group_id, challenge.recipe_key);
+  return library ? { groupId: challenge.group_id, kind: library.kind, source: library.source, label: library.label } : null;
+}
+
+const BUILT_IN_KINDS = new Set(["film", "book"]);
+
+/**
+ * A copy of a challenge that draws from a library has to say which library its items go to (`library` in the body):
+ * nothing is picked, used or made for its owner. `{ libraryId }` / `{ libraryKind }` is one the destination has;
+ * `{ suggested: true }` is the source's library made in the destination (offered when it has none of its own).
+ */
+export async function linkCopyLibrary(
+  client: PoolClient,
+  copy: { id: string; group_id: string },
+  body: Record<string, unknown>,
+  origin: LibraryOrigin | null,
+  actorUserId: string,
+): Promise<void> {
+  if (!origin) return;
+  const pick = body.library && typeof body.library === "object" ? body.library as Record<string, unknown> : null;
+  if (!pick) throw new ApiError(400, "copy_library_required", "Escolha a biblioteca onde ficam os itens da cópia.");
+  await chooseChallengeLibrary(client, copy, pick, origin, actorUserId);
+}
+
+/**
+ * Links a challenge with no library yet to the one picked: `libraryId`/`libraryKind` for one the workspace has, or
+ * `suggested: true` for the origin's library rebuilt here: a built-in as the workspace's own Screens/Pages, any other as
+ * a new library under the same name with the same columns (never its items), and the same kind while this workspace
+ * doesn't have it.
+ */
+export async function chooseChallengeLibrary(
+  client: PoolClient,
+  challenge: { id: string; group_id: string },
+  body: Record<string, unknown>,
+  origin: LibraryOrigin | null,
+  actorUserId: string,
+): Promise<void> {
+  let kind: string;
+  if (body.suggested === true) {
+    if (!origin) throw new ApiError(400, "invalid_library", "Biblioteca não encontrada.");
+    const here = await oneOrNull<{ id: string }>(
+      client, "SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [challenge.group_id, origin.kind],
+    );
+    if (BUILT_IN_KINDS.has(origin.kind) || here) {
+      kind = origin.kind;
+    } else {
+      const source = origin.source === "tables" ? "tables" : "custom";
+      const made = await insertLibrary(client, challenge.group_id, actorUserId, { label: origin.label, source }, origin.kind);
+      kind = made.kind;
+      await copyLibraryColumns(client, origin, { groupId: challenge.group_id, kind, libraryId: made.id }, actorUserId);
+    }
+  } else {
+    kind = await resolveItemKind(client, challenge.group_id, { libraryId: body.libraryId, kind: body.libraryKind });
+  }
+  await linkChallengeLibrary(client, challenge.id, challenge.group_id, kind, actorUserId);
+  await writeAudit(client, challenge.group_id, challenge.id, actorUserId,
+    "challenge.library_linked", "challenge", challenge.id, null, { kind });
+}
+/** The origin library's columns, renamed/hidden built-in ones included, onto a library just made from it (never its items). */
+async function copyLibraryColumns(
+  client: PoolClient,
+  origin: LibraryOrigin,
+  target: { groupId: string; kind: string; libraryId: string },
+  actorUserId: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
+     SELECT gen_random_uuid()::text, $3, n.property_key, n.label, n.hidden, n.position, now(), now()
+       FROM catalog_native_property_configs n
+       JOIN catalog_libraries cl ON cl.id = n.library_id AND cl.group_id = $1 AND cl.kind = $2
+     ON CONFLICT (library_id, property_key) DO NOTHING`,
+    [origin.groupId, origin.kind, target.libraryId],
+  );
+  await client.query(
+    `INSERT INTO catalog_attribute_defs
+       (id, group_id, kind, semantic_key, label, type, position, hidden, created_by_user_id, created_at, updated_at)
+     SELECT gen_random_uuid()::text, $3, $4, d.semantic_key, d.label, d.type, d.position, d.hidden, $5, now(), now()
+       FROM catalog_attribute_defs d
+      WHERE d.group_id = $1 AND d.kind = $2 AND d.archived_at IS NULL
+     ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,
+    [origin.groupId, origin.kind, target.groupId, target.kind, actorUserId],
+  );
 }

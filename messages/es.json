@@ -196,7 +196,8 @@
       "network": "No se pudo contactar con el servidor. Revisa tu conexión.",
       "network_write": "La conexión se cortó antes de la respuesta. Puede que se haya guardado: compruébalo antes de volver a intentarlo.",
       "bad_response": "El servidor respondió de forma inesperada. Inténtalo de nuevo.",
-      "bad_response_write": "El servidor respondió de forma inesperada. Puede que se haya guardado: compruébalo antes de volver a intentarlo."
+      "bad_response_write": "El servidor respondió de forma inesperada. Puede que se haya guardado: compruébalo antes de volver a intentarlo.",
+      "copy_library_required": "Elige la biblioteca donde se guardan los ítems de la copia."
     },
     "byStatus": {
       "401": "Tu sesión expiró. Vuelve a entrar.",
@@ -1875,13 +1876,6 @@
     "range": "{start} – {end}",
     "timedSpan": "{day} · {start} – {endDay} · {end} ({zone})"
   },
-  "copyNotice": {
-    "title": "{count, plural, one {Se dejó fuera una propiedad} other {Se dejaron fuera # propiedades}}",
-    "body": "Tu copia está lista. Estas propiedades ya existen en el destino como otra cosa, así que la copia mantuvo la versión del destino y no trajo sus valores.",
-    "typeMismatch": "«{property}» en {library} es {type} aquí, pero {existing} en el destino.",
-    "archived": "«{property}» en {library} se quitó en el destino.",
-    "open": "Abrir la copia"
-  },
   "quickCreate": {
     "title": "Empieza un desafío",
     "q1": "¿Cómo funcionará este desafío?",
@@ -2555,5 +2549,11 @@
     "withoutDeadline": "Sin plazo",
     "deadlineHint": "Define el inicio y el fin del desafío.",
     "detailsTitle": "Plazo y extras"
+  },
+  "libraryChoice": {
+    "label": "Biblioteca",
+    "suggestion": "Sugerencia",
+    "suggestionHint": "Se crea con la copia.",
+    "loading": "Cargando bibliotecas…"
   }
 }

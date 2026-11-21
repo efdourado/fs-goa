@@ -38,7 +38,7 @@ import type {
   BootstrapData,
   ChallengeCreationInput,
   CopyResult,
-  SkippedProperty,
+  DuplicatePayload,
   ChallengeDetail,
   Entry,
   GroupInviteResult,
@@ -570,13 +570,12 @@ function GoaAppContent() {
     return result;
   }
 
-  // The caller decides where to go: straight to the copy, or — when the copy had to skip something — after the notice.
-  async function duplicateChallenge(payload: { title: string; targetGroupId?: Id; target?: "personal" }): Promise<CopyResult> {
-    if (!bootstrap || !selectedChallenge) return { challengeId: null, skippedProperties: [] };
-    const response = await apiRequest<{ skippedProperties?: SkippedProperty[] }>(API_PATHS.duplicate(selectedChallenge.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken });
+  async function duplicateChallenge(payload: DuplicatePayload): Promise<CopyResult> {
+    if (!bootstrap || !selectedChallenge) return { challengeId: null };
+    const response = await apiRequest<unknown>(API_PATHS.duplicate(selectedChallenge.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken });
     const challengeId = normalizeCreatedId(response);
     await refreshBootstrap();
-    return { challengeId, skippedProperties: response.skippedProperties ?? [] };
+    return { challengeId };
   }
 
   async function saveEntry(

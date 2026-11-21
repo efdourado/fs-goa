@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PreflightIssue } from "../../../lib/goa/challenges/preflight";
-import { SkippedPropertiesNotice } from "../copy-notice";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { type CatalogScope, useCatalogLibraries } from "../libraries";
+import { LibraryChoiceField } from "../library-choice";
 import { SetupBlockerList } from "../setup-progress";
-import type { ChallengeDetail, CopyResult, Id } from "../types";
+import type { ChallengeDetail, CopyResult, DuplicatePayload, Id, LibraryPick } from "../types";
 import { BoxSection, Button, ChallengeStatusBadge, labelClass, PageHeading, Select, SelectableCards, StatusMessage, Toggle } from "../ui";
 import { isChallengeScheduled, isLivingList } from "../utils";
 import { PublicationPanel } from "./publication";
@@ -114,7 +115,7 @@ function TemplatePanel({ challenge, onPublish, onUnpublish }: {
  */
 function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCopy }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
+  onDuplicate: (payload: DuplicatePayload) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
 }) {
   const t = useTranslations("adminChallenge");
@@ -125,30 +126,29 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
   const [targetId, setTargetId] = useState<Id>(availableTargets[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Set when the copy worked but had to leave properties out — shown before going to the copy.
-  const [copied, setCopied] = useState<CopyResult | null>(null);
-  const ready = where === "personal" || Boolean(targetId);
+  // Where the copy's items go: always asked, among the destination's libraries (see LibraryChoiceField).
+  const source = challenge.libraries?.[0] ?? null;
+  const scope: CatalogScope | null = !source ? null : where === "personal" ? "personal" : targetId ? { groupId: targetId } : null;
+  const libraries = useCatalogLibraries(scope);
+  // Per destination: a pick made for one group doesn't follow to another, whose libraries differ.
+  const scopeKey = JSON.stringify(scope);
+  const [picked, setPicked] = useState<{ scope: string; pick: LibraryPick } | null>(null);
+  const library = picked?.scope === scopeKey ? picked.pick : null;
+  const ready = (where === "personal" || Boolean(targetId)) && (!source || Boolean(library));
 
   async function copy() {
     if (busy || !ready) return;
     setBusy(true); setError(null);
     try {
-      const result = await onDuplicate(where === "personal"
-        ? { title: challenge.title, target: "personal" }
-        : { title: challenge.title, targetGroupId: targetId });
-      if (result.skippedProperties.length) { setCopied(result); return; }
+      const result = await onDuplicate({
+        title: challenge.title,
+        ...(where === "personal" ? { target: "personal" as const } : { targetGroupId: targetId }),
+        ...(library ? { library } : {}),
+      });
       if (result.challengeId) onOpenCopy(result.challengeId);
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  if (copied) {
-    return (
-      <div>
-        <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseDoneBody")}</p>
-        <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); }} />
-      </div>
-    );
-  }
   return (
     <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void copy(); }}>
       <p className="text-sm leading-6 text-[var(--muted)]">{tt("copyWhat")}</p>
@@ -171,7 +171,10 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
             })} />
         ) : null}
       </div>
-      <StatusMessage error={error} />
+      {source && scope ? (
+        <LibraryChoiceField origin={source} libraries={libraries.data} value={library} onChange={(pick) => setPicked({ scope: scopeKey, pick })} />
+      ) : null}
+      <StatusMessage error={error ?? libraries.error} />
       <Button type="submit" className="w-full" disabled={busy || !ready}>{busy ? t("reuseCreating") : t("reuseSubmit")}</Button>
     </form>
   );
@@ -184,7 +187,7 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
  */
 export function ChallengeSettings({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onDelete, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal" }) => Promise<CopyResult>;
+  onDuplicate: (payload: DuplicatePayload) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   onDelete?: () => Promise<void>;
   isPlatformAdmin: boolean;

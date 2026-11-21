@@ -5,6 +5,7 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { ensurePersonalWorkspace } from "../domain/challenges";
 import { copyChallengeStructure } from "./copy";
+import { describeChallengeLibrary, linkCopyLibrary } from "./libraries";
 import { isRecipeKey } from "./recipes";
 
 export async function duplicateChallenge(
@@ -54,13 +55,16 @@ export async function duplicateChallenge(
         : `O grupo de destino atingiu o limite de ${limit} desafios.`,
     );
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? `Cópia de ${sourceAccess.challenge.title}`;
-    const { id: targetId, skippedProperties, status } = await copyChallengeStructure(
+    const { id: targetId, status } = await copyChallengeStructure(
       client,
       sourceChallengeId,
       targetGroupId,
       session.user.id,
       title,
     );
+    // Where the copy's items go is always its owner's choice, made in the dialog (see `linkCopyLibrary`).
+    await linkCopyLibrary(client, { id: targetId, group_id: targetGroupId }, body,
+      await describeChallengeLibrary(client, sourceAccess.challenge), session.user.id);
 
     await client.query(
       `INSERT INTO challenge_duplications
@@ -71,6 +75,6 @@ export async function duplicateChallenge(
     await writeAudit(client, targetGroupId, targetId, session.user.id,
       "challenge.duplicated", "challenge", targetId, null,
       { sourceChallengeId, sourceGroupId: sourceAccess.challenge.group_id, targetGroupId });
-    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status, skippedProperties };
+    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status };
   });
 }

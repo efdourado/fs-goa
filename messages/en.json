@@ -196,7 +196,8 @@
       "network": "Couldn't reach the server. Check your connection.",
       "network_write": "The connection dropped before the answer came back. It may have saved, so check before trying again.",
       "bad_response": "The server sent an unexpected answer. Try again.",
-      "bad_response_write": "The server sent an unexpected answer. It may have saved, so check before trying again."
+      "bad_response_write": "The server sent an unexpected answer. It may have saved, so check before trying again.",
+      "copy_library_required": "Choose the library where the copy's items are kept."
     },
     "byStatus": {
       "401": "Your session expired. Sign in again.",
@@ -1871,13 +1872,6 @@
     "range": "{start} – {end}",
     "timedSpan": "{day} · {start} – {endDay} · {end} ({zone})"
   },
-  "copyNotice": {
-    "title": "{count, plural, one {One property was left out} other {# properties were left out}}",
-    "body": "Your copy is ready. These properties already exist in the destination as something else, so the copy kept the destination's version and didn't bring their values across.",
-    "typeMismatch": "“{property}” in {library} is {type} here, but {existing} in the destination.",
-    "archived": "“{property}” in {library} was removed in the destination.",
-    "open": "Open the copy"
-  },
   "quickCreate": {
     "title": "Start a challenge",
     "q1": "How will this challenge work?",
@@ -2551,5 +2545,11 @@
     "withoutDeadline": "No deadline",
     "deadlineHint": "Set the challenge’s start and end dates.",
     "detailsTitle": "Deadline and extras"
+  },
+  "libraryChoice": {
+    "label": "Library",
+    "suggestion": "Suggestion",
+    "suggestionHint": "Created with the copy.",
+    "loading": "Loading libraries…"
   }
 }

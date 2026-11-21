@@ -545,6 +545,8 @@ export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
   /** Every library the challenge draws items from, in the order they were linked. */
   libraries?: ChallengeLibraryRef[];
+  /** Template preview only: the library a copy draws from (its name, never its items), so the copy asks where items go. */
+  templateLibrary?: Omit<ChallengeLibraryRef, "id"> | null;
   entryTypes: EntryTypeView[];
   items: ChallengeItem[];
   /** Dated sessions, always present (empty for undated rounds), independent of `items`. */
@@ -670,21 +672,20 @@ export type Screen =
   | { kind: "activity" }
   | { kind: "you" };
 
-/** A library property a copy had to leave out — the destination defines the same key differently (or removed it). */
-export interface SkippedProperty {
-  library: { kind: string; label: string | null; source: "screens" | "pages" | "tables" | "custom" };
-  key: string;
-  label: string;
-  type: string;
-  reason: "type_mismatch" | "archived";
-  /** `type_mismatch` only: the type the destination's property of that key has. */
-  existingType: string | null;
-}
-
 /** What duplicating a challenge (or a template) hands back. */
 export interface CopyResult {
   challengeId: Id | null;
-  skippedProperties: SkippedProperty[];
+}
+
+/** Where a copy's items go: one of the destination's libraries, or the source's library made there (the suggestion). */
+export type LibraryPick = { libraryId: Id } | { suggested: true };
+
+export interface DuplicatePayload {
+  title: string;
+  targetGroupId?: Id;
+  target?: "personal";
+  /** Required when the source draws from a library. */
+  library?: LibraryPick;
 }
 
 export interface ChallengeCreationInput {
