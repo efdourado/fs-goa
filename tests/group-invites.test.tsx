@@ -203,8 +203,14 @@ test("the header shows an icon-only leave action for non-owners and confirms lea
     await act(async () => button("Editar grupo")!.click());
     const ownerDialog = document.querySelector("dialog")!;
     assert.ok(ownerDialog.querySelector("input"));
-    assert.ok(ownerDialog.querySelector("button[type='submit']"));
-    assert.match(ownerDialog.querySelector("section")?.textContent ?? "", /Zona de perigo.*Excluir/);
+    const save = ownerDialog.querySelector("button[type='submit']");
+    const remove = save?.parentElement?.querySelector<HTMLButtonElement>("button[type='button']");
+    assert.ok(remove);
+    assert.equal(remove.textContent, "Excluir");
+    assert.equal(remove.nextElementSibling, save);
+    await act(async () => remove.click());
+    assert.equal(remove.getAttribute("aria-expanded"), "true");
+    assert.match(ownerDialog.textContent ?? "", /Confirmar exclusão/);
     assert.doesNotMatch(ownerDialog.textContent ?? "", /Sair/);
     await act(async () => button("Fechar")!.click());
 

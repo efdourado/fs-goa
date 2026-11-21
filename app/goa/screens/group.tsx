@@ -442,14 +442,9 @@ export function GroupScreen({
             <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} disabled={groupBusy} required maxLength={120} /></Field>
             <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} disabled={groupBusy} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
             <StatusMessage error={groupError} success={groupSuccess} />
-            {onDeleteGroup ? (
-              <section className="space-y-3 rounded-2xl border border-[var(--danger-line)] bg-[var(--danger-soft)]/40 p-4">
-                <h3 className="text-sm font-semibold text-[var(--danger-strong)]">{t("dangerTitle")}</h3>
-                <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} />
-                {deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
-              </section>
-            ) : null}
+            {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
             <ModalActions className="border-t border-[var(--line)] pt-4" sticky>
+              {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : null}
               <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
             </ModalActions>
           </form>
