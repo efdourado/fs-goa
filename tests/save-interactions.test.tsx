@@ -25,7 +25,14 @@ function setup() {
     assert.ok(found, `button ${label} exists`);
     return found;
   };
-  return { root, button, cleanup: async () => { await act(async () => root.unmount()); dom.window.close(); } };
+  // The shared Save names what it saves ("Salvar nota", "Salvar tudo"…): found by its prefix.
+  const save = () => {
+    const found = [...document.querySelectorAll("button")].find((node) => /^Salvar/.test(node.textContent?.trim() ?? ""));
+    assert.ok(found, "a Save button exists");
+    return found;
+  };
+  const hasSave = () => [...document.querySelectorAll("button")].some((node) => /^Salvar/.test(node.textContent?.trim() ?? ""));
+  return { root, button, save, hasSave, cleanup: async () => { await act(async () => root.unmount()); dom.window.close(); } };
 }
 
 const workout = {
@@ -110,7 +117,8 @@ test("expectation and optional rating share one Save; a guess can be saved befor
     assert.equal([...document.querySelectorAll("button")].filter((button) => /Salvar/.test(button.textContent ?? "")).length, 1);
     assert.equal(document.querySelector('button[aria-label="Cancelar"]'),null,"empty answers have no header edit control");
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
-    await act(async () => ui.button("Salvar").click());
+    assert.equal(ui.save().textContent?.trim(), "Salvar expectativa", "Save says what it saves");
+    await act(async () => ui.save().click());
     assert.deepEqual(types, ["expectation"], "blank actual rating is neither required nor created");
   } finally { await ui.cleanup(); }
 });
@@ -123,18 +131,19 @@ test("editing a saved expectation shows Save and blocks unchanged answers", asyn
     await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={entries} user={{id:"me"} as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item,values,_entry,_date,type) => {saved.push({type,values});}} />)));
     await act(async () => ui.button("Editar resposta").click());
     assert.equal([...document.querySelectorAll("button")].filter((button) => button.textContent?.trim() === "Cancelar").length,0);
-    assert.equal(ui.button("Salvar").disabled,true);
-    const save = ui.button("Salvar");
+    assert.equal(ui.save().disabled,true);
+    const save = ui.save();
     assert.equal(document.querySelector('button [data-lock-state]'), null);
     assert.equal(document.querySelector('#entry-type-expectation button[aria-label="Editar resposta"]'),null);
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
     assert.equal(save.disabled,false);
+    assert.equal(save.textContent?.trim(),"Salvar alterações","a saved guess is changed, not created");
     await act(async () => ui.button("Cancelar").click());
-    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false,"Save is hidden outside edit mode");
+    assert.equal(ui.hasSave(),false,"Save is hidden outside edit mode");
     await act(async () => ui.button("Editar resposta").click());
-    assert.equal(ui.button("Salvar").disabled,true,"canceling restores saved answers");
+    assert.equal(ui.save().disabled,true,"canceling restores saved answers");
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
-    await act(async () => ui.button("Salvar").click());
+    await act(async () => ui.save().click());
     assert.deepEqual(saved,[{type:"expectation",values:{guess:4}}]);
   } finally {await ui.cleanup();}
 });
@@ -153,7 +162,8 @@ for (const required of [true, false]) {
       }} />)));
       await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.click());
       await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-rating button[aria-label="Nota 3"]')!.click());
-      await act(async () => ui.button("Salvar").click());
+      assert.equal(ui.save().textContent?.trim(), "Salvar tudo", "two changed answers save together");
+      await act(async () => ui.save().click());
       assert.deepEqual(types, ["expectation", "rating"], "rating saves independently while expectation is pending");
       await act(async () => finish());
       assert.deepEqual(types, ["expectation", "rating"]);
@@ -165,9 +175,10 @@ test("rating can be saved first without filling expectation", async () => {
   const ui=setup(); const saved:string[]=[];
   try {
     await act(async () => ui.root.render(withIntl(<ParticipantChallengeScreen challenge={cinema} entries={[]} user={{id:"me"} as never} tab="today" onTab={() => undefined} onBack={() => undefined} onSaveEntry={async (_item,_values,_entry,_date,type) => {saved.push(type!);}} />)));
-    assert.equal(ui.button("Salvar").disabled,true);
+    assert.equal(ui.save().disabled,true);
     await act(async () => document.querySelector<HTMLButtonElement>('#entry-type-rating button[aria-label="Nota 3"]')!.click());
-    await act(async () => ui.button("Salvar").click());
+    assert.equal(ui.save().textContent?.trim(),"Salvar nota");
+    await act(async () => ui.save().click());
     assert.deepEqual(saved,["rating"]);
   } finally {await ui.cleanup();}
 });
@@ -178,14 +189,14 @@ test("a saved answer gains an edit control and clearing it removes the control w
   const entry={id:"guess-entry",userId:"me",itemId:"film",entryTypeId:"expectation",values:{guess:3}} as Entry;
   try {
     await act(async()=>ui.root.render(withIntl(<ParticipantChallengeScreen challenge={value} entries={[entry]} user={{id:"me"} as never} tab="today" onTab={()=>undefined} onBack={()=>undefined} onSaveEntry={async()=>undefined} onDeleteEntry={async()=>{deletes++;}} />)));
-    assert.equal([...document.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Salvar"),false);
+    assert.equal(ui.hasSave(),false);
     await act(async()=>ui.button("Editar resposta").click());
     await act(async()=>document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 3"]')!.click());
-    await act(async()=>ui.button("Salvar").click());
+    await act(async()=>ui.save().click());
     assert.equal(deletes,1);
     assert.equal(document.querySelector('button[aria-label="Editar resposta"]'),null);
     assert.equal(document.querySelector('button[aria-label="Cancelar"]'),null);
-    assert.equal(ui.button("Salvar").disabled,true);
+    assert.equal(ui.save().disabled,true);
     assert.equal(document.querySelector<HTMLButtonElement>('#entry-type-expectation button[aria-label="Nota 4"]')!.disabled,false,"the empty form is ready to answer again");
   } finally {await ui.cleanup();}
 });
