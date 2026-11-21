@@ -136,7 +136,7 @@ export function AuthScreen({
 
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
             {mode === "login" ? t("noAccount") : t("hasAccount")}
-            <StateButton className="min-h-11 font-medium text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
+            <StateButton className="min-h-11 cursor-pointer font-medium text-[var(--ink)] underline-offset-4 hover:underline" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
               {mode === "login" ? t("goRegister") : t("goLogin")}
             </StateButton>
           </p>
