@@ -173,7 +173,6 @@ export function ActiveChallengeCard({
   onTogglePin,
   onSetColor,
   onManage,
-  fluid = false,
   context,
 }: {
   challenge: ChallengeSummary;
@@ -181,8 +180,6 @@ export function ActiveChallengeCard({
   onTogglePin?: (id: Id) => void;
   onSetColor?: (id: Id, tag: ChallengeColorTag | null) => void;
   onManage?: (id: Id) => void;
-  /** Fill the container instead of the fixed shelf width (a group's grid). */
-  fluid?: boolean;
   /** Whose challenge it is — "Just you" or the group's name — on the pinned shelf, which holds both sides. */
   context?: string;
 }) {
@@ -208,7 +205,7 @@ export function ActiveChallengeCard({
     <article
       className={cx(
         "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
-        fluid ? "w-full" : shelfCardWidth,
+        shelfCardWidth,
         "hover:-translate-y-0.5",
         livingList ? "border-[var(--line)]" : tone.border,
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
@@ -298,7 +295,7 @@ function ArchiveChallengeRow({
 
 const CHALLENGE_SHELF_BATCH = 24;
 
-function ChallengeShelf({ title, challenges, actions, empty, renderCard }: {
+export function ChallengeShelf({ title, challenges, actions, empty, renderCard }: {
   title: string;
   challenges: ChallengeSummary[];
   actions?: ReactNode;

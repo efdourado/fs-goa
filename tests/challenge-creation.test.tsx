@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import GoaApp from "../app/GoaApp";
 import { clearCache } from "../app/goa/cache";
 import { CatalogRow } from "../app/goa/catalog-views";
+import { CatalogShelfView } from "../app/goa/catalog-shelf";
 import { CreateChallengeScreen } from "../app/goa/screens/create-challenge";
 import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
 import { DashboardScreen } from "../app/goa/screens/dashboard";
@@ -489,6 +490,69 @@ test('the catalogue row opens its item editor and selects the item in bulk mode'
     await act(async () => selectionRow.click());
     assert.equal(checkbox.checked, true);
     assert.equal(document.querySelector('dialog'), null);
+  } finally { await ui.cleanup(); }
+});
+
+test('group catalogue arrows appear only while the shelf can scroll', async () => {
+  const ui = await setup();
+  let opened = 0;
+  const props = { scope: { groupId: 'g' }, canManage: true, onOpenCatalog: () => { opened += 1; } };
+  const data = { libraries: [], counts: { book: 2 }, items: [{ id: 'a', title: 'A', kind: 'book' }, { id: 'b', title: 'B', kind: 'book' }] };
+  try {
+    await act(async () => ui.root.render(withIntl(<CatalogShelfView {...props} data={null} />)));
+    await act(async () => ui.root.render(withIntl(<CatalogShelfView {...props} data={data} />)));
+    const catalogue = document.querySelector('h2')!;
+    const arrows = () => catalogue.closest('section')!.querySelectorAll('button[aria-hidden="true"]');
+    const rail = document.querySelector<HTMLElement>('.snap-x')!;
+    let width = 700;
+    Object.defineProperties(rail, { scrollWidth: { value: 650 }, clientWidth: { get: () => width } });
+    const resize = () => window.dispatchEvent(new window.Event('resize'));
+    await act(async () => resize());
+    assert.equal(arrows().length, 0);
+
+    width = 600;
+    await act(async () => resize());
+    assert.equal(arrows().length, 2);
+    rail.scrollLeft = 50;
+    await act(async () => rail.dispatchEvent(new window.Event('scroll')));
+    assert.equal(arrows().length, 2);
+
+    width = 700;
+    await act(async () => resize());
+    assert.equal(arrows().length, 0);
+    await act(async () => catalogue.click());
+    assert.equal(opened, 0);
+    assert.equal(rail.querySelector('button'), null);
+    const largerShelf = { ...data, counts: { book: 11 }, items: Array.from({ length: 10 }, (_, index) => ({ id: String(index), title: `Book ${index}`, kind: 'book' })) };
+    await act(async () => ui.root.render(withIntl(<CatalogShelfView {...props} data={largerShelf} />)));
+    await act(async () => rail.querySelector('button')!.click());
+    assert.equal(opened, 1);
+  } finally { await ui.cleanup(); }
+});
+
+test('the group challenges use the home carousel and its batching', async () => {
+  const ui = await setup();
+  try {
+    clearCache();
+    window.history.replaceState(null, '', '/groups/group');
+    const fetchFixture = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      if (input === '/api/bootstrap') return Response.json({
+        user: { id: 'me', name: 'Me', username: 'me' },
+        groups: [{ id: 'group', name: 'Group', role: 'owner' }],
+        challenges: Array.from({ length: 25 }, (_, index) => ({
+          id: `c${index}`, groupId: 'group', title: `Challenge ${index + 1}`, status: 'active',
+        })),
+      });
+      return fetchFixture(input, init);
+    };
+    await act(async () => ui.root.render(withIntl(<GoaApp />)));
+    const heading = [...document.querySelectorAll('span')].find((node) => node.textContent === 'Desafios do grupo');
+    const rail = heading?.closest('section')?.querySelector('.snap-x');
+    assert.ok(rail);
+    assert.equal(rail.querySelectorAll('article').length, 24);
+    await act(async () => ui.button('+ 1 mais').click());
+    assert.equal(rail.querySelectorAll('article').length, 25);
   } finally { await ui.cleanup(); }
 });
 

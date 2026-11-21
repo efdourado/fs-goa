@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { catalogCardHeight, CatalogTile, useCatalogPropertyText } from "./catalog-views";
 import { type CatalogScope, type CatalogShelfData } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
-import { ArrowRightIcon, CatalogIcon, cx, EmptyState } from "./ui";
+import { ArrowRightIcon, cx, EmptyState } from "./ui";
 
 /** A page shows only the head of the catalogue; the rest is one tap away. */
 const PREVIEW_COUNT = 10;
@@ -38,19 +38,17 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
 }) {
   const t = useTranslations("group");
   const propertyText = useCatalogPropertyText();
-  const { railRef, showFade, onScroll, nudge } = useShelfRail();
+  const { railRef, canScroll, showFade, onScroll, nudge } = useShelfRail();
   const personal = scope === "personal";
   const title = personal ? t("myCatalogTitle") : t("catalogTitle");
 
   // Every library together, newest first.
   const counts = data?.counts ?? {};
   const all = data?.items ?? [];
-  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  const total = Math.max(all.length, Object.values(counts).reduce((sum, count) => sum + count, 0));
   const addedAt = (item: (typeof all)[number]) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sorted = [...all].sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
   const visible = sorted.slice(0, PREVIEW_COUNT);
-  // The server sends only the newest few of each library, so how many more there are comes from the counts.
-  const remaining = Math.max(0, Math.max(total, sorted.length) - visible.length);
 
   if (data === null) return <CatalogShelfSkeleton title={title} />;
   if (!sorted.length && (!personal || !canManage)) return null;
@@ -62,17 +60,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
           <h2 className="text-lg font-semibold tracking-[-0.02em]">{title}</h2>
           <span className="text-xs text-[var(--muted)]">{total}</span>
         </div>
-        {sorted.length ? (
-          <div className="ml-auto flex items-center gap-2">
-            <RailArrows nudge={nudge} />
-            {personal ? null : (
-              <StateButton type="button" onClick={onOpenCatalog} className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)]">
-                <CatalogIcon className="size-3.5" />
-                {t("catalogOpen")}
-              </StateButton>
-            )}
-          </div>
-        ) : null}
+        {sorted.length && (personal || canScroll) ? <RailArrows nudge={nudge} /> : null}
       </div>
       {sorted.length ? (
         <>
@@ -85,15 +73,18 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, data }: {
                 properties={propertyText(item, data.hiddenProperties?.[item.kind])}
               />
             ))}
-            {remaining > 0 ? (
+            {total > PREVIEW_COUNT ? (
               <StateButton
                 type="button"
                 onClick={onOpenCatalog}
                 className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--muted)]")}
               >
-                <span className="text-2xl font-light tracking-[-0.04em]">{remaining}</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: title })}</span>
-                <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
+                <span className="text-2xl font-light tracking-[-0.04em]">{total}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogIn", { name: title })}</span>
+                <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">
+                  {t("catalogView")}
+                  <ArrowRightIcon className="h-3.5 w-3.5 flex-none" />
+                </span>
               </StateButton>
             ) : null}
           </Rail>

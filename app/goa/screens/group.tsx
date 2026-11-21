@@ -19,9 +19,7 @@ import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, InlineSubmit
 /** A word of the line under the invite link that opens its select. */
 const summaryPart = "max-w-[60vw] rounded-md text-[13px] text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline focus-visible:text-[var(--ink)] focus-visible:underline aria-expanded:text-[var(--ink)]";
 import { canManage } from "../utils";
-import { ActiveChallengeCard } from "./dashboard";
-
-/** The group page shows only the head of the catalog; the rest is one tap away. */
+import { ActiveChallengeCard, ChallengeShelf } from "./dashboard";
 
 export function GroupScreen({
   group,
@@ -331,22 +329,13 @@ export function GroupScreen({
       ) : null}
 
       <div className="mt-8 space-y-12">
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-baseline gap-2.5">
-              <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
-              <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
-            </div>
-            {canCreateChallenge ? (
-              <NewChallengeButton label={tc("newChallengePill")} onChat={onQuickCreate} onManual={onCreateChallenge} />
-            ) : null}
-          </div>
-          {challenges.length ? (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-              {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
-            </div>
-          ) : <FaceEmptyState title={t("noChallengesTitle")} compact />}
-        </section>
+        <ChallengeShelf
+          title={t("challengesTitle")}
+          challenges={challenges}
+          actions={canCreateChallenge ? <NewChallengeButton label={tc("newChallengePill")} onChat={onQuickCreate} onManual={onCreateChallenge} /> : undefined}
+          empty={<div className="w-full"><FaceEmptyState title={t("noChallengesTitle")} compact /></div>}
+          renderCard={(challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />}
+        />
 
         <CatalogShelfView scope={catalogScope} canManage={canManage(group.role)} data={shelfData} onOpenCatalog={onOpenCatalog} />
 

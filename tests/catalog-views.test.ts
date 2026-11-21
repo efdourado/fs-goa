@@ -65,10 +65,11 @@ test("catalogue shelves show unlabeled item values and respect hidden native pro
   }));
   assert.match(html, /Solaris/);
   assert.match(html, /1961 · 204 · 0 · Não/);
+  assert.doesNotMatch(html, /em Coleção/);
   assert.doesNotMatch(html, /role="img"|>4\.2<|Hidden author|Exemplares:|Lido:|Páginas:/);
 });
 
-test("the group shelf keeps the home end card and adds a catalogue button after the arrows", () => {
+test("the group and home shelves use plain headings and the same end card", () => {
   const data = {
     libraries: [],
     counts: { film: 8, book: 5 },
@@ -85,9 +86,17 @@ test("the group shelf keeps the home end card and adds a catalogue button after 
   const covers = (html: string) => [...html.matchAll(/title="(Capa \d+)"/g)].map((match) => match[1]);
   assert.deepEqual(covers(group), covers(home));
   assert.equal(covers(group).length, 10);
-  assert.match(group, /<\/button><\/div><button[^>]*>[\s\S]*?Catálogo do grupo<\/button>/);
-  assert.match(group, />3<\/span>.*mais em Coleção.*Ver tudo/);
-  assert.match(home, /Ver tudo/);
+  assert.match(group, /<h2[^>]*>Coleção<\/h2>/);
+  assert.match(home, /<h2[^>]*>Coleção<\/h2>/);
+  assert.doesNotMatch(group, /Catálogo do grupo/);
+  assert.match(group, />13<\/span>.*>em Coleção<\/span>.*>Ver</);
+  assert.match(home, />13<\/span>.*>em Coleção<\/span>.*>Ver</);
+
+  const allVisible = renderWithIntl(createElement(CatalogShelfView, {
+    ...props, scope: { groupId: "g" }, data: { ...data, counts: { film: 5, book: 5 }, items: data.items.slice(0, 10) },
+  }));
+  assert.equal(covers(allVisible).length, 10);
+  assert.doesNotMatch(allVisible, /em Coleção/);
 });
 
 test("an empty group catalogue has no shelf, even for managers", () => {

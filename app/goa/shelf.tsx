@@ -2,7 +2,7 @@
 
 import { StateButton } from "./state-button";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { cx } from "./ui";
 
@@ -16,35 +16,39 @@ export const shelfCardWidth = "w-[60vw] max-w-[15rem] shrink-0 snap-start sm:w-[
  */
 /** The sideways rail's behaviour: a fade that only shows while there is more to scroll to, and the arrows' nudge. */
 export function useShelfRail() {
-  const railRef = useRef<HTMLDivElement>(null);
+  const [rail, setRail] = useState<HTMLDivElement | null>(null);
+  const [canScroll, setCanScroll] = useState(false);
   const [showFade, setShowFade] = useState(false);
 
-  function updateFade() {
-    const rail = railRef.current;
-    setShowFade(rail ? rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 4 : false);
-  }
+  const measure = useCallback(() => {
+    const overflow = rail ? rail.scrollWidth - rail.clientWidth : 0;
+    setCanScroll(overflow > 4);
+    setShowFade(overflow - (rail?.scrollLeft ?? 0) > 4);
+  }, [rail]);
 
   // Re-check after every render (children can change) and whenever the rail's size changes — which also
   // catches a rail mounted while hidden (a pager's inactive page) and only laid out once it is shown.
-  useEffect(updateFade);
   useEffect(() => {
-    const rail = railRef.current;
-    if (!rail || typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateFade);
-      return () => window.removeEventListener("resize", updateFade);
+    const timer = window.setTimeout(measure, 0);
+    return () => window.clearTimeout(timer);
+  });
+  useEffect(() => {
+    if (!rail) return;
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
     }
-    const observer = new ResizeObserver(updateFade);
+    const observer = new ResizeObserver(measure);
     observer.observe(rail);
     return () => observer.disconnect();
-  }, []);
+  }, [rail, measure]);
 
   function nudge(direction: -1 | 1) {
-    const rail = railRef.current;
     if (!rail) return;
     rail.scrollBy({ left: direction * Math.max(280, rail.clientWidth * 0.8), behavior: "smooth" });
   }
 
-  return { railRef, showFade, onScroll: updateFade, nudge };
+  return { railRef: setRail, canScroll, showFade, onScroll: measure, nudge };
 }
 
 /** The two round arrows that scroll a rail; hidden on phones, where a finger does it. */
