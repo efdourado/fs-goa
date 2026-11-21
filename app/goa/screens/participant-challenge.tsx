@@ -3,7 +3,7 @@
 import { StateButton } from "../state-button";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { type FormEvent, forwardRef, Fragment, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../api";
 import { counterField, logRange } from "../checkin-days";
@@ -946,6 +946,14 @@ function RatingBar({ value }: { value: number }) {
  * with a numbered chip that flips to a checkmark once the entry is in. Replaces a
  * bare `<select>` so progress reads at a glance on both phone and desktop.
  */
+/** A stage heading the item list: its name, its period when it has one, and its items in order. */
+interface PickerGroup {
+  id: Id;
+  title: string;
+  period: string | null;
+  ids: Id[];
+}
+
 interface PickerOption {
   id: Id;
   label: string;
@@ -966,10 +974,13 @@ function EntryPicker({
   onSelect,
   onAdd,
   onEdit,
+  groups,
 }: {
   title: string;
   tally?: string;
   options: PickerOption[];
+  /** Stages: each one's title (and period) heads its items. `options` is already in this order. */
+  groups?: PickerGroup[];
   selectedId: Id | null;
   onSelect: (id: Id) => void;
   /** A quiet "+ Add" beside the heading — there when you need it, never in the way. */
@@ -1043,6 +1054,71 @@ function EntryPicker({
     return () => cancelAnimationFrame(frame);
   }, [addShown, options.length]);
   const shown = options.flatMap((option, index) => matches(option) ? [{ option, index }] : []);
+  const renderRow = ({ option, index }: { option: PickerOption; index: number }) => {
+    const active = option.id === selectedId;
+    const rating = typeof option.rating === "number" ? option.rating : null;
+    const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
+    return (
+      <li
+        key={option.id}
+        ref={active ? selectedRow : undefined}
+        className="flex items-center gap-1.5"
+        onTouchStart={onEdit ? (event) => { const touch = event.touches[0]; swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null; } : undefined}
+        onTouchEnd={onEdit ? (event) => {
+          const start = swipe.current;
+          const touch = event.changedTouches[0];
+          swipe.current = null;
+          // Clearly sideways, right to left: a list scrolled up and down never counts.
+          if (start && touch && start.x - touch.clientX > 70 && Math.abs(touch.clientY - start.y) < 30) onEdit(option.id);
+        } : undefined}
+      >
+        <StateButton
+          type="button"
+          disabled={option.soon}
+          aria-pressed={active}
+          aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
+          onClick={() => onSelect(option.id)}
+          className={cx(
+            "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",
+            active
+              ? "border-[var(--main)] bg-[var(--main-soft)]"
+              : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+          )}
+        >
+          <span
+            className={cx(
+              "grid h-7 w-7 flex-none place-items-center rounded-full text-xs font-medium tabular-nums",
+              option.done
+                ? "bg-[var(--ok)] text-white"
+                : active
+                  ? "bg-[var(--main)] text-white"
+                  : "bg-[var(--wash)] text-[var(--muted)]",
+            )}
+          >
+            {option.done ? <CheckGlyph /> : String(index + 1).padStart(digits, "0")}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
+            {option.statusLabel ? (
+              <span className={cx("block truncate text-[11px] sm:hidden", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
+            ) : null}
+            {caption ? (
+              <span className={cx("hidden truncate text-[11px] sm:block", "text-[var(--muted)]")}>{caption}</span>
+            ) : null}
+          </span>
+          {rating !== null ? (
+            <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
+          ) : null}
+        </StateButton>
+        {onEdit && active ? (
+          <StateButton type="button" onClick={() => onEdit(option.id)} aria-label={tAdmin("editItem")} title={tAdmin("editItem")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
+            <SlidersIcon className="h-[18px] w-[18px]" />
+          </StateButton>
+        ) : null}
+      </li>
+    );
+  };
+  const indexById = new Map(options.map((option, index) => [option.id, index]));
   return (
     <div>
       <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
@@ -1085,70 +1161,25 @@ function EntryPicker({
         }}
       >
         {needle && !shown.length ? <li className="py-6 text-center text-sm font-light text-[var(--muted)]">{t("searchItemsNone")}</li> : null}
-        {shown.map(({ option, index }) => {
-          const active = option.id === selectedId;
-          const rating = typeof option.rating === "number" ? option.rating : null;
-          const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
+        {groups ? groups.map((group) => {
+          const rows = group.ids.flatMap((id) => {
+            const index = indexById.get(id);
+            return index === undefined || !matches(options[index]) ? [] : [{ option: options[index], index }];
+          });
+          // Searching hides a stage with nothing matching; otherwise every stage keeps its heading, an empty one with a smile.
+          if (needle && !rows.length) return null;
           return (
-            <li
-              key={option.id}
-              ref={active ? selectedRow : undefined}
-              className="flex items-center gap-1.5"
-              onTouchStart={onEdit ? (event) => { const touch = event.touches[0]; swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null; } : undefined}
-              onTouchEnd={onEdit ? (event) => {
-                const start = swipe.current;
-                const touch = event.changedTouches[0];
-                swipe.current = null;
-                // Clearly sideways, right to left: a list scrolled up and down never counts.
-                if (start && touch && start.x - touch.clientX > 70 && Math.abs(touch.clientY - start.y) < 30) onEdit(option.id);
-              } : undefined}
-            >
-              <StateButton
-                type="button"
-                disabled={option.soon}
-                aria-pressed={active}
-                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
-                onClick={() => onSelect(option.id)}
-                className={cx(
-                  "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",
-                  active
-                    ? "border-[var(--main)] bg-[var(--main-soft)]"
-                    : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
-                )}
-              >
-                <span
-                  className={cx(
-                    "grid h-7 w-7 flex-none place-items-center rounded-full text-xs font-medium tabular-nums",
-                    option.done
-                      ? "bg-[var(--ok)] text-white"
-                      : active
-                        ? "bg-[var(--main)] text-white"
-                        : "bg-[var(--wash)] text-[var(--muted)]",
-                  )}
-                >
-                  {option.done ? <CheckGlyph /> : String(index + 1).padStart(digits, "0")}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
-                  {option.statusLabel ? (
-                    <span className={cx("block truncate text-[11px] sm:hidden", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
-                  ) : null}
-                  {caption ? (
-                    <span className={cx("hidden truncate text-[11px] sm:block", "text-[var(--muted)]")}>{caption}</span>
-                  ) : null}
-                </span>
-                {rating !== null ? (
-                  <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
-                ) : null}
-              </StateButton>
-              {onEdit && active ? (
-                <StateButton type="button" onClick={() => onEdit(option.id)} aria-label={tAdmin("editItem")} title={tAdmin("editItem")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
-                  <SlidersIcon className="h-[18px] w-[18px]" />
-                </StateButton>
-              ) : null}
-            </li>
+            <Fragment key={`group-${group.id}`}>
+              {/* The stage's name, then its period a step smaller; an empty stage is just its name. */}
+              <li className="flex min-w-0 items-baseline gap-1.5 px-1 pb-0.5 pt-4 first:pt-0">
+                <span className="min-w-0 truncate text-[15px] font-medium tracking-[-0.01em] text-[var(--ink)]">{group.title}</span>
+                {group.period ? <span className="flex-none text-[13px] font-light text-[var(--muted)]"><span aria-hidden="true">· </span>{group.period}</span> : null}
+                {group.ids.length ? null : <span className="sr-only">{t("checkpointEmpty")}</span>}
+              </li>
+              {rows.map(renderRow)}
+            </Fragment>
           );
-        })}
+        }) : shown.map(renderRow)}
         {onAdd && !needle ? (
           // Folded away until pulled out (or tabbed to).
           // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
@@ -1195,7 +1226,8 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   return (
     <section className="mt-5 w-full">
       <h2 className={cx("mb-3", sectionLabelClass)}>{tp("scheduleTitle")}</h2>
-      <div className={cx("grid w-full grid-cols-1 items-start gap-3", columns === 3 ? "sm:grid-cols-3" : columns === 2 ? "sm:grid-cols-2" : undefined)}>
+      {/* Cards in a row share the row's height: the tallest (an opened "Show more", a long list) sets it for all. */}
+      <div className={cx("grid w-full grid-cols-1 gap-3", columns === 3 ? "sm:grid-cols-3" : columns === 2 ? "sm:grid-cols-2" : undefined)}>
         {planned.map((cp, index) => (
           <div key={cp.id} className={columns === 2 && planned.length % 2 === 1 && index === planned.length - 1 ? "sm:col-span-2" : undefined}>
           <StageCard
@@ -1217,9 +1249,11 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
   const shown = open ? items : items.slice(0, STAGE_PREVIEW);
   return (
     <article
-      className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 opacity-70"
+      className="h-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 opacity-70"
     >
-      <strong className="block text-sm">{stage.title}</strong>
+      {/* An empty stage is just its name. */}
+      <strong className="block min-w-0 text-sm">{stage.title}</strong>
+      {items.length ? null : <span className="sr-only">{t("checkpointEmpty")}</span>}
       {items.length ? (
         <>
           <ul className="mt-2 space-y-1 text-sm">
@@ -1243,9 +1277,7 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
             </StateButton>
           ) : null}
         </>
-      ) : (
-        <p className="mt-2 text-xs text-[var(--muted)]">{t("checkpointEmpty")}</p>
-      )}
+      ) : null}
     </article>
   );
 }
@@ -1383,6 +1415,7 @@ export function ParticipantChallengeScreen({
   const t = useTranslations("participant");
   const tNav = useTranslations("nav");
   const trules = useTranslations("rules");
+  const tStages = useTranslations("checkpointPlanner");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
@@ -1448,8 +1481,30 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
-  // The list on Today: in the order items were added, 01 at the top and the newest at the bottom with the next number.
-  const pickerItems = sortedItems;
+  // Stages fold into the list on Today: each stage's name (and period) heads its items, so no item is listed twice.
+  // Items no stage holds come last under "No stage". A hidden schedule (showSchedule off) keeps the plain list.
+  const stageGroups = useMemo<PickerGroup[] | undefined>(() => {
+    if (challenge.showSchedule === false) return undefined;
+    const stages = [...challenge.checkpoints].filter((cp) => cp.kind && cp.kind !== "day").sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    if (!stages.length) return undefined;
+    const stageIds = new Set(stages.map((stage) => stage.id));
+    const groups: PickerGroup[] = stages.map((stage) => ({
+      id: stage.id,
+      title: stage.title,
+      period: stage.opensAt || stage.dueAt ? f.dateRange(stage.opensAt, stage.dueAt) : null,
+      ids: sortedItems.filter((item) => item.checkpointId === stage.id).map((item) => item.id),
+    }));
+    const loose = sortedItems.filter((item) => !item.checkpointId || !stageIds.has(item.checkpointId));
+    if (loose.length) groups.push({ id: "no-stage", title: tStages("unassigned"), period: null, ids: loose.map((item) => item.id) });
+    return groups;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenge.checkpoints, challenge.showSchedule, sortedItems]);
+  // The list on Today: in the order items were added (by stage when there are stages), numbered from 01 down.
+  const pickerItems = useMemo(() => {
+    if (!stageGroups) return sortedItems;
+    const byId = new Map(sortedItems.map((item) => [item.id, item]));
+    return stageGroups.flatMap((group) => group.ids.map((id) => byId.get(id)!));
+  }, [stageGroups, sortedItems]);
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
   const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);
@@ -1659,6 +1714,7 @@ export function ParticipantChallengeScreen({
       onAdd={canAddItems ? () => setAddingItems(true) : undefined}
       onEdit={itemTools && !preview ? (id) => setEditingItem(sortedItems.find((item) => item.id === id) ?? null) : undefined}
       title={t("checkpointsTitle")}
+      groups={stageGroups}
       tally={t("checkpointTally", { done: doneCount, pending: Math.max(0, sortedItems.length - doneCount) })}
       selectedId={selectedItem?.id ?? null}
       onSelect={(id) => setSelectedItemId(id)}
@@ -1728,7 +1784,8 @@ export function ParticipantChallengeScreen({
           collapses everything to "results" but still wants the schedule as
           read-only context). Grupo already lists the same checkpoints as
           table columns, and a real Results tab doesn't act on one at all. */}
-      {(activeTab === "today" || preview) && !sessionSpec ? <CheckpointSchedule challenge={challenge} /> : null}
+      {/* The stages live in the item list when it's shown; only without it do they get their own section. */}
+      {(activeTab === "today" || preview) && !sessionSpec && !(stageGroups && checkpointPicker && !sessionMode) ? <CheckpointSchedule challenge={challenge} /> : null}
 
       {/* Shared across Today and Grupo — whichever item/session is picked here
           is what both tabs act on, so it lives above the tab selector itself,
