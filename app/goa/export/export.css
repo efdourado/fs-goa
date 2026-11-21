@@ -77,30 +77,18 @@
 .xd-modal-panel .xd-stage::-webkit-scrollbar-track { margin-block: 8px 16px; background: transparent; }
 /* Inside the header row the chips take what the button leaves, and scroll there. */
 .xd-toolbar-row .xd-chips { flex: 1; min-width: 0; margin: 0; padding: 0 0 2px; }
-.xd-chip-gap { flex: none; width: 1px; margin: 6px 6px; background: var(--line); }
-.xd-chip {
+/* "Dates": a labelled checkbox, drawn like every checkbox in the app. */
+.xd-check {
   flex: none;
-  white-space: nowrap;
   display: inline-flex;
   min-height: 34px;
   cursor: pointer;
   align-items: center;
-  gap: 6px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 12px;
+  gap: 8px;
+  white-space: nowrap;
   font-size: 13px;
-  font-weight: 300;
-  color: var(--muted);
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  color: var(--ink);
 }
-.xd-chip:hover { color: var(--ink); }
-.xd-chip[aria-pressed="true"] {
-  border-color: var(--main-line);
-  background: var(--main-soft);
-  color: var(--main-strong);
-}
-.xd-chip svg { width: 12px; height: 12px; }
 
 .xd-stage { padding: 32px 16px 96px; }
 

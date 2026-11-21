@@ -524,10 +524,6 @@ function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; show
   );
 }
 
-function CheckIcon() {
-  return <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m2.5 6.2 2.2 2.2 4.8-5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
 function DownloadIcon() {
   return (
     <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -591,10 +587,11 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
           <div className="xd-toolbar-row">
             <div className="xd-chips" role="group" aria-label={doc.t("sectionsLabel")}>
               {shown("items") || shown("records") ? (
-                <StateButton type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
-                  {showWhen ? <CheckIcon /> : null}
+                // The app's checkbox (a circle that fills and ticks, globals.css), not a toggle chip.
+                <label className="xd-check">
+                  <input type="checkbox" checked={showWhen} onChange={(event) => setShowWhen(event.target.checked)} />
                   {doc.t("showWhen")}
-                </StateButton>
+                </label>
               ) : null}
             </div>
             <div className="flex flex-none items-center gap-3">
