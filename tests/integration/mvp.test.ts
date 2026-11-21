@@ -7572,6 +7572,48 @@ test("um desafio com período só aceita registros dentro dele, mesmo reaberto d
   assert.equal((await log(endsOn)).response.status, 201);
 });
 
+test("a migração 0077 apaga registros fora do período e notas vazias, e nada mais", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const file = readdirSync(new URL("../../drizzle/", import.meta.url)).find((name) => name.startsWith("0077_"))!;
+  const statements = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), "utf8")
+    .split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+
+  const owner = await register("Nina", "nina_migra_0077");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Hábito" } })).body as { id: string }).id;
+  const today = dateKeyInTimeZone(new Date(), "America/Sao_Paulo");
+  const shift = (days: number) => { const date = new Date(`${today}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "habit", title: "Sem açúcar", startsOn: shift(-10), endsOn: shift(5), participantIds: [owner.user.id] },
+  });
+  const cid = (created.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const log = async (day: string, note: string) => {
+    const saved = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { occurredOn: day, values: { nota_dia: note } } });
+    assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+    return (saved.body as { id: string }).id;
+  };
+  const kept = await log(shift(-2), "bom dia");
+  const blank = await log(shift(-1), "nota");
+  const stray = await log(shift(-3), "fora");
+
+  const client = await adminPool.connect();
+  try {
+    await client.query("BEGIN");
+    // The state the old code could leave: a log moved past the end, and a note saved blank.
+    await client.query("UPDATE entries SET occurred_on = $2 WHERE id = $1", [stray, shift(9)]);
+    await client.query("UPDATE entry_values SET text_value = '' WHERE entry_id = $1", [blank]);
+    for (const statement of statements) await client.query(statement);
+    const left = await client.query<{ id: string; values: number }>(
+      "SELECT e.id, (SELECT count(*)::int FROM entry_values v WHERE v.entry_id = e.id) AS values FROM entries e WHERE e.challenge_id = $1 ORDER BY e.occurred_on",
+      [cid],
+    );
+    assert.deepEqual(left.rows, [{ id: kept, values: 1 }, { id: blank, values: 0 }], "the stray log goes; the blank note goes but its check-in stays");
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});
+
 test("remover um tipo de resposta que já tem respostas: avisa quantas, e só com a confirmação apaga as respostas junto", async () => {
   const owner = await register("Tais", "tais_apaga");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
