@@ -143,7 +143,7 @@ export function RevealPanel({
         {sealed ? (
           iRated || !challenge.isParticipant ? (
             <Button
-              className="min-h-12 bg-[var(--main-2-fill)] px-6 text-base text-white"
+              className="bg-[var(--main-2-fill)] px-6 text-white"
               disabled={busy || !onReveal || answered.size === 0}
               onClick={() => (missing.length ? setConfirming(true) : void reveal())}
             >
@@ -165,7 +165,7 @@ export function RevealPanel({
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
           <StateButton
             type="button"
-            className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-xl border border-white/20 px-4 text-sm text-white/90 transition hover:bg-white/10 disabled:opacity-50"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-white/20 px-4 text-sm text-white/90 transition hover:bg-white/10 disabled:opacity-50"
             disabled={invite === "busy"}
             onClick={() => void shareInvite()}
           >

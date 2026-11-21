@@ -602,7 +602,7 @@ function ChallengeCardActions({ onExport, extra, end }: { onExport: () => void; 
         onClick={onExport}
         aria-label={te("button")}
         title={te("button")}
-        className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90"
+        className="inline-flex h-10 cursor-pointer items-center justify-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90"
       >
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
           {/* A film strip represents the challenge's whole log. */}
@@ -1758,7 +1758,7 @@ export function ParticipantChallengeScreen({
                   extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
                   // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
                   end={onAdmin ? (
-                    <StateButton type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
+                    <StateButton type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-10 w-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
                       <SlidersIcon className="h-[18px] w-[18px] flex-none sm:h-4 sm:w-4" />
                       <span className="hidden sm:inline">{t("manage")}</span>
                     </StateButton>

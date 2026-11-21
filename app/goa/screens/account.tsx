@@ -244,7 +244,7 @@ export function AccountScreen({
             <h2 className="text-sm font-semibold">{t("trashTitle")}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("trashBody")}</p>
           </div>
-          <Button variant="secondary" className="min-h-9" onClick={onOpenTrash}>{t("trashOpen")}</Button>
+          <Button variant="secondary" onClick={onOpenTrash}>{t("trashOpen")}</Button>
         </section>
       </div>
 
@@ -256,7 +256,7 @@ export function AccountScreen({
               <h3 className="text-[13px] font-medium">{t("deactivateTitle")}</h3>
               <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("deactivateBody")}</p>
             </div>
-            <Button variant="secondary" className="min-h-9" disabled={deactivateBusy} onClick={() => { setDeleteError(null); setShowDeactivate(true); }}>
+            <Button variant="secondary" disabled={deactivateBusy} onClick={() => { setDeleteError(null); setShowDeactivate(true); }}>
               {deactivateBusy ? tc("saving") : t("deactivate")}
             </Button>
           </div>
@@ -265,7 +265,7 @@ export function AccountScreen({
               <h3 className="text-[13px] font-medium text-[var(--danger-strong)]">{t("deletePermanentTitle")}</h3>
               <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("deletePermanentBody")}</p>
             </div>
-            <Button variant="danger" className="min-h-9" onClick={openDelete}>{t("deletePermanent")}</Button>
+            <Button variant="danger" onClick={openDelete}>{t("deletePermanent")}</Button>
           </div>
         </div>
 

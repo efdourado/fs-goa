@@ -11,7 +11,7 @@ import type { InviteAcceptance, InvitePreview, User } from "../types";
 import { BackButton, Brand, Button, cx, StatusMessage } from "../ui";
 
 /** The one thing to do on these pages: a green pill that lifts a little on hover. */
-const acceptButton = "inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full bg-[var(--main)] px-10 text-[15px] font-medium text-white shadow-[0_10px_28px_-12px_var(--main)] transition hover:-translate-y-px hover:shadow-[0_14px_32px_-12px_var(--main)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
+const acceptButton = "inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full bg-[var(--main)] px-10 text-[15px] font-medium text-white shadow-[0_10px_28px_-12px_var(--main)] transition hover:-translate-y-px hover:shadow-[0_14px_32px_-12px_var(--main)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
 
 export function InviteScreen({
   token,

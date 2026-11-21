@@ -149,7 +149,7 @@ export function AddCatalogItemDialog({
                   <span className="block truncate text-xs text-[var(--muted)]">{[match.year, match.author].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span>
                 </span>
                 {autoMatch ? null : (
-                  <Button variant="secondary" className="min-h-9 flex-none" disabled={busy} onClick={() => void submit(match.id)}>{t("useThis")}</Button>
+                  <Button variant="secondary" className="flex-none" disabled={busy} onClick={() => void submit(match.id)}>{t("useThis")}</Button>
                 )}
               </li>
             ))}

@@ -471,7 +471,7 @@ export function CineItemsEditor({
         <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
           {value.length ? <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p> : <span />}
           <div className="ml-auto flex items-center gap-2">
-            {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
+            {canOrganise(organiseInput) ? <Button variant="secondary" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
             {showAddButton ? <StateButton
               type="button"
               onClick={() => setAdding(true)}

@@ -523,7 +523,7 @@ export function GroupScreen({
                       <strong className="block truncate text-sm">{person.name}</strong>
                       <small className="text-[var(--muted)]">@{person.username}</small>
                     </span>
-                    <Button className="min-h-9 flex-none px-3 py-1 text-xs" variant="ghost" disabled={unbanBusyId === person.id} onClick={() => void unban(person.id)}>{unbanBusyId === person.id ? tc("saving") : t("unban")}</Button>
+                    <Button className="flex-none px-3 text-xs" variant="ghost" disabled={unbanBusyId === person.id} onClick={() => void unban(person.id)}>{unbanBusyId === person.id ? tc("saving") : t("unban")}</Button>
                   </li>
                 ))}
               </ul>

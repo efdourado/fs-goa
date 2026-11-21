@@ -20,7 +20,7 @@ test("Itens e etapas mostra Organizar imediatamente à esquerda de Adicionar ite
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     ...plannerActions, challenge: challenge([book("a", 2001, "X"), book("b", 2010, "Y"), book("c", 2020, "X")]), entries: [],
   }));
-  assert.match(html, /aria-label="Organizar"[^>]*h-9 w-9[^>]*rounded-full[^>]*><svg[^>]*>.*<span class="hidden sm:inline">Organizar<\/span><\/button><button[^>]*aria-label="Adicionar itens"/);
+  assert.match(html, /aria-label="Organizar"[^>]*h-10 w-10[^>]*rounded-full[^>]*><svg[^>]*>.*<span class="hidden sm:inline">Organizar<\/span><\/button><button[^>]*aria-label="Adicionar itens"/);
 });
 
 test("sem itens livres suficientes (os registrados ficam no lugar), Organizar não aparece", () => {

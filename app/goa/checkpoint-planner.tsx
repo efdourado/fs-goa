@@ -121,7 +121,7 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
               type="button"
               aria-label={to("button")}
               title={to("button")}
-              className="inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full border border-[var(--line)] text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:px-3.5"
+              className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full border border-[var(--line)] text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:px-3.5"
               disabled={busy}
               onClick={() => setOrganising(true)}
             >
@@ -131,7 +131,7 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
               <span className="hidden sm:inline">{to("button")}</span>
             </StateButton>
           ) : null}
-          {showAdd ? <StateButton type="button" aria-label={ti("addItems")} title={ti("addItems")} onClick={() => setAddingItems(true)} className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></StateButton> : null}
+          {showAdd ? <StateButton type="button" aria-label={ti("addItems")} title={ti("addItems")} onClick={() => setAddingItems(true)} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></StateButton> : null}
         </div>
       ) : null}
       <p className="col-span-full text-sm leading-6 text-[var(--muted)]">{t("itemsDescription")}</p>

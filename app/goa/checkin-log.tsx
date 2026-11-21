@@ -593,7 +593,7 @@ function BookProgress({
           </span>
         ) : null}
         {finished && counter.onFinish ? (
-          <Button variant="secondary" className="min-h-9 px-3 text-xs" onClick={counter.onFinish}>{t("markFinished")}</Button>
+          <Button variant="secondary" className="px-3 text-xs" onClick={counter.onFinish}>{t("markFinished")}</Button>
         ) : null}
       </div>
     </div>
@@ -821,8 +821,8 @@ function CounterEditor({
       ) : confirming && record ? (
         <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-[var(--danger-soft)] px-3.5 py-2.5 text-[13px]">
           <span className="mr-auto">{t("removeConfirm", { date: f.date(day), value: shown(saved ?? 0) })}</span>
-          <Button variant="danger" className="min-h-9 bg-[var(--paper)]" disabled={busy} onClick={remove}>{t("removeYes")}</Button>
-          <Button variant="ghost" className="min-h-9" disabled={busy} onClick={() => setConfirming(false)}>{tc("cancel")}</Button>
+          <Button variant="danger" className="bg-[var(--paper)]" disabled={busy} onClick={remove}>{t("removeYes")}</Button>
+          <Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>{tc("cancel")}</Button>
         </div>
       ) : (
         <div className="flex w-full items-center gap-2.5 [&>*]:min-w-0 [&>*]:flex-1">

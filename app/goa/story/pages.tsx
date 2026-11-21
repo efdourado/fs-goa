@@ -193,8 +193,8 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero",
         aria-label={t("button")}
         title={t("button")}
         className={cx(
-          "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-sm transition",
-          compactOnMobile ? "w-11 shrink-0 sm:w-auto sm:px-4" : "px-4",
+          "inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full text-sm transition",
+          compactOnMobile ? "w-10 shrink-0 sm:w-auto sm:px-4" : "px-4",
           tone === "hero" ? "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5" : "bg-[var(--ink)] font-medium text-[var(--canvas)] hover:opacity-90",
         )}
       >
@@ -389,7 +389,7 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
               type="button"
               disabled={busy || blob === undefined}
               onClick={() => void save()}
-              className="inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--ink)] px-4 py-1.5 text-sm font-medium whitespace-nowrap text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-default disabled:opacity-45"
+              className="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--ink)] px-4 py-1.5 text-sm font-medium whitespace-nowrap text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-default disabled:opacity-45"
             >
               <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
                 <path d="M10 3v10m-4-4 4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />

@@ -121,7 +121,7 @@ export function RuleSectionsEditor({
                     </div>
                   ) : null}
                   {!disabled && topics.length < MAX_TOPICS_PER_RULE ? (
-                    <Button className="min-h-9 w-full px-3 py-1 text-xs" variant="secondary" onClick={() => addTopic(index)}><span aria-hidden="true">+</span>{t("addTopic", { n: `${index + 1}.${topics.length + 1}` })}</Button>
+                    <Button className="w-full px-3 text-xs" variant="secondary" onClick={() => addTopic(index)}><span aria-hidden="true">+</span>{t("addTopic", { n: `${index + 1}.${topics.length + 1}` })}</Button>
                   ) : null}
                 </div>
               ) : null}

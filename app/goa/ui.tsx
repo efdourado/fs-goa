@@ -112,7 +112,7 @@ export function Button({
   return (
     <StateButton
       className={cx(
-        "cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 border px-4 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         inModal ? "rounded-full" : "rounded-xl",
         tones[variant],
         className,
@@ -296,7 +296,7 @@ export interface SelectOption<T extends string = string> {
 
 const selectLooks = {
   field: inputClass,
-  pill: "min-h-9 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
+  pill: "min-h-10 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
   bare: "",
 };
 
@@ -550,7 +550,7 @@ export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLa
 /** A round choice in a row of them: solid green once picked, dashed with a plus while it only offers to make something. */
 export function choicePillClass({ active = false, dashed = false, split = false }: { active?: boolean; dashed?: boolean; split?: boolean } = {}) {
   return cx(
-    "inline-flex min-h-9 rounded-full border text-sm transition",
+    "inline-flex min-h-10 rounded-full border text-sm transition",
     split ? "max-w-full items-stretch" : "cursor-pointer items-center gap-2 px-4",
     split ? "border-[var(--line)]"
       : active ? "border-[var(--main)] bg-[var(--main)] text-white"
@@ -1140,7 +1140,7 @@ export function SchedulePeriodFields({
               aria-pressed={active}
               onClick={() => applyShift(preset.shift)}
               className={cx(
-                "min-h-9 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                "min-h-10 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
                 active ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
               )}
             >

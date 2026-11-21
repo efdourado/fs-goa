@@ -231,7 +231,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       )}
 
       <div className="mt-auto pt-5 sm:pt-8">
-        <StateButton type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] px-4 text-sm text-[var(--ink)] transition hover:bg-[var(--wash)] focus-visible:outline-none">
+        <StateButton type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] px-4 text-sm text-[var(--ink)] transition hover:bg-[var(--wash)] focus-visible:outline-none">
           {t("seeResult")} <ArrowRightIcon />
         </StateButton>
       </div>

@@ -126,8 +126,8 @@ export function FormDialog({
         <div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3.5">
           <p className="text-sm text-[var(--warn)]">{tc("unsavedChanges")}</p>
           <ModalActions>
-            <Button variant="secondary" className="min-h-9" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
-            <Button variant="danger" className="min-h-9" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
+            <Button variant="danger" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
           </ModalActions>
         </div>
       ) : null}
