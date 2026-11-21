@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 
 import type { ChallengeDetail, Entry, Id } from "../types";
 import { ExportDocument } from "./export-document";
-import { exportDisplay, exportFontClass } from "./fonts";
+import { exportDisplayFontFamily, exportFontClass } from "./fonts";
 import "./export.css";
 
 /**
@@ -45,7 +45,7 @@ export function ExportModal({ challenge, entries, userId, onClose }: { challenge
         aria-modal="true"
         aria-label={t("fileTitle", { title: challenge.title })}
       >
-        <ExportDocument challenge={challenge} entries={entries} userId={userId} fontClassName={exportFontClass} displayFont={exportDisplay.style.fontFamily} onClose={onClose} />
+        <ExportDocument challenge={challenge} entries={entries} userId={userId} fontClassName={exportFontClass} displayFont={exportDisplayFontFamily} onClose={onClose} />
       </div>
     </div>,
     document.body,

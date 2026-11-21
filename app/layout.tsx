@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import Script from "next/script";
+import "./fonts/site.css";
 import "./globals.css";
 import { Toaster } from "./goa/ui";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const title = "Goa";
 
@@ -72,7 +62,7 @@ export default async function RootLayout({
             ("Encountered a script tag while rendering React component"). */}
         <Script id="theme-boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body>
         <NextIntlClientProvider>{children}<Toaster /></NextIntlClientProvider>
       </body>
     </html>
