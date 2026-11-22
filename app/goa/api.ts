@@ -145,8 +145,6 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/transition`,
   duplicate: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/duplicate`,
-  challengePrefs: (challengeId: Id) =>
-    `/api/challenges/${encodeURIComponent(challengeId)}/prefs`,
 } as const;
 
 export class ApiError extends Error {

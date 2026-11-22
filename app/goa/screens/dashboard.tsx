@@ -5,12 +5,10 @@ import { StateButton } from "../state-button";
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
-import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfView } from "../catalog-shelf";
 import { useCatalogShelf } from "../libraries";
-import { useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
 import { ReadyMadeTemplatesSection } from "../template-gallery";
 import { NewChallengeButton, WelcomePanel } from "../welcome";
@@ -26,7 +24,6 @@ import {
   cardClass,
   challengeStatusTone,
   ChallengeStatusBadge,
-  CirclePinIcon,
   cx,
   EmptyState,
   FaceEmptyState,
@@ -39,18 +36,16 @@ import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } fr
 
 // ── shelf helpers (pure, unit-tested) ────────────────────────────────────
 
-type ShelfKey = "pinned" | "personal" | "group" | "archive";
+type ShelfKey = "personal" | "group" | "archive";
 
 /**
- * Split the viewer's challenges into Home's shelves. A pinned challenge shows only in "pinned"; the rest go by
- * status — running ones into their side's shelf ("personal"/"group") and everything closed or still a draft into
- * "archive". Order within each shelf is preserved.
+ * Split the viewer's challenges into Home's shelves by status: running ones into their side's shelf
+ * ("personal"/"group") and everything closed or still a draft into "archive". Order within each shelf is preserved.
  */
 export function splitShelves(challenges: ChallengeSummary[], personalWorkspaceId: Id | null): Record<ShelfKey, ChallengeSummary[]> {
-  const out: Record<ShelfKey, ChallengeSummary[]> = { pinned: [], personal: [], group: [], archive: [] };
+  const out: Record<ShelfKey, ChallengeSummary[]> = { personal: [], group: [], archive: [] };
   for (const challenge of challenges) {
-    if (challenge.pinned) out.pinned.push(challenge);
-    else if (challenge.status !== "active") out.archive.push(challenge);
+    if (challenge.status !== "active") out.archive.push(challenge);
     else out[isPersonalChallenge(challenge, personalWorkspaceId) ? "personal" : "group"].push(challenge);
   }
   return out;
@@ -97,33 +92,14 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
   );
 }
 
-// ── the challenge card + its per-viewer menu ────────────────────────────
-
-function CardMenu({ challenge, onTogglePin }: { challenge: ChallengeSummary; onTogglePin: () => void }) {
-  const t = useTranslations("dashboard");
-  return (
-    <KebabMenu label={t("card.more")}>
-      {(close) => (
-        <StateButton type="button" className={menuRowClass} onClick={() => { onTogglePin(); close(); }}>
-          <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
-          {challenge.pinned ? t("card.unpin") : t("card.pin")}
-        </StateButton>
-      )}
-    </KebabMenu>
-  );
-}
+// ── the challenge card ──────────────────────────────────────────────────
 
 export function ActiveChallengeCard({
   challenge,
   onOpen,
-  onTogglePin,
-  context,
 }: {
   challenge: ChallengeSummary;
   onOpen: (id: Id) => void;
-  onTogglePin?: (id: Id) => void;
-  /** Whose challenge it is — "Just you" or the group's name — on the pinned shelf, which holds both sides. */
-  context?: string;
 }) {
   const t = useTranslations("dashboard");
   const f = useGoaFormat();
@@ -131,8 +107,6 @@ export function ActiveChallengeCard({
   const total = challenge.totalCount ?? 0;
   const done = challenge.completedCount ?? 0;
   const livingList = isLivingList(challenge);
-  const interactive = Boolean(onTogglePin);
-  const menu = onTogglePin ? <CardMenu challenge={challenge} onTogglePin={() => onTogglePin(challenge.id)} /> : null;
 
   return (
     <article
@@ -145,7 +119,7 @@ export function ActiveChallengeCard({
       )}
     >
       <div className="flex flex-1 flex-col p-3.5 sm:p-5">
-        {/* A phone-sized card keeps the status dot and the menu; the date or count and the pin come in from `sm:` up. */}
+        {/* A phone-sized card keeps the status dot; the date or count comes in from `sm:` up. */}
         <div className="flex items-center justify-between gap-2">
           {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
           <span className="hidden min-w-0 flex-1 truncate text-right text-xs text-[var(--muted)] sm:block">
@@ -157,28 +131,6 @@ export function ActiveChallengeCard({
                   ? t("endsOn", { date: f.date(challenge.endsOn) })
                   : t("noDeadline")}
           </span>
-          {interactive ? (
-            <div className="relative z-10 flex flex-none items-center gap-0.5">
-              {onTogglePin ? (
-                <StateButton
-                  type="button"
-                  onClick={() => onTogglePin(challenge.id)}
-                  aria-label={challenge.pinned ? t("card.unpin") : t("card.pin")}
-                  title={challenge.pinned ? t("card.unpin") : t("card.pin")}
-                  aria-pressed={challenge.pinned}
-                  className={cx(
-                    "hidden h-7 w-7 place-items-center rounded-full transition sm:grid",
-                    challenge.pinned
-                      ? "text-[var(--main)] opacity-100"
-                      : "text-[var(--muted)] opacity-0 hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
-                  )}
-                >
-                  <CirclePinIcon className="h-[18px] w-[18px]" filled={challenge.pinned} />
-                </StateButton>
-              ) : null}
-              {menu}
-            </div>
-          ) : null}
         </div>
 
         <h3 className="mt-2.5 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
@@ -186,7 +138,6 @@ export function ActiveChallengeCard({
             {challenge.title}
           </StateButton>
         </h3>
-        {context ? <p className="mt-1 truncate text-xs text-[var(--muted)]">{context}</p> : null}
         {/* A phone-sized card has no room for the description; the title says enough. */}
         {challenge.description ? <p className="mt-1.5 hidden text-sm leading-6 text-[var(--muted)] sm:line-clamp-2">{challenge.description}</p> : null}
 
@@ -298,7 +249,6 @@ export function DashboardScreen({
   challenges,
   personalWorkspaceId,
   limits,
-  csrfToken,
   onOpenGroup,
   onOpenChallenge,
   onOpenAdmin,
@@ -309,14 +259,12 @@ export function DashboardScreen({
   onCreateManually,
   onOpenTemplate,
   onOpenPersonalCatalog,
-  onChanged,
 }: {
   user: User;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
   personalWorkspaceId: Id | null;
   limits: Limits;
-  csrfToken: string;
   onOpenGroup: (id: Id) => void;
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
@@ -328,7 +276,6 @@ export function DashboardScreen({
   onCreateManually: (target: { personal: true } | { groupId: Id } | { newGroup: string }) => Promise<void>;
   onOpenTemplate: (id: Id) => void;
   onOpenPersonalCatalog: () => void;
-  onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
   const th = useTranslations("dashboard.home");
@@ -342,36 +289,19 @@ export function DashboardScreen({
   const standardGroups = groups.filter((group) => group.kind !== "personal");
   const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
   const atGroupLimit = ownedGroups >= limits.groupsPerOwner || standardGroups.length >= limits.groupsPerMember;
-  const groupName = new Map(standardGroups.map((group) => [group.id, group.name]));
 
-  const { shelves, error, cardProps } = useChallengeOrganizer({
-    challenges,
-    csrfToken,
-    onChanged,
-    split: (all) => splitShelves(all, personalWorkspaceId),
-  });
+  const shelves = splitShelves(challenges, personalWorkspaceId);
 
   function openChallenge(challenge: ChallengeSummary) {
     if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
     else onOpenChallenge(challenge.id);
   }
 
-  const contextOf = (challenge: ChallengeSummary) =>
-    isPersonalChallenge(challenge, personalWorkspaceId) ? th("justYou") : groupName.get(challenge.groupId ?? "") ?? undefined;
-
   // Brand new = nothing anywhere: no challenge of their own, no group.
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
-  function renderCard(challenge: ChallengeSummary, labelled = false): ReactNode {
-    return (
-      <ActiveChallengeCard
-        key={challenge.id}
-        challenge={challenge}
-        onOpen={() => openChallenge(challenge)}
-        context={labelled ? contextOf(challenge) : undefined}
-        {...cardProps}
-      />
-    );
+  function renderCard(challenge: ChallengeSummary): ReactNode {
+    return <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />;
   }
 
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={title} /></div>;
@@ -447,8 +377,6 @@ export function DashboardScreen({
       ) : null}
 
 
-      <StatusMessage error={error} />
-
       {brandNew ? (
         <>
           <FaceEmptyState title={tWelcome("starts.quick.title")} />
@@ -456,21 +384,15 @@ export function DashboardScreen({
         </>
       ) : (
         <>
-          {shelves.pinned.length ? (
-            <div className="mb-12">
-              <ChallengeShelf title={t("shelf.pinned")} challenges={shelves.pinned} renderCard={(challenge) => renderCard(challenge, true)} />
-            </div>
-          ) : null}
-
           {showPersonalSide ? (
-            <HomeSectionBlock first={!shelves.pinned.length} title={th("sectionPersonal")}>
+            <HomeSectionBlock first title={th("sectionPersonal")}>
               <ChallengeShelf title={th("personalRunning")} challenges={shelves.personal} actions={newPersonalActions} empty={emptyRail(th("personalEmpty"))} renderCard={(challenge) => renderCard(challenge)} />
               {personalLibrary}
             </HomeSectionBlock>
           ) : null}
 
           {hasGroups ? (
-            <HomeSectionBlock first={!showPersonalSide && !shelves.pinned.length} title={th("sectionGroups")}>
+            <HomeSectionBlock first={!showPersonalSide} title={th("sectionGroups")}>
               {shelves.group.length ? (
                 <ChallengeShelf title={t("shelf.running")} challenges={shelves.group} renderCard={(challenge) => renderCard(challenge)} />
               ) : null}

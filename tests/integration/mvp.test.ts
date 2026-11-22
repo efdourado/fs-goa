@@ -3475,48 +3475,20 @@ test("o console da plataforma não vê texto privado: auditoria redigida e nada 
     "eventos pessoais chegam sem before/after nem IDs de conteúdo");
 });
 
-test("homepage: fixar é uma preferência privada do usuário (sem cores nem ordem manual)", async () => {
+test("homepage: sem fixar, cores nem ordem manual; nada de preferência por pessoa", async () => {
   const owner = await register("Dona Home", "dona_home_v1");
-  const stranger = await register("Estranho Home", "estranho_home_v1");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Home" } })).body as { id: string }).id;
-  const mk = async (title: string) =>
-    ((await call("POST", `/api/groups/${groupId}/challenges`, {
-      session: owner,
-      body: { recipe: "cinema", title, participantIds: [owner.user.id], items: [{ title: "Filme" }] },
-    })).body as { id: string }).id;
-  const a = await mk("Alfa");
-  const b = await mk("Beta");
-  const c = await mk("Gama");
-
-  // Pin one; a colour is no longer a preference, so asking for one alone is refused.
-  assert.equal((await call("PATCH", `/api/challenges/${a}/prefs`, { session: owner, body: { pinned: true } })).response.status, 200);
-  assert.equal((await call("PATCH", `/api/challenges/${b}/prefs`, { session: owner, body: { colorTag: "green" } })).response.status, 400);
-
-  const home = (await call("GET", "/api/bootstrap", { session: owner })).body as {
-    challenges: Array<{ id: string; pinned?: boolean; colorTag?: unknown }>;
-  };
-  assert.equal(home.challenges.find((x) => x.id === a)?.pinned, true);
-  assert.equal(home.challenges.find((x) => x.id === b)?.colorTag, undefined, "nenhuma cor no bootstrap");
-  assert.notEqual(home.challenges.find((x) => x.id === a)?.pinned, home.challenges.find((x) => x.id === c)?.pinned);
-
-  // The preferences are the viewer's own — a stranger sees none of it, and
-  // cannot set prefs on a challenge they can't even see.
-  const strangerHome = (await call("GET", "/api/bootstrap", { session: stranger })).body as { challenges: unknown[] };
-  assert.equal(strangerHome.challenges.length, 0);
-  assert.equal((await call("PATCH", `/api/challenges/${a}/prefs`, { session: stranger, body: { pinned: true } })).response.status, 404);
-
-  // There is no manual order any more: the endpoint is gone.
-  assert.equal((await call("PATCH", "/api/challenges/prefs/order", { session: owner, body: { ids: [c, a, b] } })).response.status, 404);
-
-  // Purging the challenge drops its pref rows.
-  await call("POST", `/api/challenges/${a}/transition`, { session: owner, body: { status: "active" } });
-  await call("POST", `/api/challenges/${a}/transition`, { session: owner, body: { status: "closed" } });
-  await call("DELETE", `/api/challenges/${a}`, { session: owner });
-  const preview = await call("POST", `/api/groups/${groupId}/trash/preview`, { session: owner, body: { kind: "challenge", id: a } });
-  const entryCount = (preview.body as { dependencies: Array<{ type: string; count: number }> }).dependencies.find((d) => d.type === "entries")?.count ?? 0;
-  await call("POST", `/api/groups/${groupId}/trash/purge`, { session: owner, body: { kind: "challenge", id: a, confirmation: String(entryCount) } });
-  const gone = await adminPool.query("SELECT 1 FROM challenge_user_prefs WHERE challenge_id = $1", [a]);
-  assert.equal(gone.rowCount, 0, "a purga do desafio leva junto as preferências de quem o organizou");
+  const a = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Alfa", participantIds: [owner.user.id], items: [{ title: "Filme" }] },
+  })).body as { id: string }).id;
+  // The endpoints are gone, and so is the table.
+  assert.equal((await call("PATCH", `/api/challenges/${a}/prefs`, { session: owner, body: { pinned: true } })).response.status, 404);
+  assert.equal((await call("PATCH", "/api/challenges/prefs/order", { session: owner, body: { ids: [a] } })).response.status, 404);
+  const home = (await call("GET", "/api/bootstrap", { session: owner })).body as { challenges: Array<Record<string, unknown>> };
+  const card = home.challenges.find((x) => x.id === a)!;
+  assert.equal("pinned" in card || "colorTag" in card, false, "nada de fixar ou cor no bootstrap");
+  const table = await adminPool.query("SELECT to_regclass('public.challenge_user_prefs') AS t");
+  assert.equal(table.rows[0].t, null);
 });
 
 test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reusado", async () => {

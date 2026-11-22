@@ -302,22 +302,14 @@
     "createGroup": "Criar grupo",
     "archiveTitle": "Rascunhos e memórias",
     "shelf": {
-      "pinned": "Fixados",
       "running": "Desafios que você conduz"
     },
-    "card": {
-      "more": "Mais opções",
-      "pin": "Fixar no topo",
-      "unpin": "Desafixar"
-    },
-    "prefError": "Não foi possível salvar sua preferência.",
     "shelfAdd": {
       "group": "Novo grupo"
     },
     "home": {
       "sectionPersonal": "Pessoal",
       "sectionGroups": "Grupos",
-      "justYou": "Só você",
       "personalRunning": "Em andamento",
       "personalEmpty": "Nada em andamento",
       "inviteGroups": "Grupo com amigos",

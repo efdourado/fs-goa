@@ -515,8 +515,6 @@ export interface ChallengeSummary {
   viewerNameConsent?: boolean;
   completedCount?: number;
   totalCount?: number | null;
-  /** Per-viewer homepage organisation (private; see `challenge_user_prefs`). */
-  pinned?: boolean;
 }
 
 /** A library a challenge draws items from. `id` is null for a built-in one that has never held an item. */

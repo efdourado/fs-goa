@@ -846,13 +846,12 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
   assert.doesNotMatch(html, />Hoje</, "a aba 'Hoje' some no preview");
 });
 
-test("dashboard: shelves split by pin, side and status; a mixed Home pools both sides; a hidden side drops out", async () => {
+test("dashboard: shelves split by side and status", async () => {
   const { splitShelves } = await import("../app/goa/screens/dashboard");
   const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
     id: over.id ?? "x", groupId: over.groupId ?? "g", title: over.title ?? "T", status: over.status ?? "active", ...over,
   });
   const challenges = [
-    c({ id: "pin", status: "active", pinned: true }),
     c({ id: "run", status: "active" }),
     c({ id: "solo", groupId: "ws", scope: "personal", status: "active" }),
     c({ id: "run2", status: "active" }),
@@ -862,8 +861,7 @@ test("dashboard: shelves split by pin, side and status; a mixed Home pools both 
   const ids = (list: Array<{ id: string }>) => list.map((x) => x.id);
 
   const separated = splitShelves(challenges, "ws");
-  assert.deepEqual(ids(separated.pinned), ["pin"]);
-  assert.deepEqual(ids(separated.group), ["run", "run2"], "pinned + personal are pulled out of the groups' shelf");
+  assert.deepEqual(ids(separated.group), ["run", "run2"], "personal ones are pulled out of the groups' shelf");
   assert.deepEqual(ids(separated.personal), ["solo"]);
   assert.deepEqual(ids(separated.archive), ["old", "soloDraft"]);
 });

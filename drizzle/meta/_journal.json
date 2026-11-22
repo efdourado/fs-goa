@@ -554,6 +554,13 @@
       "when": 1795881600000,
       "tag": "0078_drop_challenge_color_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1795968000000,
+      "tag": "0079_drop_challenge_user_prefs",
+      "breakpoints": true
     }
   ]
 }

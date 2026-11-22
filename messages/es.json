@@ -302,22 +302,14 @@
     "createGroup": "Crear grupo",
     "archiveTitle": "Borradores y recuerdos",
     "shelf": {
-      "pinned": "Fijados",
       "running": "Desafíos que conduces"
     },
-    "card": {
-      "more": "Más opciones",
-      "pin": "Fijar arriba",
-      "unpin": "Quitar fijado"
-    },
-    "prefError": "No se pudo guardar tu preferencia.",
     "shelfAdd": {
       "group": "Nuevo grupo"
     },
     "home": {
       "sectionPersonal": "Personal",
       "sectionGroups": "Grupos",
-      "justYou": "Solo tú",
       "personalRunning": "En marcha",
       "personalEmpty": "Nada en curso",
       "inviteGroups": "Un grupo con amigos",

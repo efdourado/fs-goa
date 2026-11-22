@@ -93,13 +93,11 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       total_count: number | null;
       submission_mode: "item" | "daily" | "free" | null;
       group_kind: "standard" | "personal";
-      pinned: boolean | null;
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status, c.kind AS challenge_kind,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               g.kind AS group_kind,
               gm.role,
-              p.pinned,
               (CASE
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id
                               AND et.archived_at IS NULL
@@ -144,7 +142,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
          JOIN group_members gm ON gm.group_id = c.group_id
           AND gm.user_id = $1 AND gm.removed_at IS NULL
-         LEFT JOIN challenge_user_prefs p ON p.challenge_id = c.id AND p.user_id = $1
          LEFT JOIN LATERAL (
            SELECT et.id, et.submission_mode,
                   coalesce(et.target_policy,
@@ -280,7 +277,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         viewerNameConsent: challenge.name_consent ?? false,
         completedCount: challenge.completed_count,
         totalCount: challenge.total_count,
-        pinned: challenge.pinned ?? false,
       })),
       memberRequests: memberRequestsResult.rows.map((request) => ({
         id: request.id,

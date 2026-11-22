@@ -194,34 +194,6 @@ export const challengeParticipants = pgTable(
   ],
 );
 
-/**
- * Per-person homepage organisation: a pin and a colour tag, private to each
- * user (challenge admins never see or set these). A missing row means "no
- * preference". Keyed by (user, challenge) like `challengeParticipants`.
- */
-export const challengeUserPrefs = pgTable(
-  "challenge_user_prefs",
-  {
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    challengeId: text("challenge_id")
-      .notNull()
-      .references(() => challenges.id, { onDelete: "cascade" }),
-    pinned: boolean("pinned").notNull().default(false),
-    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    primaryKey({
-      name: "challenge_user_prefs_pk",
-      columns: [table.userId, table.challengeId],
-    }),
-    index("challenge_user_prefs_pinned_idx")
-      .on(table.userId)
-      .where(sql`${table.pinned}`),
-  ],
-);
-
 export const challengeCheckpoints = pgTable(
   "challenge_checkpoints",
   {

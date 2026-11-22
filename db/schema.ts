@@ -9,7 +9,6 @@ export {
 export {
   challengeCheckpoints,
   challengeParticipants,
-  challengeUserPrefs,
   challenges,
 } from "./schema/challenges";
 export { inviteChallengeTargets } from "./schema/invites";

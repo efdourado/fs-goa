@@ -409,7 +409,6 @@ test('dashboard group creation unlocks only for a nonblank name', async () => {
         challenges={[]}
         personalWorkspaceId={null}
         limits={DEFAULT_LIMITS}
-        csrfToken=""
         onOpenGroup={noop}
         onOpenChallenge={noop}
         onOpenAdmin={noop}

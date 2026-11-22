@@ -36,7 +36,6 @@ export async function purgeChallengeRows(client: PoolClient, challengeId: string
     [challengeId],
   );
   await client.query("DELETE FROM audit_events WHERE challenge_id=$1", [challengeId]);
-  await client.query("DELETE FROM challenge_user_prefs WHERE challenge_id=$1", [challengeId]);
   await client.query("DELETE FROM trash_items WHERE entity_kind='challenge' AND entity_id=$1", [challengeId]);
   await client.query("DELETE FROM challenges WHERE id=$1", [challengeId]);
 }
@@ -83,7 +82,6 @@ export async function purgeMemberFromGroup(client: PoolClient, groupId: string, 
   await client.query(`DELETE FROM entries WHERE participant_user_id = $2 AND parent_entry_id IS NOT NULL AND ${inGroup}`, [groupId, userId]);
   await client.query(`DELETE FROM entries WHERE participant_user_id = $2 AND ${inGroup}`, [groupId, userId]);
   await client.query(`DELETE FROM challenge_participants WHERE user_id = $2 AND ${inGroup}`, [groupId, userId]);
-  await client.query(`DELETE FROM challenge_user_prefs WHERE user_id = $2 AND ${inGroup}`, [groupId, userId]);
   await client.query(`UPDATE challenge_items SET recommended_by_user_id = NULL WHERE recommended_by_user_id = $2 AND ${inGroup}`, [groupId, userId]);
   await client.query("UPDATE catalog_items SET recommended_by_user_id = NULL WHERE group_id = $1 AND recommended_by_user_id = $2", [groupId, userId]);
   await client.query("DELETE FROM group_member_requests WHERE group_id = $1 AND user_id = $2", [groupId, userId]);

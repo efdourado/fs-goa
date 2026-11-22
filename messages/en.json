@@ -302,22 +302,14 @@
     "createGroup": "Create group",
     "archiveTitle": "Drafts and memories",
     "shelf": {
-      "pinned": "Pinned",
       "running": "Challenges you run"
     },
-    "card": {
-      "more": "More options",
-      "pin": "Pin to top",
-      "unpin": "Unpin"
-    },
-    "prefError": "Could not save your preference.",
     "shelfAdd": {
       "group": "New group"
     },
     "home": {
       "sectionPersonal": "Personal",
       "sectionGroups": "Groups",
-      "justYou": "Just you",
       "personalRunning": "In progress",
       "personalEmpty": "Nothing running",
       "inviteGroups": "A group with friends",
