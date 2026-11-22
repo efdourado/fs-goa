@@ -249,7 +249,11 @@
 .xd-card.is-empty .xd-card-title p { margin-top: 0 !important; }
 .xd-card.is-empty .xd-by { display: flex; align-items: baseline; gap: 2mm; }
 .xd-card.is-empty .xd-by strong { font-size: 9.5pt; }
-.xd-card-empty { font-size: 8.5pt; font-style: italic; color: var(--xd-muted); }
+/* The empty updates panel's face, small: a ring with the glyph, muted. */
+.xd-card-face {
+  flex: none; display: grid; place-items: center; width: 8mm; height: 8mm; border: 1px solid var(--xd-line); border-radius: 50%;
+  font-family: system-ui, sans-serif; font-size: 12pt; line-height: 1; color: var(--xd-muted);
+}
 .xd-card-head { display: flex; align-items: flex-start; gap: 5mm; }
 .xd-num {
   flex: none;

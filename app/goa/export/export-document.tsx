@@ -323,13 +323,14 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   const multiPeople = model.people.length > 1;
   const number = <span className="xd-num">{String(item.number).padStart(2, "0")}</span>;
   const meta = item.subtitle || item.meta.length ? <p>{[item.subtitle, ...item.meta].filter(Boolean).join(" · ")}</p> : null;
-  // Nothing logged yet: the title and a line saying so — no empty tiles.
+  // Nothing logged yet: the title and, at the far side, the same quiet face as an empty updates panel (no empty tiles).
   if (!item.entries.length && !item.progress.length) {
     return (
       <article className={`xd-card is-empty ${stageTone(chapter)}`}>
         <header className="xd-card-head">
           {number}
-          <div className="xd-card-title"><h3>{item.title}</h3>{meta}<p className="xd-card-empty">{doc.t("noEntries")}</p></div>
+          <div className="xd-card-title"><h3>{item.title}</h3>{meta}</div>
+          <span className="xd-card-face" aria-hidden="true">ᴖ̈</span>
         </header>
       </article>
     );
