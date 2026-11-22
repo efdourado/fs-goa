@@ -286,7 +286,6 @@
   "dashboard": {
     "emptyGroupsTitle": "Create a group",
     "greeting": "Hi, {name}.",
-    "subtitle": "What needs your attention today, and your groups.",
     "groupNameLabel": "Group name",
     "groupNamePlaceholder": "e.g. Sofa Club",
     "creating": "Creating…",
@@ -306,24 +305,10 @@
       "pinned": "Pinned",
       "running": "Challenges you run"
     },
-    "filter": {
-      "context": "Clear ({count})",
-      "empty": "Nothing in this colour"
-    },
-    "color": {
-      "none": "No colour",
-      "green": "Green",
-      "blue": "Blue",
-      "violet": "Violet",
-      "amber": "Amber"
-    },
     "card": {
       "more": "More options",
       "pin": "Pin to top",
-      "unpin": "Unpin",
-      "color": "Colour",
-      "open": "Open",
-      "manage": "Edit"
+      "unpin": "Unpin"
     },
     "prefError": "Could not save your preference.",
     "shelfAdd": {

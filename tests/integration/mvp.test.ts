@@ -3475,7 +3475,7 @@ test("o console da plataforma não vê texto privado: auditoria redigida e nada 
     "eventos pessoais chegam sem before/after nem IDs de conteúdo");
 });
 
-test("homepage: fixar, marcar cor e reordenar são preferências privadas do usuário", async () => {
+test("homepage: fixar é uma preferência privada do usuário (sem cores nem ordem manual)", async () => {
   const owner = await register("Dona Home", "dona_home_v1");
   const stranger = await register("Estranho Home", "estranho_home_v1");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Home" } })).body as { id: string }).id;
@@ -3488,20 +3488,15 @@ test("homepage: fixar, marcar cor e reordenar são preferências privadas do usu
   const b = await mk("Beta");
   const c = await mk("Gama");
 
-  // Pin one, colour another.
+  // Pin one; a colour is no longer a preference, so asking for one alone is refused.
   assert.equal((await call("PATCH", `/api/challenges/${a}/prefs`, { session: owner, body: { pinned: true } })).response.status, 200);
-  assert.equal((await call("PATCH", `/api/challenges/${b}/prefs`, { session: owner, body: { colorTag: "green" } })).response.status, 200);
-  assert.equal(
-    (await call("PATCH", `/api/challenges/${b}/prefs`, { session: owner, body: { colorTag: "chartreuse" } })).response.status,
-    400,
-    "cor fora do conjunto é recusada",
-  );
+  assert.equal((await call("PATCH", `/api/challenges/${b}/prefs`, { session: owner, body: { colorTag: "green" } })).response.status, 400);
 
   const home = (await call("GET", "/api/bootstrap", { session: owner })).body as {
-    challenges: Array<{ id: string; pinned?: boolean; colorTag?: string | null }>;
+    challenges: Array<{ id: string; pinned?: boolean; colorTag?: unknown }>;
   };
   assert.equal(home.challenges.find((x) => x.id === a)?.pinned, true);
-  assert.equal(home.challenges.find((x) => x.id === b)?.colorTag, "green");
+  assert.equal(home.challenges.find((x) => x.id === b)?.colorTag, undefined, "nenhuma cor no bootstrap");
   assert.notEqual(home.challenges.find((x) => x.id === a)?.pinned, home.challenges.find((x) => x.id === c)?.pinned);
 
   // The preferences are the viewer's own — a stranger sees none of it, and

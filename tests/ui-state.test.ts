@@ -847,14 +847,14 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
 });
 
 test("dashboard: shelves split by pin, side and status; a mixed Home pools both sides; a hidden side drops out", async () => {
-  const { splitShelves, applyColorFilter } = await import("../app/goa/screens/dashboard");
+  const { splitShelves } = await import("../app/goa/screens/dashboard");
   const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
     id: over.id ?? "x", groupId: over.groupId ?? "g", title: over.title ?? "T", status: over.status ?? "active", ...over,
   });
   const challenges = [
-    c({ id: "pin", status: "active", pinned: true, colorTag: "green" }),
-    c({ id: "run", status: "active", colorTag: "green" }),
-    c({ id: "solo", groupId: "ws", scope: "personal", status: "active", colorTag: "blue" }),
+    c({ id: "pin", status: "active", pinned: true }),
+    c({ id: "run", status: "active" }),
+    c({ id: "solo", groupId: "ws", scope: "personal", status: "active" }),
     c({ id: "run2", status: "active" }),
     c({ id: "old", status: "closed" }),
     c({ id: "soloDraft", groupId: "ws", scope: "personal", status: "draft" }),
@@ -866,9 +866,6 @@ test("dashboard: shelves split by pin, side and status; a mixed Home pools both 
   assert.deepEqual(ids(separated.group), ["run", "run2"], "pinned + personal are pulled out of the groups' shelf");
   assert.deepEqual(ids(separated.personal), ["solo"]);
   assert.deepEqual(ids(separated.archive), ["old", "soloDraft"]);
-
-  assert.deepEqual(ids(applyColorFilter(separated.group, "green")), ["run"]);
-  assert.deepEqual(ids(applyColorFilter(separated.group, null)), ["run", "run2"]);
 });
 
 test("front page: featured templates lead, most recently featured first, topped up with the newest; the rest go below", async () => {

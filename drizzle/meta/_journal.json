@@ -547,6 +547,13 @@
       "when": 1795795200000,
       "tag": "0077_drop_entries_outside_period",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1795881600000,
+      "tag": "0078_drop_challenge_color_tags",
+      "breakpoints": true
     }
   ]
 }

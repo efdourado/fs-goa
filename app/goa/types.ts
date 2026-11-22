@@ -517,15 +517,7 @@ export interface ChallengeSummary {
   totalCount?: number | null;
   /** Per-viewer homepage organisation (private; see `challenge_user_prefs`). */
   pinned?: boolean;
-  colorTag?: ChallengeColorTag | null;
 }
-
-/** The fixed set of homepage colour tags a viewer can assign to a challenge. */
-export type ChallengeColorTag = "green" | "blue" | "violet" | "amber";
-
-export const CHALLENGE_COLOR_TAGS: readonly ChallengeColorTag[] = [
-  "green", "blue", "violet", "amber",
-];
 
 /** A library a challenge draws items from. `id` is null for a built-in one that has never held an item. */
 export interface ChallengeLibraryRef {

@@ -10,13 +10,11 @@ import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfView } from "../catalog-shelf";
 import { useCatalogShelf } from "../libraries";
-import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
+import { useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
 import { ReadyMadeTemplatesSection } from "../template-gallery";
 import { NewChallengeButton, WelcomePanel } from "../welcome";
 import {
-  CHALLENGE_COLOR_TAGS,
-  type ChallengeColorTag,
   type ChallengeSummary,
   type GroupSummary,
   type Id,
@@ -28,7 +26,6 @@ import {
   cardClass,
   challengeStatusTone,
   ChallengeStatusBadge,
-  CircleMinusIcon,
   CirclePinIcon,
   cx,
   EmptyState,
@@ -59,7 +56,6 @@ export function splitShelves(challenges: ChallengeSummary[], personalWorkspaceId
   return out;
 }
 
-export { applyColorFilter };
 
 // ── group-create dialog ─────────────────────────────────────────────────
 
@@ -103,65 +99,15 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
 
 // ── the challenge card + its per-viewer menu ────────────────────────────
 
-function ColorSwatch({ tag, selected, onClick, label }: {
-  tag: ChallengeColorTag | null; selected: boolean; onClick: () => void; label: string;
-}) {
-  return (
-    <StateButton
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={selected}
-      className={cx(
-        "grid h-6 w-6 place-items-center rounded-full ring-1 ring-inset ring-[var(--edge)] transition",
-        selected && "outline outline-2 outline-offset-2 outline-[var(--main)]",
-      )}
-      style={{ backgroundColor: tag ? `var(--tag-${tag})` : "var(--paper)" }}
-    >
-      {tag ? null : <CircleMinusIcon className="h-3.5 w-3.5 text-[var(--muted)]" />}
-    </StateButton>
-  );
-}
-
-function CardMenu({
-  challenge, canManageIt, onTogglePin, onSetColor, onOpen, onManage,
-}: {
-  challenge: ChallengeSummary;
-  canManageIt: boolean;
-  onTogglePin: () => void;
-  onSetColor: (tag: ChallengeColorTag | null) => void;
-  onOpen: () => void;
-  onManage: () => void;
-}) {
+function CardMenu({ challenge, onTogglePin }: { challenge: ChallengeSummary; onTogglePin: () => void }) {
   const t = useTranslations("dashboard");
-  const rowClass = menuRowClass;
-
   return (
     <KebabMenu label={t("card.more")}>
       {(close) => (
-        <>
-          <div className="px-3 pb-2 pt-1.5">
-            <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">{t("card.color")}</span>
-            <div className="flex items-center gap-2">
-              <ColorSwatch tag={null} label={t("color.none")} selected={!challenge.colorTag} onClick={() => { onSetColor(null); close(); }} />
-              {CHALLENGE_COLOR_TAGS.map((tag) => (
-                <ColorSwatch key={tag} tag={tag} label={t(`color.${tag}`)} selected={challenge.colorTag === tag} onClick={() => { onSetColor(tag); close(); }} />
-              ))}
-            </div>
-          </div>
-          <div className="border-t border-[var(--line)] pt-1">
-            <StateButton type="button" className={rowClass} onClick={() => { onTogglePin(); close(); }}>
-              <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
-              {challenge.pinned ? t("card.unpin") : t("card.pin")}
-            </StateButton>
-          </div>
-          <div className="border-t border-[var(--line)] pt-1">
-            <StateButton type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</StateButton>
-            {canManageIt ? (
-              <StateButton type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</StateButton>
-            ) : null}
-          </div>
-        </>
+        <StateButton type="button" className={menuRowClass} onClick={() => { onTogglePin(); close(); }}>
+          <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
+          {challenge.pinned ? t("card.unpin") : t("card.pin")}
+        </StateButton>
       )}
     </KebabMenu>
   );
@@ -171,15 +117,11 @@ export function ActiveChallengeCard({
   challenge,
   onOpen,
   onTogglePin,
-  onSetColor,
-  onManage,
   context,
 }: {
   challenge: ChallengeSummary;
   onOpen: (id: Id) => void;
   onTogglePin?: (id: Id) => void;
-  onSetColor?: (id: Id, tag: ChallengeColorTag | null) => void;
-  onManage?: (id: Id) => void;
   /** Whose challenge it is — "Just you" or the group's name — on the pinned shelf, which holds both sides. */
   context?: string;
 }) {
@@ -189,17 +131,8 @@ export function ActiveChallengeCard({
   const total = challenge.totalCount ?? 0;
   const done = challenge.completedCount ?? 0;
   const livingList = isLivingList(challenge);
-  const interactive = Boolean(onTogglePin || onSetColor);
-  const menu = interactive ? (
-    <CardMenu
-      challenge={challenge}
-      canManageIt={canManage(challenge.viewerRole)}
-      onTogglePin={() => onTogglePin?.(challenge.id)}
-      onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
-      onOpen={() => onOpen(challenge.id)}
-      onManage={() => onManage?.(challenge.id)}
-    />
-  ) : null;
+  const interactive = Boolean(onTogglePin);
+  const menu = onTogglePin ? <CardMenu challenge={challenge} onTogglePin={() => onTogglePin(challenge.id)} /> : null;
 
   return (
     <article
@@ -211,11 +144,7 @@ export function ActiveChallengeCard({
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
       )}
     >
-      {challenge.colorTag ? (
-        <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" />
-      ) : null}
-
-      <div className={cx("flex flex-1 flex-col p-3.5 sm:p-5", challenge.colorTag && "pl-4.5 sm:pl-6")}>
+      <div className="flex flex-1 flex-col p-3.5 sm:p-5">
         {/* A phone-sized card keeps the status dot and the menu; the date or count and the pin come in from `sm:` up. */}
         <div className="flex items-center justify-between gap-2">
           {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
@@ -268,7 +197,7 @@ export function ActiveChallengeCard({
           </div>
         ) : null}
       </div>
-      {!challenge.colorTag ? <span className={cx("block w-full px-5 py-1.5 sm:py-2.5", livingList ? "bg-[var(--line)]" : tone.solid)} /> : null}
+      <span className={cx("block w-full px-5 py-1.5 sm:py-2.5", livingList ? "bg-[var(--line)]" : tone.solid)} />
     </article>
   );
 }
@@ -286,7 +215,6 @@ function ArchiveChallengeRow({
       onClick={onOpen}
       className={cx(cardClass, shelfCardWidth, "relative flex items-center gap-2.5 overflow-hidden px-3.5 py-3.5 text-left text-sm hover:border-[var(--muted)] sm:px-4 sm:py-4")}
     >
-      {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
       <span className="min-w-0 flex-1 truncate">{challenge.title}</span>
     </StateButton>
@@ -416,7 +344,7 @@ export function DashboardScreen({
   const atGroupLimit = ownedGroups >= limits.groupsPerOwner || standardGroups.length >= limits.groupsPerMember;
   const groupName = new Map(standardGroups.map((group) => [group.id, group.name]));
 
-  const { shelves, colorFilter, setColorFilter, error, cardProps } = useChallengeOrganizer({
+  const { shelves, error, cardProps } = useChallengeOrganizer({
     challenges,
     csrfToken,
     onChanged,
@@ -431,14 +359,6 @@ export function DashboardScreen({
   const contextOf = (challenge: ChallengeSummary) =>
     isPersonalChallenge(challenge, personalWorkspaceId) ? th("justYou") : groupName.get(challenge.groupId ?? "") ?? undefined;
 
-  const filtered = {
-    pinned: applyColorFilter(shelves.pinned, colorFilter),
-    personal: applyColorFilter(shelves.personal, colorFilter),
-    group: applyColorFilter(shelves.group, colorFilter),
-    archive: applyColorFilter(shelves.archive, colorFilter),
-  };
-  const filteredCount = Object.values(filtered).reduce((sum, list) => sum + list.length, 0);
-  const hasAnyChallenge = challenges.length > 0;
   // Brand new = nothing anywhere: no challenge of their own, no group.
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
@@ -449,7 +369,7 @@ export function DashboardScreen({
         challenge={challenge}
         onOpen={() => openChallenge(challenge)}
         context={labelled ? contextOf(challenge) : undefined}
-        {...cardProps(onOpenAdmin)}
+        {...cardProps}
       />
     );
   }
@@ -457,12 +377,12 @@ export function DashboardScreen({
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={title} /></div>;
 
   // Starting a challenge of your own: one small button beside the shelf's title, like "new group", that asks chat or by
-  // hand (hidden while a colour filters it).
-  const newPersonalActions = colorFilter ? undefined : (
+  // hand.
+  const newPersonalActions = (
     <NewChallengeButton label={tc("newChallengePill")} onChat={onQuickCreatePersonal} onManual={onCreatePersonalChallenge} />
   );
 
-  const groupsShelf = colorFilter ? null : (
+  const groupsShelf = (
     <Shelf
       title={t("groupsTitle")}
       count={standardGroups.length}
@@ -488,7 +408,7 @@ export function DashboardScreen({
   );
 
   // A phone reaches the catalogue from the dock, so the preview is a computer's only.
-  const personalLibrary = colorFilter ? null : (
+  const personalLibrary = (
     <div className="mt-8 hidden sm:block">
       <CatalogShelfView scope="personal" canManage data={personalShelf} onOpenCatalog={onOpenPersonalCatalog} />
     </div>
@@ -503,9 +423,7 @@ export function DashboardScreen({
   const personalBlank = !hasPersonalChallenge && personalItems === 0;
   // A colour filter shows only the sections holding a challenge of that colour, and just the empty state when
   // none has it.
-  const showPersonalSide = colorFilter ? filtered.personal.length > 0 : !personalBlank;
-  const showGroupSide = colorFilter ? filtered.group.length > 0 : hasGroups;
-  const filterEmpty = Boolean(colorFilter) && filteredCount === 0;
+  const showPersonalSide = !personalBlank;
 
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
@@ -518,7 +436,7 @@ export function DashboardScreen({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{tWelcome("lede")}</p>
         </div>
       ) : (
-        <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={t("subtitle")} />
+        <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} />
       )}
 
       {showGroupDialog ? (
@@ -529,52 +447,46 @@ export function DashboardScreen({
       ) : null}
 
 
-      {hasAnyChallenge ? (
-        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} filteredCount={filteredCount} />
-      ) : null}
-
       <StatusMessage error={error} />
 
-      {filterEmpty ? (
-        <FaceEmptyState title={t("filter.empty")} />
-      ) : brandNew ? (
+      {brandNew ? (
         <>
           <FaceEmptyState title={tWelcome("starts.quick.title")} />
           <ReadyMadeTemplatesSection onOpen={onOpenTemplate} />
         </>
       ) : (
         <>
-          {filtered.pinned.length ? (
+          {shelves.pinned.length ? (
             <div className="mb-12">
-              <ChallengeShelf title={t("shelf.pinned")} challenges={filtered.pinned} renderCard={(challenge) => renderCard(challenge, true)} />
+              <ChallengeShelf title={t("shelf.pinned")} challenges={shelves.pinned} renderCard={(challenge) => renderCard(challenge, true)} />
             </div>
           ) : null}
 
           {showPersonalSide ? (
-            <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
-              <ChallengeShelf title={th("personalRunning")} challenges={filtered.personal} actions={newPersonalActions} empty={emptyRail(th("personalEmpty"))} renderCard={(challenge) => renderCard(challenge)} />
+            <HomeSectionBlock first={!shelves.pinned.length} title={th("sectionPersonal")}>
+              <ChallengeShelf title={th("personalRunning")} challenges={shelves.personal} actions={newPersonalActions} empty={emptyRail(th("personalEmpty"))} renderCard={(challenge) => renderCard(challenge)} />
               {personalLibrary}
             </HomeSectionBlock>
           ) : null}
 
-          {showGroupSide ? (
-            <HomeSectionBlock first={!showPersonalSide && !filtered.pinned.length} title={th("sectionGroups")}>
-              {(colorFilter ? filtered.group.length : shelves.group.length) ? (
-                <ChallengeShelf title={t("shelf.running")} challenges={filtered.group} renderCard={(challenge) => renderCard(challenge)} />
+          {hasGroups ? (
+            <HomeSectionBlock first={!showPersonalSide && !shelves.pinned.length} title={th("sectionGroups")}>
+              {shelves.group.length ? (
+                <ChallengeShelf title={t("shelf.running")} challenges={shelves.group} renderCard={(challenge) => renderCard(challenge)} />
               ) : null}
               {groupsShelf}
             </HomeSectionBlock>
           ) : null}
 
-          {filtered.archive.length ? (
+          {shelves.archive.length ? (
             <div className="mt-12">
-              <ChallengeShelf title={t("archiveTitle")} challenges={filtered.archive} renderCard={(challenge) => (
+              <ChallengeShelf title={t("archiveTitle")} challenges={shelves.archive} renderCard={(challenge) => (
                 <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
               )} />
             </div>
           ) : null}
 
-          {!colorFilter && ((!hasGroups && !atGroupLimit) || (personalBlank && personalShelf !== null)) ? (
+          {(!hasGroups && !atGroupLimit) || (personalBlank && personalShelf !== null) ? (
             <div className="mt-12 flex flex-col items-start gap-1">
               {personalBlank && personalShelf !== null ? <NewChallengeButton label={th("startPersonal")} onChat={onQuickCreatePersonal} onManual={onCreatePersonalChallenge} /> : null}
               {!hasGroups && !atGroupLimit ? <HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /> : null}

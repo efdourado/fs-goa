@@ -94,13 +94,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       submission_mode: "item" | "daily" | "free" | null;
       group_kind: "standard" | "personal";
       pinned: boolean | null;
-      color_tag: string | null;
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status, c.kind AS challenge_kind,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               g.kind AS group_kind,
               gm.role,
-              p.pinned, p.color_tag,
+              p.pinned,
               (CASE
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id
                               AND et.archived_at IS NULL
@@ -282,7 +281,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         completedCount: challenge.completed_count,
         totalCount: challenge.total_count,
         pinned: challenge.pinned ?? false,
-        colorTag: challenge.color_tag,
       })),
       memberRequests: memberRequestsResult.rows.map((request) => ({
         id: request.id,

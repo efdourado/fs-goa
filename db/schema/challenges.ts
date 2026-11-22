@@ -209,7 +209,6 @@ export const challengeUserPrefs = pgTable(
       .notNull()
       .references(() => challenges.id, { onDelete: "cascade" }),
     pinned: boolean("pinned").notNull().default(false),
-    colorTag: text("color_tag"),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [
@@ -220,10 +219,6 @@ export const challengeUserPrefs = pgTable(
     index("challenge_user_prefs_pinned_idx")
       .on(table.userId)
       .where(sql`${table.pinned}`),
-    check(
-      "challenge_user_prefs_color_tag_check",
-      sql`${table.colorTag} is null or ${table.colorTag} in ('green', 'blue', 'violet', 'amber')`,
-    ),
   ],
 );
 

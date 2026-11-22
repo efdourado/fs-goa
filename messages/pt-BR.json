@@ -286,7 +286,6 @@
   "dashboard": {
     "emptyGroupsTitle": "Criar um grupo",
     "greeting": "Olá, {name}.",
-    "subtitle": "O que pede sua atenção hoje e seus grupos.",
     "groupNameLabel": "Nome do grupo",
     "groupNamePlaceholder": "Ex.: Clube do Sofá",
     "creating": "Criando…",
@@ -306,24 +305,10 @@
       "pinned": "Fixados",
       "running": "Desafios que você conduz"
     },
-    "filter": {
-      "context": "Limpar ({count})",
-      "empty": "Nada nesta cor"
-    },
-    "color": {
-      "none": "Sem cor",
-      "green": "Verde",
-      "blue": "Azul",
-      "violet": "Violeta",
-      "amber": "Âmbar"
-    },
     "card": {
       "more": "Mais opções",
       "pin": "Fixar no topo",
-      "unpin": "Desafixar",
-      "color": "Cor",
-      "open": "Abrir",
-      "manage": "Editar"
+      "unpin": "Desafixar"
     },
     "prefError": "Não foi possível salvar sua preferência.",
     "shelfAdd": {
