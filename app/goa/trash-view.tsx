@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_PATHS, apiRequest } from "./api";
 import { ConfirmDialog, Dialog, ModalActions } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
-import { Button, cardClass, cx, FaceEmptyState, LoadingView, PageHeading, StatusMessage } from "./ui";
+import { Button, cardClass, CircleMinusIcon, cx, FaceEmptyState, Field, inputClass, LoadingView, PageHeading, StatusMessage } from "./ui";
 
 type Scope = "personal" | { groupId: Id } | { challengeId: Id };
 
@@ -27,6 +27,28 @@ export function TrashLoadState({ loading, error, onRetry }: {
   if (error) return <div className="space-y-3"><StatusMessage error={error} /><Button variant="secondary" onClick={onRetry}>{tc("retry")}</Button></div>;
   if (loading) return <LoadingView label={t("loading")} />;
   return <FaceEmptyState title={t("emptyTitle")} />;
+}
+
+/**
+ * Each kind of thing in the bin gets its own solid badge: a group in the ink colour (dark on light, white on dark),
+ * a challenge in the app's green, a catalogue item in blue, a record in amber. The tag tokens lighten in dark mode,
+ * so their text takes the canvas colour to stay readable in both.
+ */
+const KIND_BADGE: Partial<Record<TrashItem["kind"], string>> = {
+  group: "bg-[var(--ink)] text-[var(--canvas)]",
+  challenge: "bg-[var(--main)] text-white",
+  catalog_item: "bg-[var(--tag-blue)] text-[var(--canvas)]",
+  entry: "bg-[var(--tag-amber)] text-[var(--canvas)]",
+};
+
+/** An arrow circling back to where it started: the same 16-unit frame and stroke as CircleMinusIcon. */
+function RestoreIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.6 5.5A6 6 0 1 1 2.6 10.5" />
+      <path d="M2.2 2.4v3.4h3.4" />
+    </svg>
+  );
 }
 
 function scopeListPath(scope: Scope): string {
@@ -56,62 +78,59 @@ function PurgeDialog({
   onCancel: () => void;
 }) {
   const t = useTranslations("trash");
-  const tc = useTranslations("common");
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const entries = preview.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
   // Challenges still using a catalogue item: deleting it disconnects it from them, so say so first.
   const connected = preview.kind === "catalog_item" ? preview.dependencies.find((dep) => dep.type === "challengesUsing")?.count ?? 0 : 0;
   const needsReason = preview.kind === "entry";
+  const asksName = preview.confirmation === "name";
+  const asksCount = preview.confirmation === "count" && entries > 0;
+  const typed = !(asksName || asksCount) || Boolean(confirmation.trim());
 
   return (
     <Dialog title={t("purgeTitle", { label: preview.label })} busy={busy} onClose={onCancel}>
-      <p className="text-sm text-[var(--muted)]">{t("purgeBody")}</p>
-
-      {preview.blocked ? (
-        <p className="mt-2 text-xs text-[var(--muted)]">{preview.blocked.message}</p>
-      ) : (
-        <>
-          {connected ? <p className="mt-3 text-sm text-[var(--danger)]">{t("purgeConnected", { count: connected })}</p> : null}
-          {preview.dependencies.length ? (
-            <ul className="mt-3 space-y-1 text-sm">
-              {preview.dependencies.map((dep) => (
-                <li key={dep.type} className="flex justify-between border-b border-[var(--line)] py-1">
-                  <span className="text-[var(--muted)]">{t(`dependency.${dep.type}`, { count: dep.count })}</span>
-                  <span className="tabular-nums">{dep.count}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-[var(--muted)]">{t("purgeNoDeps")}</p>
-          )}
-
-          {preview.confirmation === "name" ? (
-            <label className="mt-4 block">
-              <span className="mb-1 block text-sm">{t("confirmName", { name: preview.label })}</span>
-              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmName", { name: preview.label })} />
-            </label>
-          ) : preview.confirmation === "count" && entries > 0 ? (
-            <label className="mt-4 block">
-              <span className="mb-1 block text-sm">{t("confirmCount", { count: entries })}</span>
-              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" inputMode="numeric" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmCount", { count: entries })} />
-            </label>
-          ) : null}
-
-          {needsReason ? (
-            <label className="mt-3 block">
-              <span className="mb-1 block text-sm">{t("reasonLabel")}</span>
-              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={reason} onChange={(event) => setReason(event.target.value)} aria-label={t("reasonLabel")} />
-            </label>
-          ) : null}
-        </>
-      )}
-
-      <div className="mt-4"><StatusMessage error={error} /></div>
+      <div className="space-y-4">
+        <p className="text-sm leading-6 text-[var(--muted)]">{t("purgeBody")}</p>
+        {preview.blocked ? (
+          <p className="text-sm text-[var(--muted)]">{preview.blocked.message}</p>
+        ) : (
+          <>
+            {connected ? <p className="text-sm leading-6 text-[var(--danger)]">{t("purgeConnected", { count: connected })}</p> : null}
+            {/* What goes with it, one line each (each line already says how many). */}
+            {preview.dependencies.length ? (
+              <div className="rounded-2xl border border-[var(--line)] px-4 py-3">
+                <p className="mb-1.5 text-xs text-[var(--muted)]">{t("purgeAlso")}</p>
+                <ul className="space-y-1 text-sm">
+                  {preview.dependencies.map((dep) => <li key={dep.type}>{t(`dependency.${dep.type}`, { count: dep.count })}</li>)}
+                </ul>
+              </div>
+            ) : null}
+            {asksName || asksCount ? (
+              <Field label={asksName ? t("confirmName", { name: preview.label }) : t("confirmCount", { count: entries })}>
+                <input
+                  className={inputClass}
+                  value={confirmation}
+                  inputMode={asksCount ? "numeric" : undefined}
+                  autoComplete="off"
+                  disabled={busy}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                />
+              </Field>
+            ) : null}
+            {needsReason ? (
+              <Field label={t("reasonLabel")}>
+                <input className={inputClass} value={reason} disabled={busy} onChange={(event) => setReason(event.target.value)} />
+              </Field>
+            ) : null}
+          </>
+        )}
+        <StatusMessage error={error} />
+      </div>
       {!preview.blocked && (
         <ModalActions className="mt-6 border-t border-[var(--line)] pt-4">
-          <Button variant="danger" onClick={() => onConfirm(preview.confirmation === "count" && entries === 0 ? "0" : confirmation.trim(), reason.trim())} disabled={busy}>
-            {busy ? t("purging") : tc("delete")}
+          <Button variant="danger" onClick={() => onConfirm(preview.confirmation === "count" && entries === 0 ? "0" : confirmation.trim(), reason.trim())} disabled={busy || !typed}>
+            {busy ? t("purging") : t("purgeAction")}
           </Button>
         </ModalActions>
       )}
@@ -141,7 +160,9 @@ export function TrashView({
   const t = useTranslations("trash");
   const [items, setItems] = useState<TrashItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  // Which row is working, and on what: the pressed button shows it, the page stays put.
+  const [busy, setBusy] = useState<{ id: string; action: "restore" | "purge" } | null>(null);
+  const busyId = busy?.id ?? null;
   const [dialog, setDialog] = useState<{ preview: TrashActionPreview } | null>(null);
   const [connectedLeft, setConnectedLeft] = useState<number | null>(null);
   const [forcing, setForcing] = useState(false);
@@ -158,12 +179,13 @@ export function TrashView({
   const listPath = scopeListPath(scope);
   const listKind = scope === "personal" ? "personal" : "groupId" in scope ? "group" : "challenge";
 
-  const load = useCallback(() => {
+  // `quiet`: refresh what's on screen without blanking it into "loading" (after a restore or a delete).
+  const load = useCallback((quiet = false) => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
     setError(null);
-    setItems(null);
+    if (!quiet) setItems(null);
     apiRequest<TrashResponse>(listPath, { signal: controller.signal })
       .then((data) => {
         if (controller.signal.aborted) return;
@@ -177,26 +199,30 @@ export function TrashView({
 
   // Reset the previous request's state when the remote scope changes.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(load, [load]);
+  useEffect(() => load(), [load]);
 
   const rows = items ?? [];
+  // A restored or deleted row leaves the list at once; the quiet reload then catches whatever went with it.
+  const drop = (item: Pick<TrashItem, "kind" | "id">) =>
+    setItems((current) => current?.filter((row) => !(row.kind === item.kind && row.id === item.id)) ?? current);
 
   async function restore(item: TrashItem) {
-    setBusyId(item.id);
+    setBusy({ id: item.id, action: "restore" });
     setError(null);
     try {
       await apiRequest(API_PATHS.trashRestore(scope), { method: "POST", csrfToken, body: { kind: item.kind, id: item.id } });
-      load();
+      drop(item);
+      load(true);
       onChanged?.();
     } catch (cause) {
       setError((cause as Error).message || t("restoreError"));
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   }
 
   async function openPurge(item: TrashItem) {
-    setBusyId(item.id);
+    setBusy({ id: item.id, action: "purge" });
     setError(null);
     try {
       const preview = await apiRequest<TrashActionPreview>(API_PATHS.trashPreview(scope), {
@@ -207,7 +233,7 @@ export function TrashView({
     } catch (cause) {
       setError((cause as Error).message || t("previewError"));
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   }
 
@@ -220,8 +246,9 @@ export function TrashView({
         method: "POST", csrfToken,
         body: { kind: dialog.preview.kind, id: dialog.preview.id, confirmation, ...(reason ? { reason } : {}) },
       });
+      drop(dialog.preview);
       setDialog(null);
-      load();
+      load(true);
       onChanged?.();
     } catch (cause) {
       setDialogError((cause as Error).message || t("purgeError"));
@@ -241,19 +268,19 @@ export function TrashView({
     setKept(result.skipped > 0 ? result.skipped : null);
     setConnectedLeft(result.connected ? result.connected : null);
     setError(null);
-    load();
+    load(true);
     onChanged?.();
   }
 
-  // "Empty the bin" on the title's line: small quiet text, only when there's something to empty.
+  // "Empty the bin" on the title's line, only when there's something to empty.
   const heading = (
     <PageHeading
       title={title}
       description={description}
       action={emptyScope && rows.length ? (
-        <StateButton type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
+        <Button variant="danger" className="!rounded-full" onClick={() => setEmptyOpen(true)} disabled={busyId !== null}>
           {t("empty")}
-        </StateButton>
+        </Button>
       ) : undefined}
     />
   );
@@ -285,10 +312,10 @@ export function TrashView({
         {rows.map((item) => {
           const sentence = dependencySentence(item, t);
           return (
-            <li key={`${item.kind}:${item.id}`} className="group flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[var(--hover)] sm:items-center sm:px-5">
+            <li key={`${item.kind}:${item.id}`} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:items-center sm:px-5">
               <div className="min-w-0">
                 <p className="text-sm">
-                  <span className="mr-2 rounded bg-[var(--wash)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">{t(`kind.${item.kind}`)}</span>
+                  <span className={cx("mr-2 rounded-full px-2 py-0.5 text-[11px] font-medium", KIND_BADGE[item.kind] ?? "bg-[var(--wash)] text-[var(--muted)]")}>{t(`kind.${item.kind}`)}</span>
                   {item.label}
                 </p>
                 {sentence ? <p className="mt-0.5 text-xs text-[var(--muted)]">{sentence}</p> : null}
@@ -299,14 +326,32 @@ export function TrashView({
                 {item.reason ? <p className="mt-0.5 text-xs italic text-[var(--muted)]">{t("reasonShown", { reason: item.reason })}</p> : null}
                 {item.parentTrashed ? <p className="mt-0.5 text-xs text-[var(--danger)]">{t("parentTrashed")}</p> : null}
               </div>
-              {/* Two quiet words. From sm: up they fade in on the row's hover (or focus) and Excluir
-                  reddens only under the pointer; on a phone, or any touch screen, they're simply there, under the details. */}
-              <div className="flex w-full flex-none items-center justify-end gap-4 transition-opacity sm:w-auto sm:gap-3 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-                <StateButton type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
-                  {t("restore")}
+              {/* Two round icons of one size: restore (an arrow turning back) and delete (the red circle-minus used for
+                  removing everywhere else). The pressed one spins while it works. */}
+              <div className="flex w-full flex-none items-center justify-end gap-1 sm:w-auto">
+                <StateButton
+                  type="button"
+                  onClick={() => restore(item)}
+                  disabled={busyId === item.id || item.parentTrashed}
+                  aria-label={t("restoreAria", { label: item.label })}
+                  title={t("restore")}
+                  className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy?.id === item.id && busy.action === "restore"
+                    ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--muted)]" aria-hidden="true" />
+                    : <RestoreIcon className="h-5 w-5" />}
                 </StateButton>
-                <StateButton type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
-                  {t("purge")}
+                <StateButton
+                  type="button"
+                  onClick={() => openPurge(item)}
+                  disabled={busyId === item.id}
+                  aria-label={t("purgeAria", { label: item.label })}
+                  title={t("purge")}
+                  className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--danger)] transition hover:bg-[var(--danger-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--danger)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy?.id === item.id && busy.action === "purge"
+                    ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--danger-line)] border-t-[var(--danger)]" aria-hidden="true" />
+                    : <CircleMinusIcon className="h-5 w-5" />}
                 </StateButton>
               </div>
             </li>

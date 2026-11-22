@@ -1677,9 +1677,8 @@
     "deletedBy": "by {who}",
     "reasonShown": "Reason: {reason}",
     "parentTrashed": "Restore the item that contains this one first.",
-    "purgeTitle": "Delete “{label}” permanently",
+    "purgeTitle": "Delete “{label}” for good?",
     "purgeBody": "This can't be undone.",
-    "purgeNoDeps": "Nothing else depends on this item.",
     "confirmName": "Type {name} to confirm",
     "confirmCount": "Type {count} to confirm that {count} records will be deleted",
     "reasonLabel": "Reason (administrative deletion)",
@@ -1716,7 +1715,11 @@
     "emptyAction": "Empty",
     "purgeConnected": "{count, plural, one {It's in # challenge. Deleting takes it out of there (the challenge keeps the title).} other {It's in # challenges. Deleting takes it out of them (they keep the title).}}",
     "emptyConnected": "{count, plural, one {# item stayed because it's in a challenge.} other {# items stayed because they're in challenges.}} Deleting takes them out of there too.",
-    "emptyConnectedAction": "Delete them too"
+    "emptyConnectedAction": "Delete them too",
+    "purgeAction": "Delete for good",
+    "purgeAlso": "Goes with it",
+    "purgeAria": "Delete {label} for good",
+    "restoreAria": "Restore {label}"
   },
   "accountDeactivated": {
     "title": "Your account is deactivated",

@@ -1677,9 +1677,8 @@
     "deletedBy": "por {who}",
     "reasonShown": "Motivo: {reason}",
     "parentTrashed": "Restaure primeiro o item que contém este.",
-    "purgeTitle": "Excluir permanentemente “{label}”",
+    "purgeTitle": "Excluir “{label}” para sempre?",
     "purgeBody": "Não dá para desfazer.",
-    "purgeNoDeps": "Nada mais depende deste item.",
     "confirmName": "Digite {name} para confirmar",
     "confirmCount": "Digite {count} para confirmar que {count} registros serão apagados",
     "reasonLabel": "Motivo (exclusão administrativa)",
@@ -1716,7 +1715,11 @@
     "emptyAction": "Esvaziar",
     "purgeConnected": "{count, plural, one {Está em # desafio. Excluir tira o item de lá (o desafio guarda o título).} other {Está em # desafios. Excluir tira o item de lá (os desafios guardam o título).}}",
     "emptyConnected": "{count, plural, one {# item ficou porque está em um desafio.} other {# itens ficaram porque estão em desafios.}} Excluir tira de lá também.",
-    "emptyConnectedAction": "Excluir também"
+    "emptyConnectedAction": "Excluir também",
+    "purgeAction": "Excluir para sempre",
+    "purgeAlso": "Vai junto",
+    "purgeAria": "Excluir {label} para sempre",
+    "restoreAria": "Restaurar {label}"
   },
   "accountDeactivated": {
     "title": "Sua conta está desativada",
