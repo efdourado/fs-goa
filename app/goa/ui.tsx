@@ -19,7 +19,7 @@ import {
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
-  "min-h-11 w-full rounded-xl border border-[var(--control-line)] bg-transparent px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--focus)] focus:ring-2 focus:ring-[var(--focus)]/35 disabled:cursor-not-allowed disabled:text-[var(--muted)]";
+  "min-h-11 w-full rounded-xl border border-[var(--control-line)] bg-transparent px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] placeholder:text-[var(--muted)] focus:border-[var(--field-focus)] focus:shadow-[0_0_0_2px_var(--field-halo)] disabled:cursor-not-allowed disabled:text-[var(--muted)]";
 export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 /**
  * A section title one step down from `PageHeading`'s `<h1>` — sentence case,
@@ -296,7 +296,7 @@ export interface SelectOption<T extends string = string> {
 
 const selectLooks = {
   field: inputClass,
-  pill: "min-h-10 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
+  pill: "min-h-10 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:border-[var(--muted)] focus-visible:border-[var(--field-focus)] focus-visible:shadow-[0_0_0_2px_var(--field-halo)] disabled:cursor-not-allowed disabled:opacity-55",
   bare: "",
 };
 
@@ -594,7 +594,7 @@ export function ArrowField({ value, onChange, onAction, onPaste, placeholder, la
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
-    <div className={cx("flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] bg-[var(--paper)] py-1 pl-4 pr-1 transition focus-within:border-[var(--focus)] focus-within:ring-2 focus-within:ring-[var(--focus)]/35", className)}>
+    <div className={cx("flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] bg-[var(--paper)] py-1 pl-4 pr-1 transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] focus-within:border-[var(--field-focus)] focus-within:shadow-[0_0_0_2px_var(--field-halo)]", className)}>
       <input
         className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
         ref={inputRef}
@@ -1176,7 +1176,7 @@ export function SchedulePeriodFields({
                   const days = Number(event.target.value);
                   if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
                 }}
-                className="w-20 rounded-lg border border-[var(--line)] bg-transparent px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
+                className="w-20 rounded-lg border border-[var(--line)] bg-transparent px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--field-focus)] focus:shadow-[0_0_0_2px_var(--field-halo)] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
               />
             </label>
           </div>

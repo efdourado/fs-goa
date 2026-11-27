@@ -171,7 +171,7 @@ function NumberStepper({ id, field, value, last, disabled, onChange }: {
   };
   const button = "w-10 flex-none cursor-pointer bg-[var(--wash)] text-lg text-[var(--muted)] transition hover:bg-[var(--wash-strong)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50";
   return (
-    <div className="flex items-stretch overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-[3px] focus-within:ring-[var(--main-soft)]">
+    <div className="flex items-stretch overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--field-focus)] focus-within:shadow-[0_0_0_2px_var(--field-halo)] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)]">
       <StateButton type="button" className={button} disabled={disabled} aria-label={t("stepDown", { field: field.label })} onClick={() => nudge(-1)}>−</StateButton>
       <input
         id={id}

@@ -469,7 +469,7 @@ export function GroupScreen({
           </div>
           <StatusMessage error={error ?? copyError} />
           <form onSubmit={inviteMember} className="mt-6">
-            <div className="flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] py-1 pl-4 pr-1 transition focus-within:border-[var(--focus)] focus-within:ring-2 focus-within:ring-[var(--focus)]/35">
+            <div className="flex min-h-[46px] items-center gap-1 rounded-full border border-[var(--control-line)] py-1 pl-4 pr-1 transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] focus-within:border-[var(--field-focus)] focus-within:shadow-[0_0_0_2px_var(--field-halo)]">
               <input className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
               <InlineSubmit label={t("sendInvite")} disabled={memberBusy} />
             </div>

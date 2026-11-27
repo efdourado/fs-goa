@@ -61,7 +61,7 @@ const chipClass = (on = false) => cx(
 /** Sort by: a pill with its name (a phone keeps just the picker) and our picker. */
 function CompactSelect<T extends string>({ label, value, onChange, options, className }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }>; className?: string }) {
   return (
-    <div className={cx(className, "inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-[13px] transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]")}>
+    <div className={cx(className, "inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-[13px] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:border-[var(--muted)] focus-within:border-[var(--field-focus)] focus-within:shadow-[0_0_0_2px_var(--field-halo)]")}>
       <span className="hidden flex-none text-xs text-[var(--muted)] sm:inline">{label}</span>
       <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="flex-1 text-[var(--ink)]" />
     </div>

@@ -49,6 +49,10 @@
 
   --focus: #347b66;
   --control-line: #71897d;
+  /* A field being typed in: its border settles into a soft graphite with a faint halo, never the accent.
+     Built on --ink, so dark mode turns it into a soft light on its own. */
+  --field-focus: color-mix(in srgb, var(--ink) 58%, var(--paper));
+  --field-halo: color-mix(in srgb, var(--ink) 4%, transparent);
 
   --button-blocked-bg: #e3ebe4;
   --button-blocked-ink: #51655a;
@@ -213,7 +217,8 @@ body {
 
 button, a, textarea { -webkit-tap-highlight-color: transparent; }
 
-button:focus-visible, a:focus-visible, textarea:focus-visible {
+/* A field being typed in shows only its darker border (its own classes); buttons and links keep the ring. */
+button:focus-visible, a:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }

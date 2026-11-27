@@ -761,7 +761,7 @@ function CounterEditor({
         options={[{ value: "amount", label: field.label }, { value: "position", label: isBook ? t("modePositionBook") : t("modePosition") }]}
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div className={cx(inModal ? "inline-flex" : "flex w-full", "overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18")}>
+        <div className={cx(inModal ? "inline-flex" : "flex w-full", "overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--field-focus)] focus-within:shadow-[0_0_0_2px_var(--field-halo)] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)]")}>
           <StateButton type="button" className="w-11 cursor-pointer bg-[var(--wash)] text-xl text-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed" disabled={disabled} aria-label={t("decrease", { step: format(step) })} onClick={() => nudge(-step)}>−</StateButton>
           <label className="sr-only" htmlFor="checkin-amount">{mode === "amount" ? field.label : isBook ? t("modePositionBook") : t("modePosition")}</label>
           <input

@@ -499,7 +499,7 @@ function AuditTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input
-          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--main)]"
+          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--field-focus)] focus:shadow-[0_0_0_2px_var(--field-halo)] transition duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)]"
           placeholder="Filtrar por ID de entidade"
           value={entity}
           onChange={(event) => onEntity(event.target.value.trim())}
