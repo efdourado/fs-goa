@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   applyOrder,
   seededShuffle,
+  stageSizes,
   type OrderableItem,
 } from "../app/goa/ordering";
 
@@ -59,9 +60,24 @@ test("shuffle_within keeps each checkpoint's members inside that checkpoint", ()
   assert.deepEqual(w2, ["k0-b", "k1-b", "k2-b"]);
 });
 
-test("distribute spreads items round-robin across the checkpoint list", () => {
+test("distribute deals items like cards, the extra one going to the last stage", () => {
   const result = applyOrder(items(7), { kind: "distribute", checkpointIds: ["w1", "w2", "w3"] });
-  assert.deepEqual(result.map((row) => row.checkpointId), ["w1", "w2", "w3", "w1", "w2", "w3", "w1"]);
+  assert.deepEqual(result.map((row) => row.checkpointId), ["w1", "w2", "w3", "w1", "w2", "w3", "w3"]);
+});
+
+test("distribute in blocks keeps the list order in runs, the extras on the last stages", () => {
+  const twelve = applyOrder(items(12), { kind: "distribute", checkpointIds: ["w1", "w2", "w3", "w4", "w5", "w6"], mode: "blocks" });
+  assert.deepEqual(twelve.map((row) => row.checkpointId), ["w1", "w1", "w2", "w2", "w3", "w3", "w4", "w4", "w5", "w5", "w6", "w6"]);
+  const thirteen = applyOrder(items(13), { kind: "distribute", checkpointIds: ["w1", "w2", "w3", "w4", "w5", "w6"], mode: "blocks" });
+  assert.deepEqual(thirteen.map((row) => row.checkpointId), ["w1", "w1", "w2", "w2", "w3", "w3", "w4", "w4", "w5", "w5", "w6", "w6", "w6"]);
+  assert.deepEqual(thirteen.map((row) => row.key), items(13).map((row) => row.key), "the list keeps its order");
+});
+
+test("stage sizes are equal where they can be, the extras on the last stages, and fewer items fill the first stages", () => {
+  assert.deepEqual(stageSizes(13, 6), [2, 2, 2, 2, 2, 3]);
+  assert.deepEqual(stageSizes(16, 6), [2, 2, 3, 3, 3, 3]);
+  assert.deepEqual(stageSizes(4, 6), [1, 1, 1, 1, 0, 0], "never empty weeks before the first item");
+  assert.deepEqual(stageSizes(12, 6), [2, 2, 2, 2, 2, 2]);
 });
 
 test("distribute with a seed still fills every checkpoint evenly", () => {

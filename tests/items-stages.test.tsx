@@ -316,23 +316,30 @@ test('emptying the stages asks first, then keeps every stage and sends their ite
  try {
   await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(values);}} />);
   assert.equal(document.body.textContent!.includes('Sortear'), false);
-  await act(async () => ui.button('Esvaziar etapas').click());
+  await act(async () => ui.button('Tirar itens das etapas').click());
   assert.equal(saved.length, 0, 'nothing changes before the confirmation');
   assert.match(document.querySelector('dialog')!.textContent!, /Todas as etapas continuam/);
-  await act(async () => ui.button('Esvaziar').click());
+  await act(async () => ui.button('Tirar itens').click());
   assert.deepEqual(saved[0], [{itemId:'one',checkpointId:null,position:0},{itemId:'two',checkpointId:null,position:1},{itemId:'three',checkpointId:null,position:2}]);
  } finally {await ui.cleanup();}
 });
 
-test('distributing in order explains itself in a modal before dealing the items out', async () => {
+test('distributing offers blocks or cards, previews each stage and puts the extra on the last stage', async () => {
  const ui = await setup(); const saved: unknown[] = [];
  try {
   await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(values);}} />);
   await act(async () => ui.button('Distribuir em ordem').click());
-  assert.equal(saved.length, 0);
-  assert.match(document.querySelector('dialog')!.textContent!, /como quem dá cartas/);
-  await act(async () => ui.button('Distribuir').click());
-  assert.deepEqual(saved[0], [{itemId:'one',checkpointId:'a',position:0},{itemId:'two',checkpointId:'b',position:1},{itemId:'three',checkpointId:'a',position:2}]);
+  assert.equal(saved.length, 0, 'nothing moves before the choice is confirmed');
+  const dialog = () => document.querySelector('dialog')!;
+  const mode = (label: string) => [...dialog().querySelectorAll<HTMLButtonElement>('button[aria-pressed]')].find((button) => button.textContent!.startsWith(label))!;
+  // Three items, two stages: in sequence the first stays alone, the last stage takes the extra.
+  assert.equal(mode('Em sequência').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual([...dialog().querySelectorAll('li')].map((row) => row.textContent), ['Phase 11 itemOne', 'Phase 22 itensTwo, Three']);
+  await act(async () => mode('Intercalado').click());
+  assert.deepEqual([...dialog().querySelectorAll('li')].map((row) => row.textContent), ['Phase 11 itemOne', 'Phase 22 itensTwo, Three']);
+  await act(async () => mode('Em sequência').click());
+  await act(async () => (dialog().querySelector('form') as HTMLFormElement).requestSubmit());
+  assert.deepEqual(saved[0], [{itemId:'one',checkpointId:'a',position:0},{itemId:'two',checkpointId:'b',position:1},{itemId:'three',checkpointId:'b',position:2}]);
  } finally {await ui.cleanup();}
 });
 

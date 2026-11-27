@@ -25,12 +25,13 @@ test("Itens e etapas põe Organizar com as ferramentas das etapas, no mesmo dese
   assert.match(html, /aria-label="Adicionar itens"/);
 });
 
-test("sem itens livres suficientes (os registrados ficam no lugar), Organizar não aparece", () => {
+test("um item já registrado também entra em Organizar, nada fica preso no lugar", () => {
   const items = [book("a", 2001, "X"), book("b", 2010, "Y"), book("c", 2020, "X")];
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     ...plannerActions, challenge: challenge(items), entries: [{ id: "e", itemId: "a", values: {} }] as never,
   }));
-  assert.doesNotMatch(html, />Organizar<\/button>/);
+  assert.match(html, />Organizar<\/button>/);
+  assert.doesNotMatch(html, /já registrado, fica/);
   assert.match(html, /aria-label="Adicionar itens"/);
 });
 

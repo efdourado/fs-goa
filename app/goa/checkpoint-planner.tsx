@@ -9,12 +9,12 @@ import { ConfirmDialog, Dialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { ItemEditorDialog } from "./item-editor-dialog";
 import type { CatalogScope } from "./libraries";
-import { applyOrder, type OrderStrategy } from "./ordering";
+import { applyOrder, type DistributeMode, type OrderStrategy } from "./ordering";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "./organize-panel";
 import { useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
 import { itemIdForEntry, formatRuntime, withUnit } from "./utils";
-import { AddRow, Button, ChevronIcon, FaceEmptyState, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
+import { AddRow, Button, ChevronIcon, SelectableCards, FaceEmptyState, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
 
 /** The stage tools under the list (Organise, distribute, empty): quiet underlined words. */
 const toolClass = "cursor-pointer underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45";
@@ -64,7 +64,8 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const organiseInput = propertiesByKind.size ? organiseFromItems(
     items,
     propertiesByKind,
-    new Set(entries.map(itemIdForEntry).filter((id): id is Id => id !== null)),
+    // Every item takes part, logged or not: a new order never touches what was recorded for an item.
+    new Set(),
     propertyName,
   ) : null;
   const showOrganise = organiseInput && canOrganise(organiseInput);
@@ -175,12 +176,11 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     {movingItem ? <MoveItemDialog item={movingItem} stages={stages} onCancel={() => setMovingItem(null)} onSave={async (checkpointId) => {await onAssign([{itemId: movingItem.id, position: movingItem.position ?? items.indexOf(movingItem), checkpointId}]); setMovingItem(null);}} /> : null}
     {addingItems && itemTools ? <AddItemsDialog members={itemTools.members ?? []} held={items.map((item) => ({ title: item.title, catalogItemId: item.catalogItem?.id }))} scope={itemTools.scope} libraries={challenge.libraries ?? []} checkpoints={autoDays ? undefined : stages} onClose={() => setAddingItems(false)} onAdd={async (added) => {await itemTools.onAdd(added); setAddingItems(false);}} /> : null}
     {asking === "distribute" ? (
-      <ConfirmDialog
-        title={t("distribute")}
-        body={t("distributeBody", { count: stages.length })}
-        confirmLabel={t("distributeConfirm")}
+      <DistributeDialog
+        stages={stages}
+        items={items}
         onClose={() => setAsking(null)}
-        onConfirm={async () => { await organise({ kind: "distribute", checkpointIds: stages.map((stage) => stage.id) }); setAsking(null); }}
+        onApply={async (mode) => { await organise({ kind: "distribute", checkpointIds: stages.map((stage) => stage.id), mode }); setAsking(null); }}
       />
     ) : null}
     {asking === "empty" ? (
@@ -271,4 +271,52 @@ function ItemDetails({item, onClose}: {item: ChallengeItem; onClose: () => void}
   const data = item.catalogItem;
   const facts = [data?.author, data?.year, data?.pageCount != null ? t("pagesCount", {count: data.pageCount}) : null, formatRuntime(data?.runtimeMinutes), data?.mainGenre].filter((value) => value !== null && value !== undefined && value !== "");
   return <Dialog title={item.title} onClose={onClose}>{item.description ? <p className="mb-4 text-sm">{item.description}</p> : null}<p className="text-sm text-[var(--muted)]">{facts.join(" · ")}</p><dl className="mt-4 space-y-3">{data?.attributes?.map((attribute) => <div key={attribute.key}><dt className="text-xs text-[var(--muted)]">{attribute.label}</dt><dd className="text-sm">{attribute.type === "minutes" ? formatRuntime(Number(attribute.value)) : withUnit(String(attribute.value), attribute.unit)}</dd></div>)}</dl></Dialog>;
+}
+
+/**
+ * Shares every item of the list between the stages, all of them (what was already in a stage may move), in
+ * one of two ways: in blocks that keep the list's order (the order Organise sets), or dealt like cards. Every
+ * stage gets the same amount where it can; the extras go to the last stages. The preview is what gets saved.
+ */
+function DistributeDialog({ stages, items, onClose, onApply }: {
+  stages: Stage[];
+  items: ChallengeItem[];
+  onClose: () => void;
+  onApply: (mode: DistributeMode) => Promise<void>;
+}) {
+  const t = useTranslations("checkpointPlanner");
+  const [mode, setMode] = useState<DistributeMode>("blocks");
+  const placed = applyOrder(items.map((item, position) => ({ key: item.id, checkpointId: item.checkpointId ?? null, position })), {
+    kind: "distribute", checkpointIds: stages.map((stage) => stage.id), mode,
+  });
+  const titleOf = new Map(items.map((item) => [item.id, item.title]));
+  return (
+    <FormDialog title={t("distribute")} dirty={false} busy={false} onCancel={onClose} onSubmit={() => onApply(mode)} submitLabel={t("distributeConfirm")}>
+      <p className="text-sm leading-6 text-[var(--muted)]">{t("distributeIntro", { items: items.length, stages: stages.length })}</p>
+      <SelectableCards<DistributeMode>
+        value={mode}
+        onChange={setMode}
+        columns={1}
+        options={[
+          { value: "blocks", label: t("distributeBlocks"), hint: t("distributeBlocksHint") },
+          { value: "cards", label: t("distributeCards"), hint: t("distributeCardsHint") },
+        ]}
+      />
+      <div>
+        <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">{t("distributePreview")}</p>
+        <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)]">
+          {stages.map((stage) => {
+            const mine = placed.filter((row) => row.checkpointId === stage.id);
+            return (
+              <li key={stage.id} className="flex items-baseline gap-3 px-3.5 py-2.5 text-sm">
+                <span className="w-28 flex-none truncate font-medium">{stage.title}</span>
+                <span className="w-16 flex-none text-xs tabular-nums text-[var(--muted)]">{t("itemCount", { count: mine.length })}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{mine.map((row) => titleOf.get(row.key)).join(", ")}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </FormDialog>
+  );
 }
