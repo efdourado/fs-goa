@@ -2164,7 +2164,7 @@ test("Tables (fase 7): a biblioteca só existe quando a pessoa a cria, três not
   };
   const tablesLibs = libs.libraries.filter((lib) => lib.source === "tables");
   assert.equal(tablesLibs.length, 1, "uma biblioteca Tables, a que a pessoa criou");
-  assert.equal(tablesLibs[0].label, null, "o nome padrão fica por conta do idioma, não gravado");
+  assert.equal(tablesLibs[0].label, "Lugares", "nasce com o nome padrão no idioma de quem cria, e ele fica gravado");
 
   // um segundo desafio reaproveita a mesma biblioteca em vez de criar outra
   const second = await call("POST", `/api/groups/${gid}/challenges`, {
@@ -7612,7 +7612,7 @@ test("a migração 0051 tira dos Screens os livros que uma versão antiga guardo
   const client = await adminPool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id) VALUES (gen_random_uuid()::text, $1, 'film', 'screens', $2) ON CONFLICT DO NOTHING", [gid, owner.user.id]);
+    await client.query("INSERT INTO catalog_libraries (id, group_id, kind, source, label, created_by_user_id) VALUES (gen_random_uuid()::text, $1, 'film', 'screens', 'Filmes e séries', $2) ON CONFLICT DO NOTHING", [gid, owner.user.id]);
     for (const title of ["Ficciones", "Perfume", "Dom Casmurro", "Repetido", "Solaris"]) {
       await client.query("UPDATE catalog_items SET kind = 'film' WHERE id = $1", [item(title)]);
     }
@@ -7626,7 +7626,11 @@ test("a migração 0051 tira dos Screens os livros que uma versão antiga guardo
     await client.query("DELETE FROM challenge_libraries WHERE challenge_id = $1 AND kind = 'book'", [both]);
     await client.query("INSERT INTO challenge_libraries (challenge_id, group_id, kind, position) VALUES ($1, $2, 'film', 0) ON CONFLICT DO NOTHING", [both, gid]);
 
+    // 0051 predates libraries keeping their own name (0082): replay it as it ran, then name what it made.
+    await client.query("ALTER TABLE catalog_libraries ALTER COLUMN label DROP NOT NULL");
     for (const statement of statements) await client.query(statement);
+    await client.query("UPDATE catalog_libraries SET label = 'Livros' WHERE label IS NULL");
+    await client.query("ALTER TABLE catalog_libraries ALTER COLUMN label SET NOT NULL");
 
     const kinds = new Map((await client.query<{ title: string; kind: string }>("SELECT title, kind FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL AND title <> 'Repetido' OR (title = 'Repetido' AND kind = 'film' AND group_id = $1)", [gid])).rows.map((row) => [row.title, row.kind]));
     assert.equal(kinds.get("Ficciones"), "book");

@@ -12,7 +12,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { Button, CircleCheckIcon, CircleMinusIcon, cx, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
+import { ArrowField, Button, CircleCheckIcon, CircleMinusIcon, cx, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "minutes", "date", "boolean"];
@@ -167,6 +167,7 @@ export function LibraryPropertiesDialog({
   onDeleted?: (name: string) => void;
 }) {
   const t = useTranslations("libraries");
+  const tc = useTranslations("common");
   const f = useGoaFormat();
   const csrf = useCsrf();
   const libraryName = useLibraryName();
@@ -179,6 +180,8 @@ export function LibraryPropertiesDialog({
   // Its name, edited in place like a property's: saved on blur or Enter.
   const currentName = libraryName(library);
   const [name, setName] = useState(currentName);
+  // The name as last saved: what the arrow compares against, and the dialog's title.
+  const [savedName, setSavedName] = useState(currentName);
   const [nameBusy, setNameBusy] = useState(false);
   // Four properties are enough to recognise a library by; the rest unfold on demand.
   const [showAll, setShowAll] = useState(false);
@@ -206,18 +209,18 @@ export function LibraryPropertiesDialog({
 
   async function commitName() {
     const next = name.trim();
-    if (!next) { setName(currentName); return; }
-    if (next === currentName) return;
+    if (!next || next === savedName) return;
     setNameBusy(true);
     setError(null);
     setSuccess(null);
     try {
       await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { label: next }, csrfToken: csrf });
+      setSavedName(next);
+      setName(next);
       onChanged();
       setSuccess(t("propertySaved"));
     } catch (cause) {
       setError(f.error(cause));
-      setName(currentName);
     } finally {
       setNameBusy(false);
     }
@@ -237,7 +240,7 @@ export function LibraryPropertiesDialog({
     } finally {
       setDeleteBusy(false);
     }
-    onDeleted?.(currentName);
+    onDeleted?.(savedName);
   }
 
   const load = useCallback((signal?: AbortSignal) =>
@@ -373,23 +376,23 @@ export function LibraryPropertiesDialog({
   );
 
   return (
-    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || nameBusy || deleteBusy}>
+    <Dialog title={savedName} onClose={onClose} busy={busyKey !== null || nameBusy || deleteBusy}>
       <StatusMessage error={error} success={success} />
 
       {canEdit ? (
-        <section className="mb-6">
+        // Renamed only by the arrow (or Enter), which waits until the name actually changes; leaving the field keeps the typing.
+        <form className="mb-6" onSubmit={(event) => { event.preventDefault(); void commitName(); }}>
           <h3 className={sectionTitle}>{t("nameLabel")}</h3>
-          <input
-            className={inputClass}
+          <ArrowField
             value={name}
+            onChange={setName}
+            label={t("nameLabel")}
+            submitLabel={tc("save")}
             maxLength={80}
             disabled={nameBusy}
-            aria-label={t("nameLabel")}
-            onChange={(event) => setName(event.target.value)}
-            onBlur={() => void commitName()}
-            onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+            submitDisabled={name.trim() === savedName}
           />
-        </section>
+        </form>
       ) : null}
 
       <section>

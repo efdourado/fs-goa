@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 
 import { requireGroupRole, type SessionContext } from "../auth";
 import { getPool, inTransaction, oneOrNull, withClient } from "../db";
+import { defaultLibraryName } from "./library-names";
 import { ApiError, stringValue } from "../http";
 import {
   attributeValuesForItems,
@@ -50,11 +51,13 @@ export async function ensureCatalogLibrary(
     "UPDATE catalog_libraries SET archived_at = NULL, updated_at = now() WHERE group_id = $1 AND kind = $2 AND archived_at IS NOT NULL",
     [groupId, kind],
   );
+  // Born with its name in the creator's language, then never translated again.
+  const source = sourceForKind(kind);
   await client.query<{ id: string }>(
-    `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, created_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (group_id, kind) DO NOTHING RETURNING id`,
-    [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
+    [publicId(), groupId, kind, source, await defaultLibraryName(source), actorUserId],
   );
 }
 
@@ -727,10 +730,10 @@ export async function insertLibrary(
   presetKind?: string,
 ): Promise<CatalogLibrary> {
   const source = typeof body.source === "string" && CREATABLE_LIBRARY_SOURCES.has(body.source) ? body.source : "custom";
-  // A Tables library can go without a stored name — it then shows the locale-aware
-  // default until someone renames it.
+  // A Tables library can be made without a typed name: it is born with the default one, in the creator's
+  // language, and keeps it until someone renames it.
   const label = source === "tables" && (body.label === undefined || body.label === null || body.label === "")
-    ? null
+    ? await defaultLibraryName("tables")
     : stringValue(body, "label", { min: 1, max: 80 })!;
   // Opaque and stable: never derived from `label`, so a rename never touches
   // it, and it never collides with another workspace's library of the same

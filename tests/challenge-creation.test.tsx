@@ -257,9 +257,15 @@ test('editing a library from manual creation preserves the draft and the selecte
     assert.deepEqual(renamedProperties, ['Item name']);
     assert.equal(document.querySelector('dialog form input[placeholder="Nome da propriedade"]'), null);
     const name = document.querySelector<HTMLInputElement>('dialog input[aria-label="Nome"]')!;
+    const rename = name.closest('form')!.querySelector<HTMLButtonElement>('button[aria-label="Salvar"]')!;
+    // Unchanged, the arrow waits; leaving the field never renames.
+    assert.equal(rename.disabled, true);
     await act(async () => name.focus());
     await ui.fill(name, 'Renamed items');
     await act(async () => name.blur());
+    assert.equal(otherLibrary.label, 'Other items');
+    assert.equal(rename.disabled, false);
+    await act(async () => rename.click());
     await act(async () => ui.button('Fechar').click());
     assert.equal(otherLibrary.label, 'Renamed items');
     assert.equal(libraryReads, 3);

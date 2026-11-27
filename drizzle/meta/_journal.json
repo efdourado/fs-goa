@@ -575,6 +575,13 @@
       "when": 1796140800000,
       "tag": "0081_catalog_attribute_minutes",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1796227200000,
+      "tag": "0082_catalog_library_label_required",
+      "breakpoints": true
     }
   ]
 }

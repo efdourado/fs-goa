@@ -38,15 +38,14 @@ export const catalogLibraries = pgTable(
     kind: text("kind").notNull(),
     // Which starting configuration this library began as. Presentation/defaults
     // only (About page copy, which properties get seeded at creation, the
-    // locale-aware default label) — never used to gate behavior. Behavior
+    // name it is born with) — never used to gate behavior. Behavior
     // gates on `kind === 'film' | 'book'` or on actual property capability,
     // never on `source` or `label`.
     source: text("source").notNull(),
-    // `null` = show the locale-aware default name for `source` (so a freshly
-    // migrated or freshly created library reads correctly in every language
-    // without a stored, frozen-in-one-language string). Set only once someone
-    // actually renames it.
-    label: text("label"),
+    // The library's own name. One nobody typed is born with the default for
+    // `source` in the creator's language, then stays as it is: a name is
+    // never translated.
+    label: text("label").notNull(),
     position: integer("position").notNull().default(0),
     // What each cover on this library's shelves shows besides the title: a
     // native property key (`year`, `author`…) or a custom attribute's semantic

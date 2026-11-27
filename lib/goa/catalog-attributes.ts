@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { requireGroupRole, type SessionContext } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
+import { defaultLibraryName } from "./library-names";
 import { ApiError, stringValue } from "../http";
 import { writeAudit } from "./domain/audit";
 import { ensurePersonalWorkspace } from "./domain/challenges";
@@ -53,11 +54,13 @@ async function ensureCatalogLibrary(
   kind: string,
   actorUserId: string,
 ): Promise<void> {
+  // Born with its name in the creator's language, then never translated again.
+  const source = sourceForKind(kind);
   await client.query<{ id: string }>(
-    `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, created_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (group_id, kind) DO NOTHING RETURNING id`,
-    [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
+    [publicId(), groupId, kind, source, await defaultLibraryName(source), actorUserId],
   );
 }
 
