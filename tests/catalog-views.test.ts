@@ -89,8 +89,8 @@ test("the group and home shelves use plain headings and the same end card", () =
   assert.match(group, /<h2[^>]*>Coleção<\/h2>/);
   assert.match(home, /<h2[^>]*>Coleção<\/h2>/);
   assert.doesNotMatch(group, /Catálogo do grupo/);
-  assert.match(group, />13<\/span>.*>em Coleção<\/span>.*>Ver</);
-  assert.match(home, />13<\/span>.*>em Coleção<\/span>.*>Ver</);
+  assert.match(group, />13<\/span>.*>em Coleção<\/span>.*>Ir</);
+  assert.match(home, />13<\/span>.*>em Coleção<\/span>.*>Ir</);
 
   const allVisible = renderWithIntl(createElement(CatalogShelfView, {
     ...props, scope: { groupId: "g" }, data: { ...data, counts: { film: 5, book: 5 }, items: data.items.slice(0, 10) },
