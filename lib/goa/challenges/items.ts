@@ -16,7 +16,6 @@ import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
   createCatalogItem,
-  upsertCatalogItem,
 } from "../catalog";
 import { ensureChallengeLibraries, resolveItemLibrary } from "./libraries";
 import { MAX_CHALLENGE_ITEM_BATCH } from "../domain/item-limits";
@@ -37,6 +36,12 @@ import {
 export async function catalogTitle(client: PoolClient, catalogItemId: string, fallback: string): Promise<string> {
   const row = await oneOrNull<{ title: string }>(client, "SELECT title FROM catalog_items WHERE id = $1", [catalogItemId]);
   return row?.title ?? fallback;
+}
+
+/** A catalogue item goes into a challenge once: refuses one `held` already has, then records it. */
+export function holdOnce(held: Set<string>, catalogItemId: string, title: string): void {
+  if (held.has(catalogItemId)) throw new ApiError(409, "item_already_in_challenge", `"${title}" já está neste desafio.`);
+  held.add(catalogItemId);
 }
 export async function generateDailyCheckpoints(
   client: PoolClient,
@@ -87,7 +92,7 @@ async function createChallengeCatalogItem(
   } = {},
 ): Promise<string> {
   return kind === "film" || kind === "book"
-    ? upsertCatalogItem(client, groupId, userId, { kind, title, ...extra })
+    ? createCatalogItem(client, groupId, userId, { kind, title, ...extra })
     : createCatalogItem(client, groupId, userId, { kind, title, attributes: extra.attributes, scheduledAt: extra.scheduledAt });
 }
 
@@ -252,6 +257,10 @@ export async function saveChallengeItems(
         [challengeId])
       ).rows.map((row) => row.id),
     );
+    const held = new Set((await client.query<{ catalog_item_id: string }>(
+      "SELECT catalog_item_id FROM challenge_items WHERE challenge_id = $1 AND archived_at IS NULL AND catalog_item_id IS NOT NULL",
+      [challengeId],
+    )).rows.map((row) => row.catalog_item_id));
     const ids: string[] = [];
     for (let index = 0; index < requestedItems.length; index += 1) {
       const item = asRecord(requestedItems[index]);
@@ -283,6 +292,7 @@ export async function saveChallengeItems(
         });
       }
       const itemTitle = await catalogTitle(client, catalogItemId, title);
+      holdOnce(held, catalogItemId, itemTitle);
       // A member, a saved outside name, or a free-text note — never a made-up
       // participant, never more than one. All may be absent.
 

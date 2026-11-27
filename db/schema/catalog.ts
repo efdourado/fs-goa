@@ -11,7 +11,6 @@ import {
   smallint,
   text,
   unique,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { users } from "./accounts";
@@ -203,25 +202,10 @@ export const catalogItems = pgTable(
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    // A film/series is the same catalog object when its normalized title matches.
-    // `year` is mutable metadata (the latest release/season), never identity.
-    uniqueIndex("catalog_items_group_film_title_uidx")
-      .on(table.groupId, table.normalizedTitle)
-      .where(sql`${table.kind} = 'film' and ${table.archivedAt} is null`),
-    // For books the author disambiguates equal titles. Case/outer whitespace are
-    // presentation details and therefore do not split the identity.
-    uniqueIndex("catalog_items_group_book_title_author_uidx")
-      .on(
-        table.groupId,
-        table.normalizedTitle,
-        sql`lower(regexp_replace(btrim(coalesce(${table.author}, '')), '\s+', ' ', 'g'))`,
-      )
-      .where(sql`${table.kind} = 'book' and ${table.archivedAt} is null`),
-    // Every other kind (including the legacy `other`, now a library like any
-    // other) has no title-based identity: a title match is only ever a
-    // suggestion the person explicitly accepts or declines (see
-    // `findPossibleCatalogItemMatches`/`createCatalogItem` in
-    // `lib/goa/catalog.ts`), never a merge key enforced here.
+    // An item is its own id, in every library: several may share a title,
+    // a year or an author. A title match is only ever a suggestion the person
+    // explicitly accepts or declines (see `findPossibleCatalogItemMatches` /
+    // `createCatalogItem` in `lib/goa/catalog.ts`), never a merge key.
     unique("catalog_items_id_group_unique").on(table.id, table.groupId),
     index("catalog_items_group_kind_idx").on(table.groupId, table.kind),
     foreignKey({

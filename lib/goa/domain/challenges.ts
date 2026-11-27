@@ -9,11 +9,10 @@ import {
   createCatalogItem,
   findLibraryBySource,
   resolveItemKind,
-  upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
-import { catalogTitle } from "../challenges/items";
+import { catalogTitle, holdOnce } from "../challenges/items";
 import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/libraries";
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
@@ -292,6 +291,7 @@ export async function createChallenge(
       const linkedKinds = [libraryKind];
       const linkedRows = linkedKinds.map((kind, position) => ({ id: null, kind, source: "", label: null, position }));
       const usedKeys = new Set<string>();
+      const held = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
         const itemTitle = typeof item.title === "string" ? item.title.trim() : "";
@@ -318,7 +318,7 @@ export async function createChallenge(
             );
           }
         } else if (catalogKind === "film" || catalogKind === "book") {
-          catalogItemId = await upsertCatalogItem(client, groupId, session.user.id, {
+          catalogItemId = await createCatalogItem(client, groupId, session.user.id, {
             kind: catalogKind,
             title: itemTitle,
             author: item.author,
@@ -330,10 +330,9 @@ export async function createChallenge(
             attributes: item.attributes,
           });
         } else {
-          // Every other kind never merges on a title match (Phase 2) — each
-          // row the caller didn't explicitly reuse via `catalogItemId` above
-          // becomes its own new item, even if an earlier row in this same
-          // batch used the same title.
+          // No kind merges on a title match: each row the caller didn't
+          // explicitly reuse via `catalogItemId` above becomes its own new
+          // item, even if an earlier row in this same batch used the same title.
           catalogItemId = await createCatalogItem(client, groupId, session.user.id, {
             kind: catalogKind,
             title: itemTitle,
@@ -344,6 +343,7 @@ export async function createChallenge(
 
         assertNoBuiltInRecommendation(item);
         const heldName = await catalogTitle(client, catalogItemId, itemTitle);
+        holdOnce(held, catalogItemId, heldName);
 
         let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
         for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {

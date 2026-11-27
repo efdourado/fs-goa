@@ -1697,14 +1697,14 @@ test("fase 1a: acervo do grupo e identidade do filme entre rodadas", async () =>
   assert.equal(Object.hasOwn(items[0], "recommendedBy"), false);
   assert.equal(items[0].catalogItem?.id, aftersun.id);
 
-  // segunda rodada reusa o mesmo filme por título → mesma identidade no acervo
+  // segunda rodada escolhe o mesmo filme do acervo (pelo id) → mesma linha do acervo
   const second = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
       recipe: "cinema", title: "Rodada 2", ...period,
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
-      items: [{ title: "AFTERSUN" }],
+      items: [{ title: "Aftersun", catalogItemId: aftersun.id }],
     },
   });
   assert.equal(second.response.status, 201, JSON.stringify(second.body));
@@ -1721,8 +1721,8 @@ test("fase 1a: acervo do grupo e identidade do filme entre rodadas", async () =>
   const afterPatch = await call("GET", `/api/challenges/${firstId}`, { session: owner });
   assert.equal((afterPatch.body as { items: Array<{ catalogItem: { mainGenre: string | null } | null }> }).items[0].catalogItem?.mainGenre, "coming of age");
 
-  // filme e série se identificam só pelo título: "Dune (1984)" e "Dune (2021)"
-  // são o mesmo item, e o ano avança para o lançamento mais recente.
+  // um item é o seu id: "Dune (1984)" e "Dune (2021)" digitados são dois filmes,
+  // e um título repetido nunca funde nada sozinho.
   const dune = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
@@ -1735,8 +1735,30 @@ test("fase 1a: acervo do grupo e identidade do filme entre rodadas", async () =>
   assert.equal(dune.response.status, 201, JSON.stringify(dune.body));
   const duneCatalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null }> };
   const dunes = duneCatalog.items.filter((item) => item.title === "Dune");
-  assert.equal(dunes.length, 1, "Dune 1984 e Dune 2021 são o mesmo filme");
-  assert.equal(dunes[0].year, 2021, "o ano acompanha o lançamento mais recente");
+  assert.deepEqual(dunes.map((item) => item.year).sort(), [1984, 2021], "Dune 1984 e Dune 2021 são dois filmes, cada um com seu ano");
+  const typedAgain = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Aftersun de novo", ...period,
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "AFTERSUN" }],
+    },
+  });
+  assert.equal(typedAgain.response.status, 201, JSON.stringify(typedAgain.body));
+  const againDetail = (await call("GET", `/api/challenges/${(typedAgain.body as { id: string }).id}`, { session: owner })).body as { items: Array<{ catalogItem: { id: string } | null }> };
+  assert.notEqual(againDetail.items[0].catalogItem?.id, aftersun.id, "um título digitado de novo é um item novo, não o mesmo");
+  const repeated = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Repetido", ...period,
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Aftersun", catalogItemId: aftersun.id }, { title: "Aftersun", catalogItemId: aftersun.id }],
+    },
+  });
+  assert.equal(repeated.response.status, 409, "o mesmo item do acervo entra num desafio uma vez só");
+  assert.equal((repeated.body as { error?: string }).error, "item_already_in_challenge");
 
   // The retired built-in recommendation key is refused even for a valid member.
   const badRecommender = await call("POST", `/api/groups/${gid}/challenges`, {
@@ -1751,16 +1773,18 @@ test("fase 1a: acervo do grupo e identidade do filme entre rodadas", async () =>
   assert.equal(badRecommender.response.status, 400);
 });
 
-test("acervo: adicionar item direto no catálogo (sem desafio) preserva o casamento de filme/livro e nunca funde 'other' por título", async () => {
+test("acervo: adicionar item direto no catálogo (sem desafio) nunca funde por título, nem filme nem 'other'", async () => {
   const owner = await register("Léo", "leo_acervo");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Acervo direto" } })).body as { id: string }).id;
 
-  // film: comportamento existente preservado — mesmo título reusa a identidade
+  // film: um item é o seu id, um título repetido é outro filme
   const film1 = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Aftersun", year: 2022 } });
   assert.equal(film1.response.status, 201, JSON.stringify(film1.body));
   const film2 = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "AFTERSUN" } });
   assert.equal(film2.response.status, 201, JSON.stringify(film2.body));
-  assert.equal((film2.body as { id: string }).id, (film1.body as { id: string }).id, "mesmo título, mesma identidade — comportamento preservado");
+  assert.notEqual((film2.body as { id: string }).id, (film1.body as { id: string }).id, "mesmo título, dois itens");
+  const filmReused = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Aftersun", useExistingId: (film1.body as { id: string }).id } });
+  assert.equal((filmReused.body as { id: string }).id, (film1.body as { id: string }).id, "reusar um filme é uma escolha explícita");
 
   // other: título (e até ano) iguais nunca fundem sozinhos — dois jogos distintos
   const matchA = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "other", title: "Barcelona x Real Madrid", year: 2026 } });
@@ -1781,7 +1805,7 @@ test("acervo: adicionar item direto no catálogo (sem desafio) preserva o casame
   assert.equal((reused.body as { id: string }).id, (matchA.body as { id: string }).id);
 
   const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
-  assert.equal((catalog.body as { items: unknown[] }).items.length, 3, "1 filme + 2 jogos — 'usar existente' não criou um terceiro");
+  assert.equal((catalog.body as { items: unknown[] }).items.length, 4, "2 filmes + 2 jogos, 'usar existente' não criou mais nenhum");
 
   // só owner/admin adiciona direto no acervo
   const member = await register("Bia", "bia_acervo");
@@ -3199,17 +3223,21 @@ test("memória do acervo: um filme reconhecido em duas rodadas encerradas", asyn
   const owner = await register("Dora", "dora_mem");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Memória" } })).body as { id: string }).id;
 
+  // The second round picks the same film from the catalogue (by its id), as the add-items picker does.
+  let stalkerId: string | undefined;
   async function runRound(title: string, notas: number[]) {
     const res = await call("POST", `/api/groups/${gid}/challenges`, {
       session: owner,
       body: {
         recipe: "cinema", title, startsOn: "2026-08-01", endsOn: "2026-12-31",
-        participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979 }],
+        participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979, ...(stalkerId ? { catalogItemId: stalkerId } : {}) }],
       },
     });
     const cid = (res.body as { id: string }).id;
     assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
-    const item = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+    const roundItem = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string; catalogItem: { id: string } | null }> }).items[0];
+    const item = roundItem.id;
+    stalkerId ??= roundItem.catalogItem?.id;
     for (const nota of notas) {
       // one participant, so update the same entry — use distinct rounds instead
       await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: item, values: { nota } } });
@@ -3322,13 +3350,16 @@ test("apagar um desafio arquiva do acervo só os itens órfãos, mantendo os que
     },
   });
   assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const shared = ((await call("GET", `/api/challenges/${(first.body as { id: string }).id}`, { session: owner })).body as {
+    items: Array<{ title: string; catalogItem: { id: string } | null }>;
+  }).items.find((item) => item.title === "Filme Compartilhado")!.catalogItem!.id;
 
   const second = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
     body: {
       recipe: "cinema", title: "Rodada 2", startsOn: "2026-03-01", endsOn: "2026-04-01",
       participantIds: [owner.user.id],
-      items: [{ title: "Filme Compartilhado", year: 2000 }, { title: "Só da Rodada 2", year: 2002 }],
+      items: [{ title: "Filme Compartilhado", catalogItemId: shared }, { title: "Só da Rodada 2", year: 2002 }],
     },
   });
   const secondId = (second.body as { id: string }).id;

@@ -269,12 +269,12 @@ function useRowSummary() {
 }
 
 /** The add dialog used while creating a challenge and when adding to a saved challenge. */
-/** An item the challenge already holds: what "already on the list" and a repeated title are checked against. */
+/** An item the challenge already holds, shown as already on the list in the catalogue picker. */
 export interface HeldItem { title: string; catalogItemId?: Id | null }
 
 function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, checkpoints, ...shared }: EditorShared & {
   existing?: CineRow[];
-  /** Items already saved in the challenge. Unlike `existing` (rows of the same unsaved draft) they don't count toward a batch. */
+  /** Items already saved in the challenge (by catalogue id). Unlike `existing` (rows of the same unsaved draft) they don't count toward a batch. */
   held?: HeldItem[];
   onSave: (rows: CineRow[], stageId: Id | null) => void | Promise<void>;
   onClose: () => void;
@@ -293,7 +293,6 @@ function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, che
   const [pending, setPending] = useState(() => newCineRow("", library));
   const [draft, setDraft] = useState<CineRow[]>([]);
   const [stageId, setStageId] = useState("");
-  const [skipped, setSkipped] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -312,28 +311,17 @@ function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, che
   }, [showCatalog, catalogPath]);
 
   const hasTitle = Boolean(pending.title.trim());
-  const titleKey = (title: string) => title.trim().toLowerCase();
-  const knownTitles = new Set([...held, ...existing, ...draft].map((row) => titleKey(row.title)));
-  const duplicate = hasTitle && knownTitles.has(titleKey(pending.title));
   const used = new Set([...held, ...existing].flatMap((row) => row.catalogItemId ? [row.catalogItemId] : []));
   const selected = new Set(draft.map((row) => row.catalogItemId));
   const manualRows = draft.filter((row) => !row.catalogItemId);
   const rows = hasTitle ? [...draft, pending] : draft;
   const missingTitle = draft.some((row) => !row.title.trim());
   const exceedsBatch = existing.length + rows.length > MAX_CHALLENGE_ITEM_BATCH;
-  const canSave = Boolean(target && rows.length && !duplicate && !missingTitle && !exceedsBatch);
+  const canSave = Boolean(target && rows.length && !missingTitle && !exceedsBatch);
 
+  // Every typed or pasted title is a new item of its own, even one sharing a name with another.
   function pasteTitles(titles: string[]) {
-    const seen = new Set(knownTitles);
-    if (hasTitle) seen.add(titleKey(pending.title));
-    const fresh = titles.filter((title) => {
-      const key = titleKey(title);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    setSkipped(titles.length - fresh.length);
-    setDraft((current) => [...current, ...fresh.map((title) => newCineRow(title, library))]);
+    setDraft((current) => [...current, ...titles.map((title) => newCineRow(title, library))]);
   }
 
   function selectCatalog(items: CatalogItem[], checked: boolean) {
@@ -351,7 +339,7 @@ function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, che
       stickyActions
       dirty={draft.length > 0 || hasTitle}
       busy={busy}
-      error={error ?? (missingTitle ? tCatalogAdd("titleRequired") : duplicate ? t("duplicateTitle") : null)}
+      error={error ?? (missingTitle ? tCatalogAdd("titleRequired") : null)}
       onCancel={onClose}
       submitDisabled={!canSave}
       submitLabel={t("addCount", { count: rows.length })}
@@ -376,10 +364,8 @@ function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, che
             onChange={(title) => setPending((row) => ({ ...row, title }))}
             label={t("typeLabel")}
             submitLabel={t("addItemRow")}
-            submitDisabled={duplicate}
             placeholder={t("typePlaceholder")}
             maxLength={160}
-            aria-invalid={duplicate || undefined}
             onAction={() => {
               setDraft((current) => [...current, pending]);
               setPending(newCineRow("", library));
@@ -412,7 +398,6 @@ function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, che
             ) : null}
           </div>
         </div>
-        {skipped ? <p className="text-xs text-[var(--muted)]" aria-live="polite">{t("skippedDuplicates", { count: skipped })}</p> : null}
         {manualRows.length ? (
           <RowCards
             rows={manualRows}

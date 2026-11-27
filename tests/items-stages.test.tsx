@@ -226,7 +226,7 @@ test('one confirmation adds checked collection items and the title still in the 
   const arrow = ui.button('Adicionar item');
   assert.equal(arrow.disabled, true);
   await ui.fill(title(), 'From collection');
-  assert.equal(arrow.disabled, true, 'a duplicate title cannot be queued');
+  assert.equal(arrow.disabled, false, 'a title another item already has is a new item of its own');
   await ui.fill(title(), 'Temporary manual title');
   assert.equal(document.querySelectorAll('dialog fieldset input:not([type="checkbox"]):not([type="search"])').length, 1);
   assert.doesNotMatch(document.querySelector('dialog')!.textContent!, /\+\d+ propriedades?/);
@@ -287,7 +287,7 @@ test('an empty collection picker shows the compact face and a short title', asyn
  } finally {await ui.cleanup();}
 });
 
-test('adding to a challenge marks what it already holds and refuses its titles again', async () => {
+test('adding to a challenge marks the catalogue items it already holds, while a repeated title stays a new item', async () => {
  const ui = await setup();
  const scope = {groupId:'g'};
  const fallbackFetch = globalThis.fetch;
@@ -304,7 +304,7 @@ test('adding to a challenge marks what it already holds and refuses its titles a
   assert.equal(heldRow.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled, true);
   assert.equal(rows.find((row) => row.textContent!.includes('Free one'))!.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled, false);
   await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!, 'renamed in the catalogue');
-  // A title the challenge already holds is flagged (the message goes to a toast) and can't be added again.
+  // Typing a name the challenge already has makes a new item (its own id), so nothing blocks it.
   const typed = document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!;
   assert.equal(typed.getAttribute('aria-invalid'), 'true');
   assert.equal(typed.parentElement!.querySelector<HTMLButtonElement>('button')!.disabled, true);

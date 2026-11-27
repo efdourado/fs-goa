@@ -352,16 +352,9 @@ async function parentTrashed(client: PoolClient, row: RowContext): Promise<boole
   return c?.gone ?? true;
 }
 
-async function identityConflict(client: PoolClient, row: RowContext, rename: string | null): Promise<{ code: string; message: string } | null> {
-  if (row.kind === "catalog_item") {
-    const clash = await oneOrNull<{ id: string }>(client,
-      `SELECT other.id FROM catalog_items self JOIN catalog_items other
-          ON other.group_id=self.group_id AND other.kind=self.kind AND other.archived_at IS NULL AND other.id<>self.id
-         AND other.normalized_title = CASE WHEN $2::text IS NULL THEN self.normalized_title ELSE lower(btrim($2)) END
-         AND coalesce(lower(btrim(other.author)),'') = coalesce(lower(btrim(self.author)),'')
-        WHERE self.id=$1`, [row.id, rename]);
-    return clash ? { code: "name_conflict", message: "Já existe um item ativo com esse título na coleção. Renomeie ao restaurar." } : null;
-  }
+async function identityConflict(client: PoolClient, row: RowContext): Promise<{ code: string; message: string } | null> {
+  // A catalogue item is its own id: another with the same title never stands in the way of a restore.
+  if (row.kind === "catalog_item") return null;
   const keyedTable: Partial<Record<TrashKind, string>> = {
     challenge_item: "challenge_items", entry_type: "entry_types", field: "challenge_fields",
     checkpoint: "challenge_checkpoints", metric: "challenge_metrics",
@@ -718,7 +711,7 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     if (await parentTrashed(client, row)) {
       throw new ApiError(409, "parent_trashed", "Restaure primeiro o item que contém este.");
     }
-    const conflict = await identityConflict(client, row, rename);
+    const conflict = await identityConflict(client, row);
     if (conflict) throw new ApiError(409, conflict.code, conflict.message);
     if (kind === "group" && row.groupKind === "standard") {
       const members = await client.query<{ user_id: string }>(

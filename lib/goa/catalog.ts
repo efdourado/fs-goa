@@ -61,11 +61,6 @@ export async function ensureCatalogLibrary(
   );
 }
 
-/** Matches the database's book-identity expression without altering accents. */
-function normalizeAuthor(value: string): string {
-  return value.toLowerCase().replace(/\s+/gu, " ").trim();
-}
-
 function optionalInt(value: unknown, min: number, max: number, name: string): number | null {
   if (value === undefined || value === null || value === "") return null;
   const number = Number(value);
@@ -116,96 +111,6 @@ function readAttributes(input: CatalogAttributes) {
 
 type ParsedAttributes = ReturnType<typeof readAttributes>;
 
-/**
- * Find-or-create a film/book by normalized title within the group. When it
- * already exists, fills in any attribute that was still empty (so a later, richer
- * entry enriches the shared row) but never overwrites a set value.
- *
- * Film/book only, deliberately: their title(+author)-based identity and this
- * auto-match behavior are frozen exactly as they were before libraries
- * existed. Every other kind goes through `createCatalogItem`/`addCatalogItem`
- * instead, which never merge on a title match — only an explicit "use
- * existing" choice reuses a row (see `findPossibleCatalogItemMatches`).
- */
-export async function upsertCatalogItem(
-  client: PoolClient,
-  groupId: string,
-  userId: string,
-  input: { kind: "film" | "book"; title: string; attributes?: unknown } & CatalogAttributes,
-): Promise<string> {
-  const title = input.title.trim();
-  if (title.length < 1 || title.length > 300) {
-    throw new ApiError(400, "invalid_catalog_title", "O título do item da coleção é inválido.");
-  }
-  const normalized = normalizeTitle(title);
-  const attributes = readAttributes(input);
-  await ensureCatalogLibrary(client, groupId, input.kind, userId);
-
-  // Film identity is title-only: `year` is the latest installment/season and
-  // may advance over time. Books additionally use the author, so equal
-  // titles by different people remain separate works.
-  type Row = {
-    id: string; author: string | null; year: number | null;
-    main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
-    scheduled_at: Date | null;
-  };
-  const sameTitle = await client.query<Row>(
-    `SELECT id, author, year, main_genre, page_count, runtime_minutes, scheduled_at FROM catalog_items
-      WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
-      ORDER BY created_at`,
-    [groupId, input.kind, normalized],
-  );
-  const existing: Row | null = input.kind === "film"
-    ? sameTitle.rows[0] ?? null
-    : sameTitle.rows.find(
-        (row) => normalizeAuthor(row.author ?? "") === normalizeAuthor(attributes.author ?? ""),
-      ) ?? null;
-  if (existing) {
-    const sets: string[] = [];
-    const params: unknown[] = [existing.id];
-    const enrich = (column: string, current: string | number | null, next: string | number | null) => {
-      if (next !== null && current === null) {
-        params.push(next);
-        sets.push(`${column} = $${params.length}`);
-      }
-    };
-    enrich("author", existing.author, attributes.author);
-    // Re-adding a film/series with a new latest year updates its metadata instead
-    // of creating a second catalog identity. Explicit PATCHes can still correct a
-    // year downwards; normal upserts only advance it.
-    if (
-      input.kind === "film"
-      && attributes.year !== null
-      && (existing.year === null || attributes.year > existing.year)
-    ) {
-      params.push(attributes.year);
-      sets.push(`year = $${params.length}`);
-    } else {
-      enrich("year", existing.year, attributes.year);
-    }
-    enrich("main_genre", existing.main_genre, attributes.mainGenre);
-    enrich("page_count", existing.page_count, attributes.pageCount);
-    enrich("runtime_minutes", existing.runtime_minutes, attributes.runtimeMinutes);
-    // A film/book already scheduled keeps its date — the same "never overwrite" rule as every attribute.
-    if (attributes.scheduled && !existing.scheduled_at) {
-      const columns = eventScheduleColumns(attributes.scheduled);
-      for (const [column, value] of Object.entries(columns)) {
-        params.push(value);
-        sets.push(`${column} = $${params.length}`);
-      }
-    }
-    if (sets.length) {
-      await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
-    }
-    if (input.attributes) await setCatalogItemAttributeValues(client, existing.id, groupId, input.kind, input.attributes);
-    return existing.id;
-  }
-
-  const id = await insertCatalogItemRow(client, groupId, userId, input.kind, title, normalized, attributes);
-  if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
-  return id;
-}
-
 async function insertCatalogItemRow(
   client: PoolClient,
   groupId: string,
@@ -232,9 +137,8 @@ async function insertCatalogItemRow(
 
 /**
  * Possible existing items for a title someone just typed, before they add a
- * new one. Only meaningful for kinds without a title-based identity — every
- * kind except film/book, whose existing single-step auto-match this does not
- * change. Basic normalized-title substring match; fuzzy matching is not a
+ * new one: a heads-up only, since an item is its own id and a title never
+ * merges two of them. Basic normalized-title substring match; fuzzy matching is not a
  * requirement here, only an honest "here's what's close" suggestion list the
  * person explicitly accepts or ignores. `kind` is a plain string, not just
  * `CatalogKind`: it may be an opaque, user-created library's kind too.
@@ -257,10 +161,10 @@ export async function findPossibleCatalogItemMatches(
 }
 
 /**
- * Always inserts a new catalog item — no find-or-create, no merge. A title
- * matching an existing item is never identity here (see
- * `findPossibleCatalogItemMatches`): only an explicit "use existing" choice
- * reuses a row. film/book never call this — see `upsertCatalogItem`.
+ * Always inserts a new catalog item: no find-or-create, no merge. An item is
+ * identified by its id alone, so several can share a title, a year or an
+ * author (the person's own organisation). Only an explicit "use existing"
+ * choice reuses a row (see `findPossibleCatalogItemMatches`).
  */
 export async function createCatalogItem(
   client: PoolClient,
@@ -300,11 +204,9 @@ export async function assertCatalogItemInGroup(
 }
 
 /**
- * The catalog page's own "add an item" flow, independent of any challenge.
- * film/book keep their existing single-step auto-match unchanged. Every
- * other kind requires an explicit choice: pass `useExistingId` (an id from
- * `findPossibleCatalogItemMatches`) to reuse that row as-is, or omit it to
- * always create a new one — a matching title is never a silent merge here.
+ * The catalog page's own "add an item" flow, independent of any challenge, the same for every library:
+ * pass `useExistingId` (an id from `findPossibleCatalogItemMatches`) to reuse that row as-is, or omit it to
+ * always create a new one. A matching title is never a silent merge.
  */
 export async function addCatalogItem(
   client: PoolClient,
@@ -314,10 +216,6 @@ export async function addCatalogItem(
     kind: string; title: string; useExistingId?: string; attributes?: unknown;
   } & CatalogAttributes,
 ): Promise<{ id: string }> {
-  if (input.kind === "film" || input.kind === "book") {
-    const id = await upsertCatalogItem(client, groupId, userId, { ...input, kind: input.kind });
-    return { id };
-  }
   if (input.useExistingId) {
     await assertCatalogItemInGroup(client, input.useExistingId, groupId, input.kind);
     return { id: input.useExistingId };
@@ -1013,24 +911,11 @@ const NATIVE_COLUMNS: Record<string, string[]> = {
 
 /**
  * A property that is off holds nothing: switching one off erases what the library's items had saved for it
- * (a hidden-but-kept value is of no use to anyone). Two books that only their authors told apart would become
- * the same book without an author, so that one case is refused instead.
+ * (a hidden-but-kept value is of no use to anyone).
  */
 async function eraseNativeProperty(client: PoolClient, groupId: string, kind: string, propertyKey: string): Promise<void> {
   const columns = NATIVE_COLUMNS[propertyKey];
   if (!columns) return;
-  if (propertyKey === "author") {
-    const clash = await oneOrNull<{ title: string }>(
-      client,
-      `SELECT min(title) AS title FROM catalog_items
-        WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL
-        GROUP BY normalized_title HAVING count(*) > 1 LIMIT 1`,
-      [groupId, kind],
-    );
-    if (clash) {
-      throw new ApiError(409, "author_tells_apart", `Há dois livros "${clash.title}": renomeie um antes de tirar o autor.`);
-    }
-  }
   await client.query(
     `UPDATE catalog_items SET ${columns.map((column) => `${column} = NULL`).join(", ")}, updated_at = now() WHERE group_id = $1 AND kind = $2`,
     [groupId, kind],

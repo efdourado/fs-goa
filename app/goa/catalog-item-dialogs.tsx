@@ -25,14 +25,10 @@ interface PossibleMatch {
   author: string | null;
 }
 
-/** Film/book look items up by title and merge on their own; every other library asks first. */
-const AUTO_MATCH = new Set(["film", "book"]);
-
 /**
  * Add one item to a library, with the choice made explicit: type a title, see
- * what's already there, and either reuse it or create a new one. Screens and
- * Pages (films and books) keep matching a repeated title on their own, exactly
- * as they always have — for those the list is only a heads-up.
+ * what's already there, and either reuse it or create a new one. A title never
+ * merges two items on its own, in any library: each new one gets its own id.
  */
 export function AddCatalogItemDialog({
   scope,
@@ -62,7 +58,6 @@ export function AddCatalogItemDialog({
   const [found, setFound] = useState<{ query: string; libraryKey: string; items: PossibleMatch[] }>({ query: "", libraryKey: "", items: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoMatch = kind !== null && AUTO_MATCH.has(kind);
 
   // What already looks like this title — refreshed a beat after typing stops.
   const query = title.trim();
@@ -139,8 +134,8 @@ export function AddCatalogItemDialog({
 
       {matches.length ? (
         <div className="rounded-2xl border border-[var(--warn-line)] bg-[var(--warn-soft)]/60 p-4">
-          <h3 className="text-sm font-medium text-[var(--warn)]">{autoMatch ? t("matchesAutoTitle") : t("matchesTitle")}</h3>
-          <p className="mb-3 mt-0.5 text-xs leading-5 text-[var(--muted)]">{autoMatch ? t("matchesAutoBody") : t("matchesBody")}</p>
+          <h3 className="text-sm font-medium text-[var(--warn)]">{t("matchesTitle")}</h3>
+          <p className="mb-3 mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("matchesBody")}</p>
           <ul className="space-y-1.5">
             {matches.map((match) => (
               <li key={match.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--paper)] px-3 py-2">
@@ -148,13 +143,11 @@ export function AddCatalogItemDialog({
                   <span className="block truncate">{match.title}</span>
                   <span className="block truncate text-xs text-[var(--muted)]">{[match.year, match.author].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span>
                 </span>
-                {autoMatch ? null : (
-                  <Button variant="secondary" className="flex-none" disabled={busy} onClick={() => void submit(match.id)}>{t("useThis")}</Button>
-                )}
+                <Button variant="secondary" className="flex-none" disabled={busy} onClick={() => void submit(match.id)}>{t("useThis")}</Button>
               </li>
             ))}
           </ul>
-          {autoMatch ? null : <p className="mt-3 text-xs text-[var(--muted)]">{t("orCreateNew")}</p>}
+          <p className="mt-3 text-xs text-[var(--muted)]">{t("orCreateNew")}</p>
         </div>
       ) : null}
 
