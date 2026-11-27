@@ -4335,6 +4335,44 @@ test("um filme carrega a duração em minutos, editável depois, e o item do ace
   assert.equal(afterEdit.runtimeMinutes, 132, "a duração é editável depois da criação");
 });
 
+test("renomear um item no acervo renomeia em todo desafio que o usa, e renomear dentro do desafio renomeia no acervo", async () => {
+  const owner = await register("Dona Renome", "dona_renome_acervo");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do Renome" } })).body as { id: string }).id;
+  const make = async (title: string, items: Array<Record<string, unknown>>) => (await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title, participantIds: [owner.user.id], items },
+  })).body as { id: string };
+  const first = await make("Sessão um", [{ title: "Aftersun", year: 2022 }]);
+  const firstDetail = (await call("GET", `/api/challenges/${first.id}`, { session: owner })).body as { items: Array<{ id: string; catalogItem: { id: string } }> };
+  const catalogItemId = firstDetail.items[0].catalogItem.id;
+  const second = await make("Sessão dois", [{ title: "Aftersun", catalogItemId }]);
+  const titles = async () => (await adminPool.query<{ challenge_id: string; title: string }>(
+    "SELECT challenge_id, title FROM challenge_items WHERE catalog_item_id = $1 ORDER BY challenge_id", [catalogItemId],
+  )).rows;
+  assert.equal((await titles()).length, 2, "os dois desafios usam o mesmo item do acervo");
+
+  const fromCatalog = await call("PATCH", `/api/catalog/${catalogItemId}`, { session: owner, body: { title: "Aftersun (2022)" } });
+  assert.equal(fromCatalog.response.status, 200, JSON.stringify(fromCatalog.body));
+  assert.deepEqual((await titles()).map((row) => row.title), ["Aftersun (2022)", "Aftersun (2022)"], "o novo nome chega aos dois desafios");
+
+  const secondDetail = (await call("GET", `/api/challenges/${second.id}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  assert.equal(secondDetail.items[0].title, "Aftersun (2022)");
+  const fromChallenge = await call("PATCH", `/api/challenges/${second.id}/items/${secondDetail.items[0].id}`, { session: owner, body: { title: "Aftersun, de Charlotte Wells" } });
+  assert.equal(fromChallenge.response.status, 200, JSON.stringify(fromChallenge.body));
+  const catalogRow = await adminPool.query<{ title: string }>("SELECT title FROM catalog_items WHERE id = $1", [catalogItemId]);
+  assert.equal(catalogRow.rows[0].title, "Aftersun, de Charlotte Wells", "renomear no desafio renomeia no acervo");
+  assert.deepEqual((await titles()).map((row) => row.title), ["Aftersun, de Charlotte Wells", "Aftersun, de Charlotte Wells"], "e no outro desafio também");
+
+  // An item put into a challenge always takes the catalogue's current name, whatever the page still had.
+  const third = await make("Sessão três", [{ title: "nome velho que a página ainda tinha", catalogItemId }]);
+  assert.deepEqual((await titles()).find((row) => row.challenge_id === third.id)?.title, "Aftersun, de Charlotte Wells", "entra com o nome atual do acervo");
+
+  // A name as long as the catalogue allows reaches every challenge too.
+  const long = "A".repeat(260);
+  const longRename = await call("PATCH", `/api/catalog/${catalogItemId}`, { session: owner, body: { title: long } });
+  assert.equal(longRename.response.status, 200, JSON.stringify(longRename.body));
+  assert.ok((await titles()).every((row) => row.title === long));
+});
+
 test("preflight: bloqueia ativação com erros, lista avisos, e é o mesmo portão do transition", async () => {
   const owner = await register("Dona Preflight", "dona_preflight");
   const member = await register("Participa Preflight", "participa_preflight");

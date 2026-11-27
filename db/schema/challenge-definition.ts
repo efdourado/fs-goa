@@ -220,7 +220,7 @@ export const challengeItems = pgTable(
     index("challenge_items_due_idx").on(table.challengeId, table.dueAt),
     index("challenge_items_catalog_idx").on(table.catalogItemId),
     check("challenge_items_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
-    check("challenge_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 200`),
+    check("challenge_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 300`),
     check(
       "challenge_items_origin_note_check",
       sql`${table.originNote} is null or char_length(btrim(${table.originNote})) between 1 and 200`,

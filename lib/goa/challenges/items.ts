@@ -29,6 +29,15 @@ import {
   usesRoundItems,
 } from "./entry-types";
 
+
+/**
+ * The name a challenge item linked to `catalogItemId` carries: the catalogue item's own, as it is now (never
+ * an older one a page still had, nor a typed spelling a film merged into).
+ */
+export async function catalogTitle(client: PoolClient, catalogItemId: string, fallback: string): Promise<string> {
+  const row = await oneOrNull<{ title: string }>(client, "SELECT title FROM catalog_items WHERE id = $1", [catalogItemId]);
+  return row?.title ?? fallback;
+}
 export async function generateDailyCheckpoints(
   client: PoolClient,
   challengeId: string,
@@ -273,6 +282,7 @@ export async function saveChallengeItems(
           pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes, scheduledAt: item.scheduledAt, attributes: item.attributes,
         });
       }
+      const itemTitle = await catalogTitle(client, catalogItemId, title);
       // A member, a saved outside name, or a free-text note — never a made-up
       // participant, never more than one. All may be absent.
 
@@ -289,7 +299,7 @@ export async function saveChallengeItems(
           (id,challenge_id,entry_type_id,catalog_item_id,checkpoint_id,semantic_key,title,position,metadata,created_at,updated_at)
          VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
         [id, challengeId, catalogItemId, checkpointId,
-          await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
+          await uniqueItemKey(client, challengeId, item.key ?? itemTitle, position), itemTitle,
           position],
       );
       ids.push(id);
@@ -398,15 +408,18 @@ export async function updateChallengeItem(
       // compartilhado, não no item do desafio — atualizá-los aqui é o que deixa
       // "esqueci de preencher na criação" corrigível depois, sem duplicar a
       // lógica de `updateCatalogItem`.
+      // A linked item's name is the catalogue item's: renaming it here renames it there, and in every other
+      // challenge that uses it.
+      const renamed = title !== current.title;
       if (current.catalog_item_id
-        && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
+        && (renamed || Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
           || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes") || Object.hasOwn(body, "scheduledAt")
           || Object.hasOwn(body, "attributes"))) {
         // The item's library decides which custom properties `attributes` may set.
         const catalogKind = (await oneOrNull<{ kind: string }>(
           client, "SELECT kind FROM catalog_items WHERE id = $1", [current.catalog_item_id],
         ))?.kind;
-        await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body, catalogKind);
+        await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, renamed ? { ...body, title } : body, catalogKind);
       }
       await writeAudit(
         client,

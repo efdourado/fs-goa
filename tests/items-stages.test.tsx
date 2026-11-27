@@ -186,7 +186,7 @@ test('one confirmation adds checked collection items and the title still in the 
     ]});
     return fallbackFetch(input, init);
   };
-  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={[books]} onAdd={async (items) => {saved.push(items);}} onClose={noop} />);
+  await ui.render(<AddItemsDialog scope={scope} members={[]} held={[]} libraries={[books]} onAdd={async (items) => {saved.push(items);}} onClose={noop} />);
   const collectionToggle = ui.button('Da coleção (89)');
   const collectionPanel = document.getElementById(collectionToggle.getAttribute('aria-controls')!)!;
   assert.equal(collectionPanel.hidden, true);
@@ -277,13 +277,37 @@ test('an empty collection picker shows the compact face and a short title', asyn
   globalThis.fetch = (input, init) => String(input) === API_PATHS.catalogWorkspace(scope).list
     ? Promise.resolve(Response.json({items:[]}))
     : fallbackFetch(input, init);
-  await ui.render(<AddItemsDialog scope={scope} members={[]} libraries={challenge.libraries!} onAdd={noop} onClose={noop} />);
+  await ui.render(<AddItemsDialog scope={scope} members={[]} held={[]} libraries={challenge.libraries!} onAdd={noop} onClose={noop} />);
   await act(async () => ui.button('Da coleção (89)').click());
   const title = [...document.querySelectorAll('dialog p')].find((paragraph) => paragraph.textContent === 'Coleção vazia');
   assert.ok(title);
   assert.equal(title.previousElementSibling?.getAttribute('aria-hidden'), 'true');
   assert.match(title.previousElementSibling?.textContent ?? '', /ᴖ̈/);
   assert.doesNotMatch(document.querySelector('dialog')!.textContent!, /Os títulos que você adicionar aqui/);
+ } finally {await ui.cleanup();}
+});
+
+test('adding to a challenge marks what it already holds and refuses its titles again', async () => {
+ const ui = await setup();
+ const scope = {groupId:'g'};
+ const fallbackFetch = globalThis.fetch;
+ const kind = challenge.libraries![0].kind;
+ try {
+  globalThis.fetch = (input, init) => String(input) === API_PATHS.catalogWorkspace(scope).list
+    ? Promise.resolve(Response.json({items:[{id:'cat-held',kind,title:'Renamed in the catalogue'},{id:'cat-free',kind,title:'Free one'}]}))
+    : fallbackFetch(input, init);
+  await ui.render(<AddItemsDialog scope={scope} members={[]} held={[{title:'Renamed in the catalogue',catalogItemId:'cat-held'}]} libraries={challenge.libraries!} onAdd={noop} onClose={noop} />);
+  await act(async () => ui.button('Da coleção (89)').click());
+  const rows = [...document.querySelectorAll('dialog li')];
+  const heldRow = rows.find((row) => row.textContent!.includes('Renamed in the catalogue'))!;
+  assert.match(heldRow.textContent!, /já na lista/);
+  assert.equal(heldRow.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled, true);
+  assert.equal(rows.find((row) => row.textContent!.includes('Free one'))!.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled, false);
+  await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!, 'renamed in the catalogue');
+  // A title the challenge already holds is flagged (the message goes to a toast) and can't be added again.
+  const typed = document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!;
+  assert.equal(typed.getAttribute('aria-invalid'), 'true');
+  assert.equal(typed.parentElement!.querySelector<HTMLButtonElement>('button')!.disabled, true);
  } finally {await ui.cleanup();}
 });
 

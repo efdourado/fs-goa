@@ -13,6 +13,7 @@ import {
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
+import { catalogTitle } from "../challenges/items";
 import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/libraries";
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
@@ -342,6 +343,7 @@ export async function createChallenge(
         }
 
         assertNoBuiltInRecommendation(item);
+        const heldName = await catalogTitle(client, catalogItemId, itemTitle);
 
         let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
         for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {
@@ -353,7 +355,7 @@ export async function createChallenge(
           `INSERT INTO challenge_items
             (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, position, metadata, created_at, updated_at)
            VALUES ($1,$2,NULL,$3,$4,$5,$6,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, itemKey, itemTitle, index],
+          [publicId(), id, catalogItemId, itemKey, heldName, index],
         );
       }
     }

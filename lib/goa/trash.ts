@@ -736,6 +736,8 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
         "UPDATE catalog_items SET title=$2, normalized_title=$3, updated_at=now() WHERE id=$1",
         [id, rename, normalizeTitle(rename)],
       );
+      // The challenges that use it carry its name too.
+      await client.query("UPDATE challenge_items SET title=$2, updated_at=now() WHERE catalog_item_id=$1", [id, rename]);
     }
     if (rename && kind === "group") {
       await client.query("UPDATE groups SET name=$2, updated_at=now() WHERE id=$1", [id, rename]);

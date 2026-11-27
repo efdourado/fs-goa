@@ -1207,7 +1207,7 @@ export async function updateCatalogLibraryProperty(
 
 /**
  * Applies whichever of title/author/year/main genre/pages the body actually sets,
- * leaving the rest untouched. Shared by the catalog item's own PATCH route and
+ * leaving the rest untouched; a new title also renames the item in every challenge that uses it. Shared by the catalog item's own PATCH route and
  * by editing a challenge item's linked catalog entry from inside a challenge.
  */
 export async function applyCatalogItemUpdate(
@@ -1249,6 +1249,14 @@ export async function applyCatalogItemUpdate(
     await client.query(
       `UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND group_id = $2`,
       params,
+    );
+  }
+  // Every challenge that uses the item keeps its own copy of the name (what rankings, results and the
+  // showcase read): a rename reaches all of them at once. Everything else is read live from the item.
+  if (title !== undefined) {
+    await client.query(
+      "UPDATE challenge_items SET title = $2, updated_at = now() WHERE catalog_item_id = $1 AND title IS DISTINCT FROM $2",
+      [catalogItemId, title],
     );
   }
   if (kind && body.attributes) await setCatalogItemAttributeValues(client, catalogItemId, groupId, kind, body.attributes);

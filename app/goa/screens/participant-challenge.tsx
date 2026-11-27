@@ -2041,6 +2041,7 @@ export function ParticipantChallengeScreen({
       {addingItems && itemTools ? (
         <AddItemsDialog
           members={itemTools.members}
+          held={challenge.items.map((item) => ({ title: item.title, catalogItemId: item.catalogItem?.id }))}
           scope={itemTools.scope}
           libraries={challenge.libraries ?? []}
 

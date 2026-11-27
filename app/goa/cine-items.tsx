@@ -269,8 +269,13 @@ function useRowSummary() {
 }
 
 /** The add dialog used while creating a challenge and when adding to a saved challenge. */
-function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, ...shared }: EditorShared & {
+/** An item the challenge already holds: what "already on the list" and a repeated title are checked against. */
+export interface HeldItem { title: string; catalogItemId?: Id | null }
+
+function ItemsDraftDialog({ existing = [], held = [], onSave, onClose, note, checkpoints, ...shared }: EditorShared & {
   existing?: CineRow[];
+  /** Items already saved in the challenge. Unlike `existing` (rows of the same unsaved draft) they don't count toward a batch. */
+  held?: HeldItem[];
   onSave: (rows: CineRow[], stageId: Id | null) => void | Promise<void>;
   onClose: () => void;
   note?: string;
@@ -308,9 +313,9 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
 
   const hasTitle = Boolean(pending.title.trim());
   const titleKey = (title: string) => title.trim().toLowerCase();
-  const knownTitles = new Set([...existing, ...draft].map((row) => titleKey(row.title)));
+  const knownTitles = new Set([...held, ...existing, ...draft].map((row) => titleKey(row.title)));
   const duplicate = hasTitle && knownTitles.has(titleKey(pending.title));
-  const used = new Set(existing.map((row) => row.catalogItemId));
+  const used = new Set([...held, ...existing].flatMap((row) => row.catalogItemId ? [row.catalogItemId] : []));
   const selected = new Set(draft.map((row) => row.catalogItemId));
   const manualRows = draft.filter((row) => !row.catalogItemId);
   const rows = hasTitle ? [...draft, pending] : draft;
@@ -425,6 +430,8 @@ function ItemsDraftDialog({ existing = [], onSave, onClose, note, checkpoints, .
 
 export function AddItemsDialog({ onAdd, checkpoints, ...props }: EditorShared & {
   onAdd: (items: ChallengeItemInput[]) => Promise<void>;
+  /** What the challenge already holds, marked as already on the list and never added twice. */
+  held: HeldItem[];
   onClose: () => void;
   note?: string;
   checkpoints?: Array<{ id: Id; title: string }>;
