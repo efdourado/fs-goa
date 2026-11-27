@@ -12,7 +12,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { Button, CircleCheckIcon, CircleMinusIcon, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
+import { Button, CircleCheckIcon, CircleMinusIcon, cx, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "minutes", "date", "boolean"];
@@ -167,7 +167,6 @@ export function LibraryPropertiesDialog({
   onDeleted?: (name: string) => void;
 }) {
   const t = useTranslations("libraries");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const csrf = useCsrf();
   const libraryName = useLibraryName();
@@ -428,9 +427,9 @@ export function LibraryPropertiesDialog({
                     <PropertyForm
                       key={property.key}
                       title={t("propertyFormEdit")}
-                      submitLabel={tc("save")}
+                      submitLabel={t("addProperty")}
                       initial={{ label: nameOf(property), type: property.type, unit: property.unit ?? "" }}
-                      typeLock={property.storage === "native" ? t("propertyTypeBuiltIn") : (property.filled ?? 0) > 0 ? t("propertyTypeHasValues") : null}
+                      types={typesFor(property)}
                       onCancel={() => setEditing(null)}
                       onSubmit={(draft) => saveProperty(property, draft)}
                     />
@@ -497,12 +496,17 @@ export function LibraryPropertiesDialog({
  * each value. Minutes are typed as minutes and shown in hours ("2h12"). A built-in column keeps its type, and a
  * property that already holds values keeps its type.
  */
-function PropertyForm({ title, submitLabel, initial, typeLock = null, onCancel, onSubmit }: {
+/** The types an existing property can switch to: any while it holds nothing, none for a built-in column or once filled. */
+function typesFor(property: LibraryProperty): PropertyType[] {
+  return property.storage === "native" || (property.filled ?? 0) > 0 ? [] : PROPERTY_TYPES;
+}
+
+function PropertyForm({ title, submitLabel, initial, types = PROPERTY_TYPES, onCancel, onSubmit }: {
   title: string;
   submitLabel: string;
   initial: PropertyDraft;
-  /** Why the type can't change here, or `null` when it can. */
-  typeLock?: string | null;
+  /** The types it can be; with one or none the type isn't offered at all. */
+  types?: PropertyType[];
   onCancel: () => void;
   onSubmit: (draft: PropertyDraft) => Promise<void>;
 }) {
@@ -536,18 +540,21 @@ function PropertyForm({ title, submitLabel, initial, typeLock = null, onCancel, 
 
   return (
     <form className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-4" onSubmit={(event) => void submit(event)}>
-      <p className="mb-3 text-sm font-light text-[var(--ink)]">{title}</p>
+      <p className="mb-3 border-b border-[var(--line)] pb-3 text-sm font-light text-[var(--ink)]">{title}</p>
       <fieldset disabled={busy} className="grid min-w-0 gap-3 sm:grid-cols-2">
         <label><span className="sr-only">{t("propertyNameLabel")}</span><input className={inputClass} value={draft.label} maxLength={80} required placeholder={t("propertyNamePlaceholder")} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label>
-        <Select ariaLabel={t("propertyTypeLabel")} value={draft.type} disabled={Boolean(typeLock)} onChange={(type) => pickType(type as PropertyType)} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
-        {typeLock ? <p className="text-xs text-[var(--muted)] sm:col-span-2">{typeLock}</p> : null}
+        {types.length > 1 ? <Select ariaLabel={t("propertyTypeLabel")} value={draft.type} onChange={(type) => pickType(type as PropertyType)} options={types.map((type) => ({ value: type, label: t(`type.${type}`) }))} /> : (
+          // A type that can't change still says what it is, read-only beside the name.
+          <div className={cx(inputClass, "flex cursor-not-allowed select-none items-center !bg-[var(--wash-strong)] !text-[var(--muted)]")} aria-label={t("propertyTypeLabel")} aria-disabled="true">{t(`type.${draft.type}`)}</div>
+        )}
+        {types.length > 1 ? null : <p className="-mt-1 text-xs text-[var(--muted)] sm:col-span-2">{t("propertyTypeFixed")}</p>}
         {draft.type === "number" ? (
           <Field className="sm:col-span-2" label={tf("unit")} optional>
             <input className={inputClass} value={draft.unit} maxLength={12} placeholder={t("unitPlaceholder")} onChange={(event) => setDraft({ ...draft, unit: event.target.value })} />
           </Field>
         ) : null}
         {error ? <div className="sm:col-span-2"><StatusMessage error={error} /></div> : null}
-        <div className="flex items-center justify-end gap-1 sm:col-span-2">
+        <div className="mt-1 flex items-center justify-end gap-1 border-t border-[var(--line)] pt-3 sm:col-span-2">
           <StateButton type="button" onClick={onCancel} className="h-9 cursor-pointer rounded-full px-3.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">{tc("cancel")}</StateButton>
           <StateButton type="submit" className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--ink)] pl-3 pr-4 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:opacity-40">
             <CircleCheckIcon className="h-4 w-4" />

@@ -248,8 +248,10 @@ test('editing a library from manual creation preserves the draft and the selecte
     await act(async () => ui.button('Name').click());
     // The property opens in a little form inside the library's own modal.
     assert.equal(document.querySelectorAll('dialog').length, 1);
-    const saveProperty = ui.button('Salvar');
-    assert.equal(saveProperty.textContent, 'Salvar');
+    const saveProperty = ui.button('Ok');
+    assert.equal(saveProperty.textContent, 'Ok');
+    // A built-in column keeps its type, so the form doesn't offer one.
+    assert.match(saveProperty.closest('form')!.textContent ?? '', /O tipo não pode mudar\./);
     await ui.fill(saveProperty.closest('form')!.querySelector('input')!, 'Item name');
     await act(async () => saveProperty.closest('form')!.requestSubmit());
     assert.deepEqual(renamedProperties, ['Item name']);
