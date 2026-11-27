@@ -22,7 +22,7 @@ const NATIVE_FIELD: Record<string, { field: keyof CatalogItem; body: string; int
 /** What a film/book library offers before it has ever been saved — the built-in columns, in their usual order. */
 export function builtInProperties(kind: string): LibraryProperty[] {
   const keys = kind === "film"
-    ? [["title", "text"], ["year", "number"], ["main_genre", "text"], ["runtime_minutes", "number"]]
+    ? [["title", "text"], ["year", "number"], ["main_genre", "text"], ["runtime_minutes", "minutes"]]
     : kind === "book"
       ? [["title", "text"], ["author", "text"], ["year", "number"], ["main_genre", "text"], ["page_count", "number"]]
       : [["title", "text"]];
@@ -140,7 +140,7 @@ export function bodyFromValues(
     }
     const key = property.attributeKey ?? property.key;
     if (!raw) { if (mode === "update") attributes[key] = ""; continue; }
-    attributes[key] = property.type === "number" ? Number(raw) : property.type === "boolean" ? raw === "true" : raw;
+    attributes[key] = property.type === "number" || property.type === "minutes" ? Number(raw) : property.type === "boolean" ? raw === "true" : raw;
   }
   return { native, attributes };
 }
@@ -165,7 +165,10 @@ export function PropertyInputs({
     <div className="grid gap-4 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
       {visible.map((property) => {
         const value = values[property.key] ?? "";
-        const label = name(property);
+        // A number names its unit right in the label: "Duração (min)".
+        // A number names its unit right in the label ("Distância (km)"); minutes are typed as minutes and shown in hours.
+        const unit = property.type === "minutes" ? "min" : property.type === "number" ? property.unit : null;
+        const label = unit ? `${name(property)} (${unit})` : name(property);
         const native = property.storage === "native" ? NATIVE_FIELD[property.key] : undefined;
         return (
           <Field key={property.key} label={label}>
@@ -175,8 +178,8 @@ export function PropertyInputs({
             ) : (
               <input
                 className={inputClass}
-                type={property.type === "number" ? "number" : property.type === "date" ? "date" : "text"}
-                inputMode={property.type === "number" ? "numeric" : undefined}
+                type={property.type === "number" || property.type === "minutes" ? "number" : property.type === "date" ? "date" : "text"}
+                inputMode={property.type === "number" || property.type === "minutes" ? "numeric" : undefined}
                 value={value}
                 disabled={disabled}
                 maxLength={property.type === "text" ? (native?.maxLength ?? 500) : undefined}

@@ -3,7 +3,7 @@
 import { StateButton } from "./state-button";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { API_PATHS, ApiError, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
@@ -12,11 +12,12 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { ArrowField, Button, CircleMinusIcon, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
+import { Button, CircleCheckIcon, CircleMinusIcon, Field, inputClass, ListMoreButton, Select, StatusMessage } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
-const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
-const propertySelectClass = "max-w-[55%] rounded-full border border-[var(--line)] py-1.5 pl-3 pr-2 text-xs text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)]";
+const PROPERTY_TYPES: PropertyType[] = ["text", "number", "minutes", "date", "boolean"];
+/** What the property form edits: a name, a type and, for a number, the unit it is counted in. */
+interface PropertyDraft { label: string; type: PropertyType; unit: string }
 /** How many properties the settings dialog lists before "show all". */
 const VISIBLE_PROPERTIES = 4;
 
@@ -174,10 +175,8 @@ export function LibraryPropertiesDialog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{ key: string; label: string; type: PropertyType } | null>(null);
-  const [newLabel, setNewLabel] = useState("");
-  const [newType, setNewType] = useState<PropertyType>("text");
-  const [adding, setAdding] = useState(false);
+  // The property open in the form, by key; `addOpen` opens the same form empty.
+  const [editing, setEditing] = useState<string | null>(null);
   // Its name, edited in place like a property's: saved on blur or Enter.
   const currentName = libraryName(library);
   const [name, setName] = useState(currentName);
@@ -277,12 +276,21 @@ export function LibraryPropertiesDialog({
     }
   }
 
-  async function saveProperty(property: LibraryProperty) {
-    if (!editing) return;
-    const label = editing.label.trim();
-    if (!label) { setError(t("propertyNameRequired")); return; }
-    const saved = await patch(property, { label, ...(editing.type !== property.type ? { type: editing.type } : {}) }, t("propertySaved"));
-    if (saved) setEditing(null);
+  async function saveProperty(property: LibraryProperty, draft: PropertyDraft) {
+    const unit = draft.type === "number" ? draft.unit.trim() || null : null;
+    await apiRequest(API_PATHS.libraryProperty(library.id, property.key), {
+      method: "PATCH",
+      csrfToken: csrf,
+      body: {
+        label: draft.label.trim(),
+        ...(draft.type !== property.type ? { type: draft.type } : {}),
+        ...(property.storage === "native" || unit === (property.unit ?? null) ? {} : { unit }),
+      },
+    });
+    setEditing(null);
+    await load();
+    onChanged();
+    setSuccess(t("propertySaved"));
   }
 
   async function move(index: number, delta: -1 | 1) {
@@ -341,28 +349,18 @@ export function LibraryPropertiesDialog({
     }
   }
 
-  async function addProperty() {
-    const label = newLabel.trim();
-    if (!label) { setError(t("propertyNameRequired")); return; }
-    setAdding(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await apiRequest<CatalogAttributeDef>(API_PATHS.catalogWorkspace(scope).attributes, {
-        method: "POST", body: { libraryId: library.id, label, type: newType }, csrfToken: csrf,
-      });
-      setNewLabel("");
-      setNewType("text");
-      setAddOpen(false);
-      await load();
-      onChanged();
-      setSuccess(t("propertyAdded"));
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setAdding(false);
-    }
+  async function addProperty(draft: PropertyDraft) {
+    await apiRequest<CatalogAttributeDef>(API_PATHS.catalogWorkspace(scope).attributes, {
+      method: "POST",
+      csrfToken: csrf,
+      body: { libraryId: library.id, label: draft.label.trim(), type: draft.type, ...(draft.type === "number" && draft.unit.trim() ? { unit: draft.unit.trim() } : {}) },
+    });
+    setAddOpen(false);
+    await load();
+    onChanged();
+    setSuccess(t("propertyAdded"));
   }
+
 
   const sectionTitle = "mb-2.5 text-[13px] font-medium text-[var(--ink)]";
   const shown = properties ? (showAll ? properties : properties.slice(0, VISIBLE_PROPERTIES)) : [];
@@ -372,11 +370,11 @@ export function LibraryPropertiesDialog({
       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="8" cy="8" r="5.8" /><path d="M5.6 8.2l1.7 1.700 3.200-3.500" />
       </svg>
-    ) : type === "number" ? "123" : type === "date" ? "31" : "Aa"
+    ) : type === "number" ? "123" : type === "minutes" ? "h" : type === "date" ? "31" : "Aa"
   );
 
   return (
-    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || adding || nameBusy || deleteBusy}>
+    <Dialog title={currentName} onClose={onClose} busy={busyKey !== null || nameBusy || deleteBusy}>
       <StatusMessage error={error} success={success} />
 
       {canEdit ? (
@@ -408,11 +406,14 @@ export function LibraryPropertiesDialog({
               <li key={property.key} className="px-3 py-2.5 transition-colors hover:bg-[var(--wash)] focus-within:bg-[var(--wash)]">
                 <div className="flex items-center gap-2.5">
                   <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash)] text-[11px] font-medium text-[var(--muted)]" aria-hidden="true">{typeIcon(property.type)}</span>
-                  <StateButton type="button" disabled={!canEdit || busyKey !== null} aria-expanded={editing?.key === property.key} onClick={() => {
+                  <StateButton type="button" disabled={!canEdit || busyKey !== null} aria-expanded={editing === property.key} onClick={() => {
+                    setError(null);
+                    setSuccess(null);
                     setAddOpen(false);
-                    setEditing((current) => current?.key === property.key ? null : { key: property.key, label: nameOf(property), type: property.type });
+                    setEditing((current) => current === property.key ? null : property.key);
                   }} className="min-h-10 min-w-0 flex-1 cursor-pointer rounded-lg px-1.5 text-left text-sm font-medium disabled:cursor-default">
                     <span className="block truncate">{nameOf(property)}</span>
+                    {property.unit ? <span className="block truncate text-xs font-normal text-[var(--muted)]">{property.unit}</span> : null}
                   </StateButton>
                   {canEdit ? (
                     <div className="flex flex-none items-center">
@@ -422,13 +423,18 @@ export function LibraryPropertiesDialog({
                     </div>
                   ) : null}
                 </div>
-                {editing?.key === property.key ? (
-                  <form className="space-y-3 pb-1 pt-3" onSubmit={(event) => { event.preventDefault(); void saveProperty(property); }}>
-                    <ArrowField key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
-                    {property.storage === "attribute" && !(property.filled ?? 0) ? (
-                      <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={editing.type} disabled={busyKey !== null} onChange={(type) => setEditing({ ...editing, type: type as PropertyType })} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
-                    ) : null}
-                  </form>
+                {editing === property.key ? (
+                  <div className="pb-1 pt-3">
+                    <PropertyForm
+                      key={property.key}
+                      title={t("propertyFormEdit")}
+                      submitLabel={tc("save")}
+                      initial={{ label: nameOf(property), type: property.type, unit: property.unit ?? "" }}
+                      typeLock={property.storage === "native" ? t("propertyTypeBuiltIn") : (property.filled ?? 0) > 0 ? t("propertyTypeHasValues") : null}
+                      onCancel={() => setEditing(null)}
+                      onSubmit={(draft) => saveProperty(property, draft)}
+                    />
+                  </div>
                 ) : null}
                 {erasing === property.key ? <div className="mt-3"><DeleteConfirm body={t("eraseBody", { name: nameOf(property), count: property.filled ?? 0 })} onConfirm={async () => { setErasing(null); await removeProperty(property); }} /></div> : null}
               </li>
@@ -443,14 +449,17 @@ export function LibraryPropertiesDialog({
             {canEdit ? (
               <li>
                 {addOpen ? (
-                  <form className="space-y-3 px-3 py-3" onSubmit={(event) => { event.preventDefault(); void addProperty(); }}>
-                    <ArrowField value={newLabel} onChange={setNewLabel} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={t("addProperty")} maxLength={80} disabled={adding} takesCursor />
-                    <div className="flex items-center gap-3 px-1">
-                      <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={newType} disabled={adding} onChange={(type) => setNewType(type as PropertyType)} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
-                    </div>
-                  </form>
+                  <div className="p-3">
+                    <PropertyForm
+                      title={t("propertyFormAdd")}
+                      submitLabel={t("addProperty")}
+                      initial={{ label: "", type: "text", unit: "" }}
+                      onCancel={() => setAddOpen(false)}
+                      onSubmit={addProperty}
+                    />
+                  </div>
                 ) : (
-                  <StateButton type="button" onClick={() => { setEditing(null); setAddOpen(true); }} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                  <StateButton type="button" onClick={() => { setError(null); setSuccess(null); setEditing(null); setAddOpen(true); }} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
                     <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-dashed border-[var(--line)]" aria-hidden="true">＋</span>
                     {t("addPropertyTitle")}
                   </StateButton>
@@ -477,6 +486,75 @@ export function LibraryPropertiesDialog({
           ) : null}
         </div>
       ) : null}
+
     </Dialog>
+  );
+}
+
+/**
+ * Add or edit one property right inside the library's modal, in the same little form a challenge adds a field
+ * with: a name and a type side by side and, for a number, the unit it is counted in ("km"), only shown beside
+ * each value. Minutes are typed as minutes and shown in hours ("2h12"). A built-in column keeps its type, and a
+ * property that already holds values keeps its type.
+ */
+function PropertyForm({ title, submitLabel, initial, typeLock = null, onCancel, onSubmit }: {
+  title: string;
+  submitLabel: string;
+  initial: PropertyDraft;
+  /** Why the type can't change here, or `null` when it can. */
+  typeLock?: string | null;
+  onCancel: () => void;
+  onSubmit: (draft: PropertyDraft) => Promise<void>;
+}) {
+  const t = useTranslations("libraries");
+  const tf = useTranslations("fields");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [draft, setDraft] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Picking minutes names a nameless property "Duração"; it renames it back while the name is still that suggestion.
+  const minutesName = t("minutesName");
+  function pickType(type: PropertyType) {
+    const label = draft.label.trim();
+    const next = type === "minutes" && !label ? minutesName : type !== "minutes" && label === minutesName && initial.label !== minutesName ? "" : draft.label;
+    setDraft({ ...draft, type, label: next });
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.label.trim()) { setError(t("propertyNameRequired")); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit(draft);
+    } catch (cause) {
+      setError(f.error(cause));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-4" onSubmit={(event) => void submit(event)}>
+      <p className="mb-3 text-sm font-light text-[var(--ink)]">{title}</p>
+      <fieldset disabled={busy} className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <label><span className="sr-only">{t("propertyNameLabel")}</span><input className={inputClass} value={draft.label} maxLength={80} required placeholder={t("propertyNamePlaceholder")} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></label>
+        <Select ariaLabel={t("propertyTypeLabel")} value={draft.type} disabled={Boolean(typeLock)} onChange={(type) => pickType(type as PropertyType)} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
+        {typeLock ? <p className="text-xs text-[var(--muted)] sm:col-span-2">{typeLock}</p> : null}
+        {draft.type === "number" ? (
+          <Field className="sm:col-span-2" label={tf("unit")} optional>
+            <input className={inputClass} value={draft.unit} maxLength={12} placeholder={t("unitPlaceholder")} onChange={(event) => setDraft({ ...draft, unit: event.target.value })} />
+          </Field>
+        ) : null}
+        {error ? <div className="sm:col-span-2"><StatusMessage error={error} /></div> : null}
+        <div className="flex items-center justify-end gap-1 sm:col-span-2">
+          <StateButton type="button" onClick={onCancel} className="h-9 cursor-pointer rounded-full px-3.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">{tc("cancel")}</StateButton>
+          <StateButton type="submit" className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--ink)] pl-3 pr-4 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:opacity-40">
+            <CircleCheckIcon className="h-4 w-4" />
+            {busy ? tc("saving") : submitLabel}
+          </StateButton>
+        </div>
+      </fieldset>
+    </form>
   );
 }

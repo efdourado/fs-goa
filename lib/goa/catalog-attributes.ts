@@ -70,8 +70,9 @@ async function ensureCatalogLibrary(
  * defining or archiving an attribute needs to manage it.
  */
 
-export type CatalogAttributeType = "text" | "number" | "date" | "boolean";
-const ATTRIBUTE_TYPES = new Set<string>(["text", "number", "date", "boolean"]);
+/** `minutes` is a whole number of minutes, stored as a number and shown in hours ("2h12"). */
+export type CatalogAttributeType = "text" | "number" | "minutes" | "date" | "boolean";
+const ATTRIBUTE_TYPES = new Set<string>(["text", "number", "minutes", "date", "boolean"]);
 
 export interface CatalogAttributeDef {
   id: string;
@@ -79,6 +80,8 @@ export interface CatalogAttributeDef {
   key: string;
   label: string;
   type: CatalogAttributeType;
+  /** A number's unit ("km", "min"), shown beside the value and never converted. */
+  unit: string | null;
   position: number;
   hidden: boolean;
 }
@@ -88,10 +91,26 @@ export interface CatalogAttributeValue {
   label: string;
   type: CatalogAttributeType;
   value: string | number | boolean;
+  unit?: string | null;
 }
 
-function mapDef(row: { id: string; kind: string; semantic_key: string; label: string; type: string; position: number; hidden: boolean }): CatalogAttributeDef {
-  return { id: row.id, kind: row.kind, key: row.semantic_key, label: row.label, type: row.type as CatalogAttributeType, position: row.position, hidden: row.hidden };
+type DefRow = { id: string; kind: string; semantic_key: string; label: string; type: string; unit: string | null; position: number; hidden: boolean };
+function mapDef(row: DefRow): CatalogAttributeDef {
+  return { id: row.id, kind: row.kind, key: row.semantic_key, label: row.label, type: row.type as CatalogAttributeType, unit: row.unit, position: row.position, hidden: row.hidden };
+}
+
+/**
+ * A number property's unit from a request body: `undefined` when absent, `null` to clear it, otherwise 1–12
+ * characters ("km", "min").
+ */
+export function unitValue(input: unknown): string | null | undefined {
+  if (input === undefined) return undefined;
+  if (input === null) return null;
+  if (typeof input !== "string") throw new ApiError(400, "invalid_unit", "Unidade inválida.");
+  const unit = input.trim();
+  if (!unit) return null;
+  if (unit.length > 12) throw new ApiError(400, "invalid_unit", "A unidade tem no máximo 12 caracteres.");
+  return unit;
 }
 
 /**
@@ -105,11 +124,11 @@ export async function listDefsWithClient(
   kind?: string,
   includeHidden = false,
 ): Promise<CatalogAttributeDef[]> {
-  const rows = await client.query<{ id: string; kind: string; semantic_key: string; label: string; type: string; position: number; hidden: boolean }>(
+  const rows = await client.query<DefRow>(
     kind
-      ? `SELECT id, kind, semantic_key, label, type, position, hidden FROM catalog_attribute_defs
+      ? `SELECT id, kind, semantic_key, label, type, unit, position, hidden FROM catalog_attribute_defs
           WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL AND ($3::boolean OR NOT hidden) ORDER BY position`
-      : `SELECT id, kind, semantic_key, label, type, position, hidden FROM catalog_attribute_defs
+      : `SELECT id, kind, semantic_key, label, type, unit, position, hidden FROM catalog_attribute_defs
           WHERE group_id = $1 AND archived_at IS NULL AND ($2::boolean OR NOT hidden) ORDER BY kind, position`,
     kind ? [groupId, kind, includeHidden] : [groupId, includeHidden],
   );
@@ -139,7 +158,7 @@ export async function updateAttributeDef(
   actorUserId: string,
   groupId: string,
   defId: string,
-  patch: { label?: string; hidden?: boolean; position?: number; type?: CatalogAttributeType },
+  patch: { label?: string; hidden?: boolean; position?: number; type?: CatalogAttributeType; unit?: string | null },
 ): Promise<void> {
   const def = await oneOrNull<{ label: string; type: CatalogAttributeType }>(
     client,
@@ -154,7 +173,9 @@ export async function updateAttributeDef(
   }
   const sets: string[] = [];
   const params: unknown[] = [defId];
-  for (const [column, value] of [["label", patch.label], ["hidden", patch.hidden], ["position", patch.position], ["type", patch.type]] as const) {
+  // Only a number has a unit: switching to another type drops it.
+  const unit = (patch.type ?? def.type) === "number" ? patch.unit : patch.type !== undefined ? null : undefined;
+  for (const [column, value] of [["label", patch.label], ["hidden", patch.hidden], ["position", patch.position], ["type", patch.type], ["unit", unit]] as const) {
     if (value !== undefined) {
       params.push(value);
       sets.push(`${column} = $${params.length}`);
@@ -175,6 +196,7 @@ async function insertDef(
   const label = stringValue(body, "label", { min: 1, max: 80 })!;
   const type = typeof body.type === "string" ? body.type : "text";
   if (!ATTRIBUTE_TYPES.has(type)) throw new ApiError(400, "invalid_type", "Tipo de atributo inválido.");
+  const unit = type === "number" ? unitValue(body.unit) ?? null : null;
 
   await ensureCatalogLibrary(client, groupId, kind, actorUserId);
   const existing = await client.query<{ semantic_key: string }>(
@@ -197,12 +219,12 @@ async function insertDef(
   const id = publicId();
   await client.query(
     `INSERT INTO catalog_attribute_defs
-      (id, group_id, kind, semantic_key, label, type, position, created_by_user_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now(),now())`,
-    [id, groupId, kind, key, label, type, position, actorUserId],
+      (id, group_id, kind, semantic_key, label, type, unit, position, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())`,
+    [id, groupId, kind, key, label, type, unit, position, actorUserId],
   );
-  await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_created", "catalog_attribute_def", id, null, { kind, label, type });
-  return { id, kind, key, label, type: type as CatalogAttributeType, position, hidden: false };
+  await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_created", "catalog_attribute_def", id, null, { kind, label, type, unit });
+  return { id, kind, key, label, type: type as CatalogAttributeType, unit, position, hidden: false };
 }
 
 async function archiveDefWithClient(client: PoolClient, actorUserId: string, groupId: string, defId: string): Promise<void> {
@@ -258,7 +280,7 @@ export async function setCatalogItemAttributeValues(
     let numberValue: number | null = null;
     let dateValue: string | null = null;
     let booleanValue: boolean | null = null;
-    if (def.type === "number") {
+    if (def.type === "number" || def.type === "minutes") {
       const parsed = Number(rawValue);
       if (!Number.isFinite(parsed)) throw new ApiError(400, "invalid_attribute_value", `"${def.label}" precisa de um número.`);
       numberValue = Math.round(parsed);
@@ -286,7 +308,7 @@ export async function setCatalogItemAttributeValues(
 }
 
 type AttributeValueRow = {
-  catalog_item_id: string; key: string; label: string; type: string;
+  catalog_item_id: string; key: string; label: string; type: string; unit: string | null;
   text_value: string | null; number_value: number | null; date_value: string | null; boolean_value: boolean | null;
 };
 
@@ -294,13 +316,13 @@ type AttributeValueRow = {
 function attributeValueMap(rows: AttributeValueRow[]): Map<string, CatalogAttributeValue[]> {
   const map = new Map<string, CatalogAttributeValue[]>();
   for (const row of rows) {
-    const value = row.type === "number" ? row.number_value
+    const value = row.type === "number" || row.type === "minutes" ? row.number_value
       : row.type === "date" ? row.date_value
       : row.type === "boolean" ? row.boolean_value
       : row.text_value;
     if (value === null) continue;
     const list = map.get(row.catalog_item_id) ?? [];
-    list.push({ key: row.key, label: row.label, type: row.type as CatalogAttributeType, value });
+    list.push({ key: row.key, label: row.label, type: row.type as CatalogAttributeType, value, ...(row.type === "number" && row.unit ? { unit: row.unit } : {}) });
     map.set(row.catalog_item_id, list);
   }
   return map;
@@ -309,7 +331,7 @@ function attributeValueMap(rows: AttributeValueRow[]): Map<string, CatalogAttrib
 // `date_value::text`: a plain date must stay the calendar day that was
 // stored — the driver would otherwise hand back a Date at local midnight,
 // which serializes as a different instant depending on the server's zone.
-const ATTRIBUTE_VALUE_COLUMNS = `v.catalog_item_id, d.semantic_key AS key, d.label, d.type,
+const ATTRIBUTE_VALUE_COLUMNS = `v.catalog_item_id, d.semantic_key AS key, d.label, d.type, d.unit,
             v.text_value, v.number_value, v.date_value::text AS date_value, v.boolean_value`;
 
 /** Batch-loads every filled-in attribute value for a set of catalog items. */

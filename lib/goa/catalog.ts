@@ -9,6 +9,7 @@ import {
   attributeValuesForWorkspace,
   listDefsWithClient,
   setCatalogItemAttributeValues,
+  unitValue,
   updateAttributeDef,
   type CatalogAttributeType,
 } from "./catalog-attributes";
@@ -968,7 +969,7 @@ type NativePropertyType = CatalogAttributeType;
 const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: NativePropertyType }>> = {
   film: [
     { key: "title", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" },
+    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "minutes" },
   ],
   book: [
     { key: "title", type: "text" }, { key: "author", type: "text" }, { key: "year", type: "number" },
@@ -994,6 +995,8 @@ export interface LibraryProperty {
   filled: number;
   /** Custom properties only: the stable key an item's saved value is stored under. */
   attributeKey?: string;
+  /** A custom number's unit ("km"), shown beside each value and never converted. */
+  unit?: string | null;
 }
 
 /** Where each built-in property keeps its value on `catalog_items` — what "filled" counts and what switching it off clears. */
@@ -1070,7 +1073,7 @@ async function listLibraryPropertiesWithClient(
     ...defs.map((def) => ({
       key: def.id, storage: "attribute" as const, label: def.label, type: def.type,
       hidden: def.hidden, position: def.position + 10, canHide: true, sort: def.position + 10, attributeKey: def.key,
-      filled: attributeCounts.get(def.id) ?? 0,
+      filled: attributeCounts.get(def.id) ?? 0, ...(def.type === "number" ? { unit: def.unit } : {}),
     })),
   ];
   return properties.sort((a, b) => a.sort - b.sort).map(({ sort, ...property }) => { void sort; return property; });
@@ -1141,10 +1144,14 @@ export async function updateCatalogLibraryProperty(
     }
 
     const type = Object.hasOwn(body, "type") ? body.type : undefined;
-    if (type !== undefined && !["text", "number", "date", "boolean"].includes(type as string)) {
+    if (type !== undefined && !["text", "number", "minutes", "date", "boolean"].includes(type as string)) {
       throw new ApiError(400, "invalid_type", "Tipo de propriedade inválido.");
     }
+    const unit = unitValue(body.unit);
     if (isNative) {
+      if (unit) {
+        throw new ApiError(400, "property_unit_fixed", "Esta propriedade não tem unidade.");
+      }
       if (type !== undefined && type !== nativePropertiesFor(library.kind).find((property) => property.key === propertyKey)?.type) {
         throw new ApiError(400, "property_type_fixed", "Esta propriedade mantém seu tipo original.");
       }
@@ -1185,7 +1192,7 @@ export async function updateCatalogLibraryProperty(
         throw new ApiError(400, "invalid_property", "Uma propriedade personalizada precisa de um nome e de uma posição.");
       }
       if (hidden === true) await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [propertyKey, library.group_id]);
-      await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, type: type as CatalogAttributeType | undefined, position: position === undefined ? undefined : position });
+      await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, type: type as CatalogAttributeType | undefined, unit, position: position === undefined ? undefined : position });
     }
 
     const properties = await listLibraryPropertiesWithClient(client, library.group_id, library);

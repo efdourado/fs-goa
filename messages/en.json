@@ -1740,6 +1740,7 @@
     "type": {
       "text": "Text",
       "number": "Number",
+      "minutes": "Minutes",
       "date": "Date",
       "boolean": "Yes or no",
       "schedule": "Date"
@@ -1761,13 +1762,17 @@
     "propertyTypeBuiltIn": "This standard property has a fixed type.",
     "propertyTypeHasValues": "The type cannot change while this property has saved values.",
     "propertyTypeLabel": "Type",
-    "addProperty": "Add",
+    "minutesName": "Runtime",
+    "unitPlaceholder": "km, kg, pages…",
+    "addProperty": "Ok",
+    "propertyFormAdd": "What else does each item hold?",
+    "propertyFormEdit": "Adjust property",
     "native": {
       "title": "Name",
       "year": "Year",
       "author": "Author",
       "main_genre": "Main genre",
-      "runtime_minutes": "Runtime (minutes)",
+      "runtime_minutes": "Runtime",
       "page_count": "Pages",
       "scheduled_at": "Date",
       "recommended_by": "Recommended by"

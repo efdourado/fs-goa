@@ -31,7 +31,7 @@ const PAGE_SIZE = 30;
 const FACET_SIZE = 6;
 
 function propertyOrder(type: LibraryProperty["type"]) {
-  if (type === "number") return (left: string, right: string) => Number(right) - Number(left);
+  if (type === "number" || type === "minutes") return (left: string, right: string) => Number(right) - Number(left);
   if (type === "date") return (left: string, right: string) => right.localeCompare(left);
   return (left: string, right: string) => left.localeCompare(right);
 }

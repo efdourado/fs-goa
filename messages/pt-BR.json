@@ -1740,6 +1740,7 @@
     "type": {
       "text": "Texto",
       "number": "Número",
+      "minutes": "Minutos",
       "date": "Data",
       "boolean": "Sim ou não",
       "schedule": "Data"
@@ -1761,13 +1762,17 @@
     "propertyTypeBuiltIn": "O tipo deste campo padrão é fixo.",
     "propertyTypeHasValues": "O tipo não pode mudar enquanto esta propriedade tiver valores preenchidos.",
     "propertyTypeLabel": "Tipo",
-    "addProperty": "Adicionar",
+    "minutesName": "Duração",
+    "unitPlaceholder": "km, kg, páginas…",
+    "addProperty": "Ok",
+    "propertyFormAdd": "O que mais cada item guarda?",
+    "propertyFormEdit": "Ajustar propriedade",
     "native": {
       "title": "Nome",
       "year": "Ano",
       "author": "Autor",
       "main_genre": "Gênero principal",
-      "runtime_minutes": "Duração (minutos)",
+      "runtime_minutes": "Duração",
       "page_count": "Páginas",
       "scheduled_at": "Data",
       "recommended_by": "Indicado por"

@@ -285,6 +285,8 @@ export const catalogAttributeDefs = pgTable(
     semanticKey: text("semantic_key").notNull(),
     label: text("label").notNull(),
     type: text("type").notNull(),
+    // A number's unit ("km", "min"), shown beside the value and never converted.
+    unit: text("unit"),
     position: integer("position").notNull().default(0),
     // Hides the property from normal item forms and displays while keeping
     // every stored value — same meaning as
@@ -307,10 +309,11 @@ export const catalogAttributeDefs = pgTable(
       columns: [table.groupId, table.kind],
       foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
     }).onDelete("restrict"),
-    check("catalog_attribute_defs_type_check", sql`${table.type} in ('text', 'number', 'date', 'boolean')`),
+    check("catalog_attribute_defs_type_check", sql`${table.type} in ('text', 'number', 'minutes', 'date', 'boolean')`),
     check("catalog_attribute_defs_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("catalog_attribute_defs_label_check", sql`char_length(btrim(${table.label})) between 1 and 80`),
     check("catalog_attribute_defs_position_check", sql`${table.position} >= 0`),
+    check("catalog_attribute_defs_unit_check", sql`${table.unit} is null or char_length(btrim(${table.unit})) between 1 and 12`),
   ],
 );
 

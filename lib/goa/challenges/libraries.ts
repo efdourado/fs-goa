@@ -290,8 +290,8 @@ async function copyLibraryColumns(
   );
   await client.query(
     `INSERT INTO catalog_attribute_defs
-       (id, group_id, kind, semantic_key, label, type, position, hidden, created_by_user_id, created_at, updated_at)
-     SELECT gen_random_uuid()::text, $3, $4, d.semantic_key, d.label, d.type, d.position, d.hidden, $5, now(), now()
+       (id, group_id, kind, semantic_key, label, type, unit, position, hidden, created_by_user_id, created_at, updated_at)
+     SELECT gen_random_uuid()::text, $3, $4, d.semantic_key, d.label, d.type, d.unit, d.position, d.hidden, $5, now(), now()
        FROM catalog_attribute_defs d
       WHERE d.group_id = $1 AND d.kind = $2 AND d.archived_at IS NULL
      ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,

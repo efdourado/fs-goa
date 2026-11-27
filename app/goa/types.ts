@@ -149,7 +149,8 @@ export interface CatalogAttributeDef {
   kind: string;
   key: string;
   label: string;
-  type: "text" | "number" | "date" | "boolean";
+  type: "text" | "number" | "minutes" | "date" | "boolean";
+  unit?: string | null;
   position: number;
   hidden?: boolean;
 }
@@ -179,7 +180,7 @@ export interface LibraryProperty {
   key: string;
   storage: "native" | "attribute";
   label: string | null;
-  type: "text" | "number" | "date" | "boolean";
+  type: "text" | "number" | "minutes" | "date" | "boolean";
   hidden: boolean;
   position: number;
   canHide: boolean;
@@ -187,13 +188,16 @@ export interface LibraryProperty {
   filled?: number;
   /** Custom properties only: the key an item's saved value is stored under. */
   attributeKey?: string;
+  /** A number's unit ("min", "km"): shown beside each value, never converted. */
+  unit?: string | null;
 }
 
 export interface CatalogAttributeValue {
   key: string;
   label: string;
-  type: "text" | "number" | "date" | "boolean";
+  type: "text" | "number" | "minutes" | "date" | "boolean";
   value: string | number | boolean;
+  unit?: string | null;
 }
 
 /**

@@ -28,7 +28,7 @@ function organiseProperties(propertiesByKind: PropertiesByKind, name: PropertyNa
     const label = name(property);
     // Native fields with the same display name can be compared across libraries. Custom fields belong to one library.
     const key = JSON.stringify([property.storage === "native" ? null : kind, property.key, property.type, label]);
-    traits.set(key, { key, label, kind: property.type === "number" || property.type === "date" ? "number" : "category", suggest: property.key !== "year" });
+    traits.set(key, { key, label, kind: property.type === "number" || property.type === "minutes" || property.type === "date" ? "number" : "category", suggest: property.key !== "year" });
     return { property, key };
   })]));
   return {

@@ -1744,6 +1744,7 @@
     "type": {
       "text": "Texto",
       "number": "Número",
+      "minutes": "Minutos",
       "date": "Fecha",
       "boolean": "Sí o no",
       "schedule": "Fecha"
@@ -1765,13 +1766,17 @@
     "propertyTypeBuiltIn": "Esta propiedad estándar tiene un tipo fijo.",
     "propertyTypeHasValues": "El tipo no puede cambiar mientras esta propiedad tenga valores guardados.",
     "propertyTypeLabel": "Tipo",
-    "addProperty": "Añadir",
+    "minutesName": "Duración",
+    "unitPlaceholder": "km, kg, páginas…",
+    "addProperty": "Ok",
+    "propertyFormAdd": "¿Qué más guarda cada ítem?",
+    "propertyFormEdit": "Ajustar propiedad",
     "native": {
       "title": "Nombre",
       "year": "Año",
       "author": "Autor",
       "main_genre": "Género principal",
-      "runtime_minutes": "Duración (minutos)",
+      "runtime_minutes": "Duración",
       "page_count": "Páginas",
       "scheduled_at": "Fecha",
       "recommended_by": "Recomendado por"

@@ -246,12 +246,14 @@ test('editing a library from manual creation preserves the draft and the selecte
     assert.equal(document.querySelector('dialog h2')?.textContent, 'Other items');
     assert.doesNotMatch(document.querySelector('dialog')?.textContent ?? '', /Clique para renomear|Capas|No topo da capa|Nota na capa/);
     await act(async () => ui.button('Name').click());
+    // The property opens in a little form inside the library's own modal.
+    assert.equal(document.querySelectorAll('dialog').length, 1);
     const saveProperty = ui.button('Salvar');
-    assert.equal(saveProperty.textContent, '');
-    assert.ok(saveProperty.querySelector('svg[aria-hidden="true"]'));
+    assert.equal(saveProperty.textContent, 'Salvar');
     await ui.fill(saveProperty.closest('form')!.querySelector('input')!, 'Item name');
-    await act(async () => saveProperty.click());
+    await act(async () => saveProperty.closest('form')!.requestSubmit());
     assert.deepEqual(renamedProperties, ['Item name']);
+    assert.equal(document.querySelector('dialog form input[placeholder="Nome da propriedade"]'), null);
     const name = document.querySelector<HTMLInputElement>('dialog input[aria-label="Nome"]')!;
     await act(async () => name.focus());
     await ui.fill(name, 'Renamed items');

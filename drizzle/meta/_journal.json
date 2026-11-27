@@ -561,6 +561,20 @@
       "when": 1795968000000,
       "tag": "0079_drop_challenge_user_prefs",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1796054400000,
+      "tag": "0080_catalog_attribute_unit",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1796140800000,
+      "tag": "0081_catalog_attribute_minutes",
+      "breakpoints": true
     }
   ]
 }

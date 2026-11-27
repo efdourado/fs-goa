@@ -73,6 +73,7 @@ import {
   entryRatingReader,
   findMissingRequiredField,
   formatRuntime,
+  withUnit,
   isChallengeScheduled,
   isEmptySaveADelete,
   isLivingList,
@@ -1399,7 +1400,7 @@ function SelectedItemProperties({ item, library }: { item: ChallengeItem; librar
     ...(catalog.attributes ?? []).flatMap((attribute) => {
       const property = properties?.find((entry) => entry.storage === "attribute" && (entry.attributeKey ?? entry.key) === attribute.key);
       if (property?.hidden || attribute.value === "") return [];
-      return [attribute.type === "boolean" ? attribute.value ? tc("yes") : tc("no") : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value)];
+      return [attribute.type === "boolean" ? attribute.value ? tc("yes") : tc("no") : attribute.type === "date" ? f.date(String(attribute.value)) : attribute.type === "minutes" ? formatRuntime(Number(attribute.value)) ?? String(attribute.value) : withUnit(String(attribute.value), attribute.unit)];
     }),
   ];
   if (!details.length) return null;

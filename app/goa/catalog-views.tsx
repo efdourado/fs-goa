@@ -8,7 +8,7 @@ import { useGoaFormat } from "./format";
 import { StateButton } from "./state-button";
 import type { CatalogItem } from "./types";
 import { cx } from "./ui";
-import { formatRuntime } from "./utils";
+import { formatRuntime, withUnit } from "./utils";
 
 export const decadeOf = (year: number): string => `${Math.floor(year / 10) * 10}s`;
 
@@ -51,7 +51,9 @@ export function useCatalogPropertyText() {
     const parts = native.flatMap(([key, value]) => hidden.includes(key) || value == null || value === "" ? [] : [String(value)]);
     for (const attribute of item.attributes ?? []) {
       const value = attribute.type === "boolean" ? tc(attribute.value ? "yes" : "no")
-        : attribute.type === "date" ? f.date(String(attribute.value)) : String(attribute.value);
+        : attribute.type === "date" ? f.date(String(attribute.value))
+          : attribute.type === "minutes" ? formatRuntime(Number(attribute.value)) ?? String(attribute.value)
+            : withUnit(String(attribute.value), attribute.unit);
       parts.push(value);
     }
     return parts;

@@ -13,7 +13,7 @@ import { applyOrder, type OrderStrategy } from "./ordering";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "./organize-panel";
 import { useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
-import { itemIdForEntry, formatRuntime } from "./utils";
+import { itemIdForEntry, formatRuntime, withUnit } from "./utils";
 import { AddRow, Button, ChevronIcon, FaceEmptyState, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
 
 type Stage = ChallengeDetail["checkpoints"][number];
@@ -256,5 +256,5 @@ function ItemDetails({item, onClose}: {item: ChallengeItem; onClose: () => void}
   const t = useTranslations("cineItems");
   const data = item.catalogItem;
   const facts = [data?.author, data?.year, data?.pageCount != null ? t("pagesCount", {count: data.pageCount}) : null, formatRuntime(data?.runtimeMinutes), data?.mainGenre].filter((value) => value !== null && value !== undefined && value !== "");
-  return <Dialog title={item.title} onClose={onClose}>{item.description ? <p className="mb-4 text-sm">{item.description}</p> : null}<p className="text-sm text-[var(--muted)]">{facts.join(" · ")}</p><dl className="mt-4 space-y-3">{data?.attributes?.map((attribute) => <div key={attribute.key}><dt className="text-xs text-[var(--muted)]">{attribute.label}</dt><dd className="text-sm">{String(attribute.value)}</dd></div>)}</dl></Dialog>;
+  return <Dialog title={item.title} onClose={onClose}>{item.description ? <p className="mb-4 text-sm">{item.description}</p> : null}<p className="text-sm text-[var(--muted)]">{facts.join(" · ")}</p><dl className="mt-4 space-y-3">{data?.attributes?.map((attribute) => <div key={attribute.key}><dt className="text-xs text-[var(--muted)]">{attribute.label}</dt><dd className="text-sm">{attribute.type === "minutes" ? formatRuntime(Number(attribute.value)) : withUnit(String(attribute.value), attribute.unit)}</dd></div>)}</dl></Dialog>;
 }

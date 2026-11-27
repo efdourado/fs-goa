@@ -34,7 +34,7 @@ export function metricTheme(metric: { operation: MetricOperation; groupBy?: Metr
   return "ranking";
 }
 
-/** "105" → "1h45"; "45" → "45min"; "120" → "2h". */
+/** Minutes shown in hours: "105" → "1h45"; "45" → "45min"; "120" → "2h". */
 export function formatRuntime(minutes?: number | null): string | null {
   if (!minutes || minutes <= 0) return null;
   const hours = Math.floor(minutes / 60);
@@ -42,6 +42,11 @@ export function formatRuntime(minutes?: number | null): string | null {
   if (hours === 0) return `${rest}min`;
   if (rest === 0) return `${hours}h`;
   return `${hours}h${String(rest).padStart(2, "0")}`;
+}
+
+/** A number followed by its unit, when it has one ("12 km"). */
+export function withUnit(value: number | string, unit?: string | null): string {
+  return unit ? `${value} ${unit}` : String(value);
 }
 
 /** A metric worth rendering: a real scalar, or a series with ≥1 non-thin row. */
