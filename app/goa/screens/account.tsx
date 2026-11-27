@@ -26,7 +26,6 @@ export function AccountScreen({
   onSaveProfile,
   onChangePassword,
   onSetNameConsent,
-  onOpenTrash,
   onDeactivate,
   onDeletePermanently,
 }: {
@@ -38,7 +37,6 @@ export function AccountScreen({
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
   onSetNameConsent: (challengeId: string, consent: boolean) => Promise<void>;
-  onOpenTrash: () => void;
   onDeactivate: () => Promise<void>;
   onDeletePermanently: (password: string) => Promise<void>;
 }) {
@@ -237,14 +235,6 @@ export function AccountScreen({
           ) : (
             <p className="mt-3 text-sm text-[var(--muted)]">{t("nameConsentEmpty")}</p>
           )}
-        </section>
-
-        <section className="flex flex-wrap items-start justify-between gap-3 border-t border-[var(--line)] py-6">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold">{t("trashTitle")}</h2>
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("trashBody")}</p>
-          </div>
-          <Button variant="secondary" onClick={onOpenTrash}>{t("trashOpen")}</Button>
         </section>
       </div>
 
