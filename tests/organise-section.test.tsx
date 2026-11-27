@@ -16,11 +16,13 @@ const noop = async () => undefined;
 const plannerActions = { itemTools: { scope: "personal" as const, onAdd: noop, onUpdate: noop, onRemove: noop }, onAssign: noop, onSaveCheckpoints: noop };
 const bookProperties = new Map([["book", builtInProperties("book")]]);
 
-test("Itens e etapas mostra Organizar imediatamente à esquerda de Adicionar itens", () => {
+test("Itens e etapas põe Organizar com as ferramentas das etapas, no mesmo desenho de Distribuir em ordem", () => {
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     ...plannerActions, challenge: challenge([book("a", 2001, "X"), book("b", 2010, "Y"), book("c", 2020, "X")]), entries: [],
   }));
-  assert.match(html, /aria-label="Organizar"[^>]*h-10 w-10[^>]*rounded-full[^>]*><svg[^>]*>.*<span class="hidden sm:inline">Organizar<\/span><\/button><button[^>]*aria-label="Adicionar itens"/);
+  assert.match(html, /<button[^>]*class="[^"]*underline underline-offset-4[^"]*"[^>]*>Organizar<\/button>/);
+  assert.doesNotMatch(html, /aria-label="Organizar"/, "não fica mais no cabeçalho, ao lado de Adicionar itens");
+  assert.match(html, /aria-label="Adicionar itens"/);
 });
 
 test("sem itens livres suficientes (os registrados ficam no lugar), Organizar não aparece", () => {
@@ -28,7 +30,7 @@ test("sem itens livres suficientes (os registrados ficam no lugar), Organizar n�
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     ...plannerActions, challenge: challenge(items), entries: [{ id: "e", itemId: "a", values: {} }] as never,
   }));
-  assert.doesNotMatch(html, /aria-label="Organizar"/);
+  assert.doesNotMatch(html, />Organizar<\/button>/);
   assert.match(html, /aria-label="Adicionar itens"/);
 });
 

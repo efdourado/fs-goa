@@ -611,7 +611,8 @@ test("planejador de etapas: mostra a distribuição e omite o total de duração
   assert.match(html, /Semana 3/);
   assert.doesNotMatch(html, /1h40/, "a duração do filme atribuído não aparece no cabeçalho da etapa");
   assert.match(html, /Distribuir em ordem/, "oferece a distribuição sequencial");
-  assert.match(html, /Sortear dentro de cada/);
+  assert.doesNotMatch(html, /Sortear tudo|Sortear dentro de cada/, "os sorteios saíram");
+  assert.match(html, /Esvaziar etapas/, "e há como esvaziar as etapas de uma vez");
   assert.match(html, /Sem etapa/, "há um balde para itens sem etapa");
   assert.doesNotMatch(html, /<option value="(week|session|milestone|day)"/, "etapas não têm mais um tipo para escolher");
   assert.match(html, /aria-label="Etapa de Filme B"/, "um item sem etapa pode ser movido a partir da caixa Sem etapa");

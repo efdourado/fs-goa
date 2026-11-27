@@ -306,8 +306,33 @@ test('adding to a challenge marks the catalogue items it already holds, while a 
   await ui.fill(document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!, 'renamed in the catalogue');
   // Typing a name the challenge already has makes a new item (its own id), so nothing blocks it.
   const typed = document.querySelector<HTMLInputElement>('dialog input[maxlength="160"]')!;
-  assert.equal(typed.getAttribute('aria-invalid'), 'true');
-  assert.equal(typed.parentElement!.querySelector<HTMLButtonElement>('button')!.disabled, true);
+  assert.equal(typed.getAttribute('aria-invalid'), null);
+  assert.equal(typed.parentElement!.querySelector<HTMLButtonElement>('button')!.disabled, false);
+ } finally {await ui.cleanup();}
+});
+
+test('emptying the stages asks first, then keeps every stage and sends their items back to the list in order', async () => {
+ const ui = await setup(); const saved: unknown[] = [];
+ try {
+  await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(values);}} />);
+  assert.equal(document.body.textContent!.includes('Sortear'), false);
+  await act(async () => ui.button('Esvaziar etapas').click());
+  assert.equal(saved.length, 0, 'nothing changes before the confirmation');
+  assert.match(document.querySelector('dialog')!.textContent!, /Todas as etapas continuam/);
+  await act(async () => ui.button('Esvaziar').click());
+  assert.deepEqual(saved[0], [{itemId:'one',checkpointId:null,position:0},{itemId:'two',checkpointId:null,position:1},{itemId:'three',checkpointId:null,position:2}]);
+ } finally {await ui.cleanup();}
+});
+
+test('distributing in order explains itself in a modal before dealing the items out', async () => {
+ const ui = await setup(); const saved: unknown[] = [];
+ try {
+  await ui.render(<CheckpointPlanner challenge={challenge} onSaveCheckpoints={noop} onAssign={async (values) => {saved.push(values);}} />);
+  await act(async () => ui.button('Distribuir em ordem').click());
+  assert.equal(saved.length, 0);
+  assert.match(document.querySelector('dialog')!.textContent!, /como quem dá cartas/);
+  await act(async () => ui.button('Distribuir').click());
+  assert.deepEqual(saved[0], [{itemId:'one',checkpointId:'a',position:0},{itemId:'two',checkpointId:'b',position:1},{itemId:'three',checkpointId:'a',position:2}]);
  } finally {await ui.cleanup();}
 });
 

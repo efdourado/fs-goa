@@ -5,7 +5,7 @@ import { StateButton } from "./state-button";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AddItemsDialog } from "./cine-items";
-import { Dialog, FormDialog } from "./dialog";
+import { ConfirmDialog, Dialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { ItemEditorDialog } from "./item-editor-dialog";
 import type { CatalogScope } from "./libraries";
@@ -15,6 +15,9 @@ import { useLibrariesProperties, useNativePropertyName } from "./property-inputs
 import type { ChallengeDetail, ChallengeItem, ChallengeItemInput, CheckpointInput, Entry, Id, Member } from "./types";
 import { itemIdForEntry, formatRuntime, withUnit } from "./utils";
 import { AddRow, Button, ChevronIcon, FaceEmptyState, Field, inputClass, ListMoreButton, rowIconClass, Select, SlidersIcon, StatusMessage } from "./ui";
+
+/** The stage tools under the list (Organise, distribute, empty): quiet underlined words. */
+const toolClass = "cursor-pointer underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-45";
 
 type Stage = ChallengeDetail["checkpoints"][number];
 const ITEM_BATCH_SIZE = 12;
@@ -54,7 +57,8 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [seed, setSeed] = useState(0);
+  // Distributing and emptying change every stage at once, so each first says what it does.
+  const [asking, setAsking] = useState<"distribute" | "empty" | null>(null);
   const organiseLibraries = !locked && challenge.submissionMode === "item" ? challenge.libraries ?? [] : [];
   const propertiesByKind = useLibrariesProperties(organiseLibraries);
   const organiseInput = propertiesByKind.size ? organiseFromItems(
@@ -76,7 +80,11 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
   }
   function organise(strategy: OrderStrategy) {
     const next = applyOrder(items.map((item, position) => ({key: item.id, checkpointId: item.checkpointId ?? null, position})), strategy);
-    void run(() => onAssign(next.map((item, position) => ({itemId: item.key, checkpointId: item.checkpointId, position}))));
+    return run(() => onAssign(next.map((item, position) => ({itemId: item.key, checkpointId: item.checkpointId, position}))));
+  }
+  /** Every stage stays, emptied: its items go back to the list, in the order they had. */
+  function emptyStages() {
+    return run(() => onAssign(items.map((item, position) => ({ itemId: item.id, checkpointId: null, position }))));
   }
   function applyOrganisedOrder(order: string[]) {
     return run(async () => {
@@ -110,27 +118,14 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
     );
   }
   const stageIds = new Set(stages.map((stage) => stage.id));
+  const canDistribute = !locked && !autoDays && stages.length > 1;
+  const canEmpty = !locked && !autoDays && stages.length > 0;
   const loose = items.filter((item) => !item.checkpointId || !stageIds.has(item.checkpointId));
   return <div className="mx-auto max-w-2xl">
     <div className="mb-7 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
       <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{t("title")}</h1>
-      {showOrganise || showAdd ? (
+      {showAdd ? (
         <div className="flex items-center gap-2">
-          {showOrganise ? (
-            <StateButton
-              type="button"
-              aria-label={to("button")}
-              title={to("button")}
-              className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center gap-1.5 rounded-full border border-[var(--line)] text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:px-3.5"
-              disabled={busy}
-              onClick={() => setOrganising(true)}
-            >
-              <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                <path d="M4.5 16v-5M10 16V4M15.5 16V8" />
-              </svg>
-              <span className="hidden sm:inline">{to("button")}</span>
-            </StateButton>
-          ) : null}
           {showAdd ? <StateButton type="button" aria-label={ti("addItems")} title={ti("addItems")} onClick={() => setAddingItems(true)} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></StateButton> : null}
         </div>
       ) : null}
@@ -169,16 +164,35 @@ export function CheckpointPlanner({ challenge, entries = [], itemTools, onSaveCh
         </section>;
       })}
       {!locked && !autoDays ? <AddRow label={t("stageWord")} ariaLabel={t("addCheckpoint")} onClick={() => setEditingStage("new")} /> : null}
-      {!locked && !autoDays && stages.length > 1 ? <div className="flex flex-wrap gap-3 text-xs text-[var(--muted)]">
-        <StateButton type="button" disabled={busy} className="cursor-pointer underline underline-offset-4" onClick={() => organise({kind: "distribute", checkpointIds: stages.map((stage) => stage.id)})}>{t("distribute")}</StateButton>
-        <StateButton type="button" disabled={busy} className="cursor-pointer underline underline-offset-4" onClick={() => {setSeed(seed + 1); organise({kind: "shuffle", seed: `all-${seed + 1}`});}}>{t("shuffleAll")}</StateButton>
-        <StateButton type="button" disabled={busy} className="cursor-pointer underline underline-offset-4" onClick={() => organise({kind: "shuffle_within", seed: crypto.randomUUID()})}>{t("shuffleWithin")}</StateButton>
+      {showOrganise || canDistribute || canEmpty ? <div className="flex flex-wrap gap-3 text-xs text-[var(--muted)]">
+        {showOrganise ? <StateButton type="button" disabled={busy} className={toolClass} onClick={() => setOrganising(true)}>{to("button")}</StateButton> : null}
+        {canDistribute ? <StateButton type="button" disabled={busy} className={toolClass} onClick={() => setAsking("distribute")}>{t("distribute")}</StateButton> : null}
+        {canEmpty ? <StateButton type="button" disabled={busy || !items.some((item) => item.checkpointId && stageIds.has(item.checkpointId))} className={toolClass} onClick={() => setAsking("empty")}>{t("emptyStages")}</StateButton> : null}
       </div> : null}
     </div>
     {editingStage ? <StageEditor stage={editingStage === "new" ? undefined : editingStage} hasDeadline={Boolean(challenge.endsOn)} onCancel={() => setEditingStage(null)} onSave={async (value) => {await onSaveCheckpoints(editingStage === "new" ? [...stages.map(stageInput), value] : stages.map((stage) => stage.id === editingStage.id ? value : stageInput(stage))); setEditingStage(null);}} onRemove={editingStage === "new" ? undefined : async () => {await onSaveCheckpoints(stages.filter((stage) => stage.id !== editingStage.id).map(stageInput)); setEditingStage(null);}} /> : null}
     {assigning ? <StageItemsDialog stage={assigning} stages={stages} items={items} onCancel={() => setAssigning(null)} onSave={async (selected) => {await onAssign(items.map((item, position) => ({itemId: item.id, position, checkpointId: selected.has(item.id) ? assigning.id : item.checkpointId === assigning.id ? null : item.checkpointId ?? null}))); setAssigning(null); setOpen((current) => new Set([...current, assigning.id]));}} /> : null}
     {movingItem ? <MoveItemDialog item={movingItem} stages={stages} onCancel={() => setMovingItem(null)} onSave={async (checkpointId) => {await onAssign([{itemId: movingItem.id, position: movingItem.position ?? items.indexOf(movingItem), checkpointId}]); setMovingItem(null);}} /> : null}
     {addingItems && itemTools ? <AddItemsDialog members={itemTools.members ?? []} held={items.map((item) => ({ title: item.title, catalogItemId: item.catalogItem?.id }))} scope={itemTools.scope} libraries={challenge.libraries ?? []} checkpoints={autoDays ? undefined : stages} onClose={() => setAddingItems(false)} onAdd={async (added) => {await itemTools.onAdd(added); setAddingItems(false);}} /> : null}
+    {asking === "distribute" ? (
+      <ConfirmDialog
+        title={t("distribute")}
+        body={t("distributeBody", { count: stages.length })}
+        confirmLabel={t("distributeConfirm")}
+        onClose={() => setAsking(null)}
+        onConfirm={async () => { await organise({ kind: "distribute", checkpointIds: stages.map((stage) => stage.id) }); setAsking(null); }}
+      />
+    ) : null}
+    {asking === "empty" ? (
+      <ConfirmDialog
+        title={t("emptyStages")}
+        body={t("emptyStagesBody")}
+        confirmLabel={t("emptyStagesConfirm")}
+        danger
+        onClose={() => setAsking(null)}
+        onConfirm={async () => { await emptyStages(); setAsking(null); }}
+      />
+    ) : null}
     {organising && showOrganise && organiseInput ? (
       <OrganiseDialog input={organiseInput} busy={busy} onClose={() => setOrganising(false)} onApply={applyOrganisedOrder} />
     ) : null}
