@@ -4,6 +4,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, publicId, semanticKey, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { dateKeyInTimeZone } from "../domain/shared";
 import { MAX_LIBRARY_ITEMS } from "../domain/item-limits";
 import { deleteCheckpointsHard } from "../hard-delete";
 
@@ -21,6 +22,9 @@ interface CheckpointInput {
   description: string | null;
   startsAt: string | null;
   dueAt: string | null;
+  /** The calendar days as sent, when a plain date (YYYY-MM-DD) came instead of an instant. */
+  startsDay: string | null;
+  dueDay: string | null;
 }
 
 function readCheckpointInput(raw: unknown, index: number): CheckpointInput {
@@ -49,7 +53,46 @@ function readCheckpointInput(raw: unknown, index: number): CheckpointInput {
     description,
     startsAt,
     dueAt,
+    startsDay: plainDay(record.startsAt ?? record.opensAt),
+    dueDay: plainDay(record.dueAt),
   };
+}
+
+function plainDay(value: unknown): string | null {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+/**
+ * A stage lives inside its challenge: neither its start nor its end can fall before the challenge starts or
+ * after it ends. A plain date is compared as sent; an instant by its day in the challenge's time zone. A
+ * challenge without one of the dates has no bound on that side.
+ */
+function assertInsidePeriod(
+  inputs: CheckpointInput[],
+  period: { start: string | null; end: string | null; timeZone: string },
+  saved: Map<string, { starts_at: Date | null; due_at: Date | null }>,
+): void {
+  const dayOf = (instant: string | null, day: string | null) =>
+    day ?? (instant ? dateKeyInTimeZone(new Date(instant), period.timeZone) : null);
+  // Only a date being set or changed is checked: a stage saved before this rule never blocks saving the others.
+  const unchanged = (instant: string | null, stored: Date | null | undefined) =>
+    stored !== undefined && (instant === null ? stored === null : stored !== null && new Date(instant).getTime() === stored.getTime());
+  inputs.forEach((input, index) => {
+    const before = input.id ? saved.get(input.id) : undefined;
+    const days = [
+      unchanged(input.startsAt, before?.starts_at) ? null : dayOf(input.startsAt, input.startsDay),
+      unchanged(input.dueAt, before?.due_at) ? null : dayOf(input.dueAt, input.dueDay),
+    ];
+    for (const day of days) {
+      if (!day) continue;
+      if (period.start && day < period.start) {
+        throw new ApiError(400, "checkpoint_outside_period", `A etapa ${index + 1} não pode começar ou terminar antes do início do desafio.`);
+      }
+      if (period.end && day > period.end) {
+        throw new ApiError(400, "checkpoint_outside_period", `A etapa ${index + 1} não pode começar ou terminar depois do fim do desafio.`);
+      }
+    }
+  });
 }
 
 function normalizeInstant(value: unknown, label: string): string | null {
@@ -125,11 +168,16 @@ export async function saveCheckpoints(
     await assertManualCheckpointsAllowed(client, challengeId);
 
     const existing = (
-      await client.query<{ id: string; title: string; semantic_key: string }>(
-        "SELECT id, title, semantic_key FROM challenge_checkpoints WHERE challenge_id = $1 AND archived_at IS NULL",
+      await client.query<{ id: string; title: string; semantic_key: string; starts_at: Date | null; due_at: Date | null }>(
+        "SELECT id, title, semantic_key, starts_at, due_at FROM challenge_checkpoints WHERE challenge_id = $1 AND archived_at IS NULL",
         [challengeId],
       )
     ).rows;
+    assertInsidePeriod(
+      inputs,
+      { start: access.challenge.start_date, end: access.challenge.end_date, timeZone: access.challenge.time_zone },
+      new Map(existing.map((row) => [row.id, row])),
+    );
     const existingById = new Map(existing.map((row) => [row.id, row]));
     const keptIds = new Set(inputs.filter((input) => input.id).map((input) => input.id as string));
 

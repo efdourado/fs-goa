@@ -152,6 +152,7 @@
     "operation": "We couldn't complete that.",
     "network": "Couldn't reach the server. Check your connection.",
     "byCode": {
+      "checkpoint_outside_period": "The stage dates must fall within the challenge period.",
       "item_already_in_challenge": "That item is already in this challenge.",
       "date_range": "That day is outside the challenge's period.",
       "conflict": "A record with this data already exists.",

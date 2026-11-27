@@ -152,6 +152,7 @@
     "operation": "Não foi possível concluir a operação.",
     "network": "Não foi possível falar com o servidor. Verifique sua conexão.",
     "byCode": {
+      "checkpoint_outside_period": "As datas da etapa precisam ficar dentro do período do desafio.",
       "item_already_in_challenge": "Esse item já está neste desafio.",
       "date_range": "Esse dia está fora do período do desafio.",
       "conflict": "Já existe um registro com esses dados.",

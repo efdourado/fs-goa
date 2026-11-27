@@ -4610,6 +4610,33 @@ test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desc
   assert.equal((tooMany.body as { error: string }).error, "json_too_large");
 });
 
+test("uma etapa não começa nem termina fora do período do desafio, e uma antiga fora dele não trava as outras", async () => {
+  const owner = await register("Dona Prazo", "dona_prazo_etapa");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do Prazo" } })).body as { id: string }).id;
+  const challengeId = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Março", participantIds: [owner.user.id], startsOn: "2026-03-02", endsOn: "2026-03-29", items: [{ title: "Filme" }] },
+  })).body as { id: string }).id;
+  const save = (checkpoints: Array<Record<string, unknown>>) => call("POST", `/api/challenges/${challengeId}/checkpoints`, { session: owner, body: { checkpoints } });
+
+  const late = await save([{ title: "Semana 4", startsAt: "2026-03-23", dueAt: "2026-04-05" }]);
+  assert.equal(late.response.status, 400, "o fim depois do fim do desafio é recusado");
+  assert.equal((late.body as { error: string }).error, "checkpoint_outside_period");
+  const early = await save([{ title: "Semana 0", startsAt: "2026-02-23", dueAt: "2026-03-01" }]);
+  assert.equal((early.body as { error: string }).error, "checkpoint_outside_period", "o início antes do início do desafio é recusado");
+  const edges = await save([{ title: "Tudo", startsAt: "2026-03-02", dueAt: "2026-03-29" }]);
+  assert.equal(edges.response.status, 200, "os próprios dias do desafio valem");
+
+  // Uma etapa gravada fora do período antes da regra: salvar as outras continua possível, mexer nas datas dela não.
+  const stage = (edges.body as { checkpoints: Array<{ id: string }> }).checkpoints[0].id;
+  await adminPool.query("UPDATE challenge_checkpoints SET due_at = '2026-04-10T03:00:00Z' WHERE id = $1", [stage]);
+  const stored = (await adminPool.query<{ due_at: Date }>("SELECT due_at FROM challenge_checkpoints WHERE id = $1", [stage])).rows[0].due_at.toISOString();
+  const others = await save([{ id: stage, title: "Tudo", startsAt: "2026-03-02", dueAt: stored }, { title: "Extra", startsAt: "2026-03-09", dueAt: "2026-03-15" }]);
+  assert.equal(others.response.status, 200, JSON.stringify(others.body));
+  const moved = await save([{ id: stage, title: "Tudo", startsAt: "2026-03-02", dueAt: "2026-04-12" }]);
+  assert.equal((moved.body as { error: string }).error, "checkpoint_outside_period");
+});
+
 test("checkpoints genéricos: semanas com pausa, atribuição de itens, total de duração, e nada de registro órfão", async () => {
   const owner = await register("Dona Semana", "dona_semana_cp");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Semanal" } })).body as { id: string }).id;
